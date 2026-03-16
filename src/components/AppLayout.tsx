@@ -1,7 +1,8 @@
 import { ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { BarChart3, LayoutDashboard, Receipt, CreditCard, Package, Lightbulb, Settings, LogOut, Menu, X } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
@@ -14,7 +15,14 @@ const navItems = [
 
 const AppLayout = ({ children }: { children: ReactNode }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -45,10 +53,10 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
             );
           })}
         </nav>
-        <Link to="/" className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+        <button onClick={handleSignOut} className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
           <LogOut className="h-4 w-4" />
           Déconnexion
-        </Link>
+        </button>
       </aside>
 
       {/* Mobile header */}
@@ -84,6 +92,13 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
                 </Link>
               );
             })}
+            <button
+              onClick={handleSignOut}
+              className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors w-full"
+            >
+              <LogOut className="h-4 w-4" />
+              Déconnexion
+            </button>
           </div>
         </div>
       )}
