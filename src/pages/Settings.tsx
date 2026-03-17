@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User, Bell, CreditCard, Users, Shield, ChevronRight, Camera, Loader2, Check,
-  Plus, Trash2, Lock, Eye, EyeOff, LogOut
+  Plus, Trash2, Lock, Eye, EyeOff, LogOut, Pencil, X
 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
