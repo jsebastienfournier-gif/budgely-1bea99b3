@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Upload, Camera, FileText, ChevronRight, Mail, Landmark, RefreshCw, Plus, Check, Loader2 } from "lucide-react";
+import { Upload, Camera, FileText, ChevronRight, Mail, Landmark, RefreshCw, Plus, Check, Loader2, X, ShoppingCart } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,12 +12,45 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 type ConnectedEmail = { id: string; email: string; provider: string; label: string | null; status: string; last_sync_at: string | null };
 type ConnectedBank = { id: string; bank_name: string; account_label: string | null; account_type: string | null; status: string; last_sync_at: string | null };
 
-const receipts = [
-  { id: 1, store: "Carrefour", date: "16 mars 2026", total: "€67.40", items: 12, status: "Analysé" },
-  { id: 2, store: "Leclerc", date: "13 mars 2026", total: "€89.20", items: 18, status: "Analysé" },
-  { id: 3, store: "Auchan", date: "10 mars 2026", total: "€45.60", items: 8, status: "Analysé" },
-  { id: 4, store: "Lidl", date: "7 mars 2026", total: "€34.80", items: 10, status: "Analysé" },
-  { id: 5, store: "Carrefour", date: "2 mars 2026", total: "€72.15", items: 14, status: "Analysé" },
+type ReceiptProduct = { name: string; qty: number; unit: string; unitPrice: number; total: number; pricePerUnit?: string };
+type Receipt = { id: number; store: string; date: string; total: string; items: number; status: string; products: ReceiptProduct[] };
+
+const receipts: Receipt[] = [
+  { id: 1, store: "Carrefour", date: "16 mars 2026", total: "€67.40", items: 12, status: "Analysé", products: [
+    { name: "Lait demi-écrémé 1L", qty: 2, unit: "L", unitPrice: 1.15, total: 2.30, pricePerUnit: "1,15 €/L" },
+    { name: "Pain de mie complet", qty: 1, unit: "pce", unitPrice: 1.89, total: 1.89 },
+    { name: "Poulet fermier 1,2kg", qty: 1, unit: "kg", unitPrice: 9.90, total: 11.88, pricePerUnit: "9,90 €/kg" },
+    { name: "Tomates grappe 1kg", qty: 1, unit: "kg", unitPrice: 2.49, total: 2.49, pricePerUnit: "2,49 €/kg" },
+    { name: "Pâtes penne 500g", qty: 2, unit: "pce", unitPrice: 1.25, total: 2.50, pricePerUnit: "2,50 €/kg" },
+    { name: "Huile d'olive 75cl", qty: 1, unit: "L", unitPrice: 6.99, total: 6.99, pricePerUnit: "9,32 €/L" },
+    { name: "Yaourts nature x8", qty: 1, unit: "pce", unitPrice: 2.10, total: 2.10 },
+    { name: "Bananes 1,5kg", qty: 1, unit: "kg", unitPrice: 1.99, total: 2.99, pricePerUnit: "1,99 €/kg" },
+    { name: "Fromage râpé 200g", qty: 1, unit: "pce", unitPrice: 2.15, total: 2.15, pricePerUnit: "10,75 €/kg" },
+    { name: "Eau minérale 6x1,5L", qty: 1, unit: "pce", unitPrice: 3.20, total: 3.20, pricePerUnit: "0,36 €/L" },
+    { name: "Beurre doux 250g", qty: 1, unit: "pce", unitPrice: 2.49, total: 2.49, pricePerUnit: "9,96 €/kg" },
+    { name: "Céréales muesli 450g", qty: 1, unit: "pce", unitPrice: 3.89, total: 3.89, pricePerUnit: "8,64 €/kg" },
+  ]},
+  { id: 2, store: "Leclerc", date: "13 mars 2026", total: "€89.20", items: 18, status: "Analysé", products: [
+    { name: "Steak haché 5% x4", qty: 1, unit: "pce", unitPrice: 5.99, total: 5.99, pricePerUnit: "14,98 €/kg" },
+    { name: "Saumon frais 300g", qty: 1, unit: "pce", unitPrice: 6.50, total: 6.50, pricePerUnit: "21,67 €/kg" },
+    { name: "Pommes de terre 2,5kg", qty: 1, unit: "kg", unitPrice: 1.59, total: 3.98, pricePerUnit: "1,59 €/kg" },
+    { name: "Lessive liquide 3L", qty: 1, unit: "L", unitPrice: 8.99, total: 8.99, pricePerUnit: "3,00 €/L" },
+  ]},
+  { id: 3, store: "Auchan", date: "10 mars 2026", total: "€45.60", items: 8, status: "Analysé", products: [
+    { name: "Riz basmati 1kg", qty: 2, unit: "kg", unitPrice: 2.29, total: 4.58, pricePerUnit: "2,29 €/kg" },
+    { name: "Sauce tomate 500g", qty: 1, unit: "pce", unitPrice: 1.49, total: 1.49, pricePerUnit: "2,98 €/kg" },
+    { name: "Café moulu 250g", qty: 1, unit: "pce", unitPrice: 3.99, total: 3.99, pricePerUnit: "15,96 €/kg" },
+  ]},
+  { id: 4, store: "Lidl", date: "7 mars 2026", total: "€34.80", items: 10, status: "Analysé", products: [
+    { name: "Œufs plein air x10", qty: 1, unit: "pce", unitPrice: 2.89, total: 2.89 },
+    { name: "Jambon blanc x4", qty: 1, unit: "pce", unitPrice: 2.19, total: 2.19, pricePerUnit: "10,95 €/kg" },
+    { name: "Carottes 1kg", qty: 2, unit: "kg", unitPrice: 0.99, total: 1.98, pricePerUnit: "0,99 €/kg" },
+  ]},
+  { id: 5, store: "Carrefour", date: "2 mars 2026", total: "€72.15", items: 14, status: "Analysé", products: [
+    { name: "Filet de dinde 500g", qty: 1, unit: "pce", unitPrice: 4.99, total: 4.99, pricePerUnit: "9,98 €/kg" },
+    { name: "Courgettes 1kg", qty: 1, unit: "kg", unitPrice: 2.29, total: 2.29, pricePerUnit: "2,29 €/kg" },
+    { name: "Crème fraîche 20cl", qty: 2, unit: "pce", unitPrice: 1.15, total: 2.30, pricePerUnit: "5,75 €/L" },
+  ]},
 ];
 
 const emailProviders = [
@@ -46,7 +80,7 @@ const Receipts = () => {
   const [newBankName, setNewBankName] = useState("");
   const [newBankLabel, setNewBankLabel] = useState("");
   const [saving, setSaving] = useState(false);
-
+  const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
   useEffect(() => {
     if (!user) return;
     const load = async () => {
@@ -276,7 +310,7 @@ const Receipts = () => {
         <div className="bg-card rounded-2xl border border-border overflow-hidden">
           <div className="divide-y divide-border">
             {receipts.map((r) => (
-              <div key={r.id} className="grid grid-cols-[1fr_auto_auto_auto] md:grid-cols-[auto_1fr_auto_auto_auto] gap-4 p-4 items-center hover:bg-secondary/50 transition-colors cursor-pointer">
+              <div key={r.id} onClick={() => setSelectedReceipt(r)} className="grid grid-cols-[1fr_auto_auto_auto] md:grid-cols-[auto_1fr_auto_auto_auto] gap-4 p-4 items-center hover:bg-secondary/50 transition-colors cursor-pointer">
                 <div className="hidden md:flex h-10 w-10 rounded-xl bg-secondary items-center justify-center text-sm font-bold text-foreground">
                   {r.store[0]}
                 </div>
@@ -384,6 +418,68 @@ const Receipts = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Receipt detail sheet */}
+      <Sheet open={!!selectedReceipt} onOpenChange={(open) => !open && setSelectedReceipt(null)}>
+        <SheetContent className="sm:max-w-lg overflow-y-auto">
+          {selectedReceipt && (
+            <>
+              <SheetHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
+                    {selectedReceipt.store[0]}
+                  </div>
+                  <div>
+                    <SheetTitle className="text-lg">{selectedReceipt.store}</SheetTitle>
+                    <p className="text-xs text-muted-foreground">{selectedReceipt.date} · {selectedReceipt.items} articles</p>
+                  </div>
+                </div>
+              </SheetHeader>
+
+              {/* Summary bar */}
+              <div className="flex items-center justify-between bg-secondary/50 rounded-xl px-4 py-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">{selectedReceipt.products.length} produits</span>
+                </div>
+                <span className="text-base font-bold text-foreground">{selectedReceipt.total}</span>
+              </div>
+
+              {/* Products list */}
+              <div className="space-y-1">
+                {/* Header */}
+                <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <span>Produit</span>
+                  <span className="text-right w-20">Prix unit.</span>
+                  <span className="text-right w-16">Total</span>
+                </div>
+
+                {selectedReceipt.products.map((p, i) => (
+                  <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2.5 rounded-lg hover:bg-secondary/50 transition-colors items-center">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{p.name}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] text-muted-foreground">Qté: {p.qty}</span>
+                        {p.pricePerUnit && (
+                          <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">{p.pricePerUnit}</span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-xs tabular-nums text-muted-foreground text-right w-20">{p.unitPrice.toFixed(2)} €</span>
+                    <span className="text-sm tabular-nums font-semibold text-foreground text-right w-16">{p.total.toFixed(2)} €</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Total bar */}
+              <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
+                <span className="text-sm font-medium text-muted-foreground">Total</span>
+                <span className="text-lg font-bold text-foreground">{selectedReceipt.total}</span>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </AppLayout>
   );
 };
