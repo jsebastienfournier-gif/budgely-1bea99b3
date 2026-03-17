@@ -20,6 +20,36 @@ const Transactions = () => {
           <p className="text-sm text-muted-foreground mt-1">Comprenez où va votre argent</p>
         </div>
 
+        <div className="grid grid-cols-3 gap-4 mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="bg-card rounded-2xl border border-border p-4 text-center"
+          >
+            <p className="text-xs text-muted-foreground mb-1">Dépenses du mois</p>
+            <p className="text-lg font-bold text-foreground">2 340 €</p>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-card rounded-2xl border border-border p-4 text-center"
+          >
+            <p className="text-xs text-muted-foreground mb-1">Évolution vs mois dernier</p>
+            <p className="text-lg font-bold text-destructive">+8,2 %</p>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="bg-card rounded-2xl border border-border p-4 text-center"
+          >
+            <p className="text-xs text-muted-foreground mb-1">Catégorie principale</p>
+            <p className="text-lg font-bold text-foreground">🛒 Alimentation</p>
+          </motion.div>
+        </div>
+
         <div className="space-y-3">
           {categories.map((cat, i) => (
             <motion.div
