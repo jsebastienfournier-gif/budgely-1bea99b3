@@ -149,6 +149,38 @@ const Settings = () => {
     loadMembers();
   }, [user]);
 
+  // Load connected emails & banks
+  useEffect(() => {
+    if (!user) return;
+    const loadConnections = async () => {
+      setLoadingEmails(true);
+      setLoadingBanks(true);
+      const [emailRes, bankRes] = await Promise.all([
+        supabase.from("connected_emails").select("*").eq("user_id", user.id).order("created_at"),
+        supabase.from("connected_bank_accounts").select("*").eq("user_id", user.id).order("created_at"),
+      ]);
+      setConnectedEmails((emailRes.data as ConnectedEmail[]) || []);
+      setConnectedBanks((bankRes.data as ConnectedBank[]) || []);
+      setLoadingEmails(false);
+      setLoadingBanks(false);
+    };
+    loadConnections();
+  }, [user]);
+
+  const handleDeleteEmail = async (id: string) => {
+    const { error } = await supabase.from("connected_emails").delete().eq("id", id);
+    if (error) { toast.error("Erreur lors de la suppression"); return; }
+    setConnectedEmails(prev => prev.filter(e => e.id !== id));
+    toast.success("Email supprimé");
+  };
+
+  const handleDeleteBank = async (id: string) => {
+    const { error } = await supabase.from("connected_bank_accounts").delete().eq("id", id);
+    if (error) { toast.error("Erreur lors de la suppression"); return; }
+    setConnectedBanks(prev => prev.filter(b => b.id !== id));
+    toast.success("Compte bancaire supprimé");
+  };
+
   const handleAddMember = async () => {
     if (!newMemberName.trim() || !user) return;
     setAddingMember(true);
