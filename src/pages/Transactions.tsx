@@ -1,5 +1,8 @@
 import { motion } from "framer-motion";
+import { AlertTriangle, Copy, TrendingUp, CreditCard } from "lucide-react";
+import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
+import { Badge } from "@/components/ui/badge";
 
 const categories = [
   { name: "Alimentation", emoji: "🛒", percent: 35, color: "hsl(var(--savings))" },
@@ -77,6 +80,57 @@ const Transactions = () => {
               </div>
             </motion.div>
           ))}
+        </div>
+
+        {/* Détections automatiques */}
+        <div className="mt-10">
+          <h2 className="text-lg font-bold text-foreground mb-1">Détections automatiques</h2>
+          <p className="text-xs text-muted-foreground mb-4">Anomalies et tendances repérées dans vos dépenses</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {[
+              {
+                icon: AlertTriangle,
+                title: "Frais bancaires anormaux",
+                desc: "Des frais inhabituels de 12,50 € ont été détectés le 8 mars sur votre compte courant.",
+              },
+              {
+                icon: Copy,
+                title: "Doublons potentiels",
+                desc: "2 transactions similaires de 29,99 € chez Netflix repérées à 3 jours d'intervalle.",
+              },
+              {
+                icon: TrendingUp,
+                title: "Catégorie en hausse",
+                desc: "Vos dépenses Restaurants ont augmenté de 22 % par rapport au mois dernier.",
+              },
+              {
+                icon: CreditCard,
+                title: "Abonnements repérés",
+                desc: "4 abonnements récurrents détectés pour un total de 52 €/mois.",
+              },
+            ].map((item, i) => (
+              <motion.div
+                key={item.title}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className="bg-card rounded-2xl border border-border p-4 flex gap-3 items-start"
+              >
+                <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                  <item.icon className="h-4 w-4 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground leading-tight">{item.title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{item.desc}</p>
+                  <Link to="/insights">
+                    <Badge variant="secondary" className="mt-2 text-[10px] font-medium cursor-pointer hover:bg-secondary/80">
+                      Voir dans Optimisation
+                    </Badge>
+                  </Link>
+                </div>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </div>
     </AppLayout>
