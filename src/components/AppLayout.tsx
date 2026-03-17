@@ -1,8 +1,9 @@
 import { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { BarChart3, LayoutDashboard, Receipt, CreditCard, Package, Lightbulb, Settings, LogOut, Menu, X } from "lucide-react";
+import { BarChart3, LayoutDashboard, Receipt, CreditCard, Package, Lightbulb, Settings, LogOut, Menu, X, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 
 const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
@@ -18,6 +19,12 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { signOut } = useAuth();
+  const { isAdmin } = useIsAdmin();
+
+  const allNavItems = [
+    ...navItems,
+    ...(isAdmin ? [{ to: "/admin", icon: ShieldCheck, label: "Administration" }] : []),
+  ];
 
   const handleSignOut = async () => {
     await signOut();
@@ -35,7 +42,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
           <span className="text-lg font-semibold text-foreground">Budgely</span>
         </Link>
         <nav className="flex-1 space-y-1">
-          {navItems.map((item) => {
+          {allNavItems.map((item) => {
             const active = location.pathname === item.to;
             return (
               <Link
@@ -76,7 +83,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-40 bg-background/80 backdrop-blur-sm" onClick={() => setMobileOpen(false)}>
           <div className="absolute top-14 left-0 right-0 bg-card border-b border-border p-4 space-y-1" onClick={(e) => e.stopPropagation()}>
-            {navItems.map((item) => {
+            {allNavItems.map((item) => {
               const active = location.pathname === item.to;
               return (
                 <Link
