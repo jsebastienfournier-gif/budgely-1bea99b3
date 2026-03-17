@@ -418,6 +418,68 @@ const Receipts = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Receipt detail sheet */}
+      <Sheet open={!!selectedReceipt} onOpenChange={(open) => !open && setSelectedReceipt(null)}>
+        <SheetContent className="sm:max-w-lg overflow-y-auto">
+          {selectedReceipt && (
+            <>
+              <SheetHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
+                    {selectedReceipt.store[0]}
+                  </div>
+                  <div>
+                    <SheetTitle className="text-lg">{selectedReceipt.store}</SheetTitle>
+                    <p className="text-xs text-muted-foreground">{selectedReceipt.date} · {selectedReceipt.items} articles</p>
+                  </div>
+                </div>
+              </SheetHeader>
+
+              {/* Summary bar */}
+              <div className="flex items-center justify-between bg-secondary/50 rounded-xl px-4 py-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">{selectedReceipt.products.length} produits</span>
+                </div>
+                <span className="text-base font-bold text-foreground">{selectedReceipt.total}</span>
+              </div>
+
+              {/* Products list */}
+              <div className="space-y-1">
+                {/* Header */}
+                <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <span>Produit</span>
+                  <span className="text-right w-20">Prix unit.</span>
+                  <span className="text-right w-16">Total</span>
+                </div>
+
+                {selectedReceipt.products.map((p, i) => (
+                  <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2.5 rounded-lg hover:bg-secondary/50 transition-colors items-center">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{p.name}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] text-muted-foreground">Qté: {p.qty}</span>
+                        {p.pricePerUnit && (
+                          <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">{p.pricePerUnit}</span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-xs tabular-nums text-muted-foreground text-right w-20">{p.unitPrice.toFixed(2)} €</span>
+                    <span className="text-sm tabular-nums font-semibold text-foreground text-right w-16">{p.total.toFixed(2)} €</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Total bar */}
+              <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
+                <span className="text-sm font-medium text-muted-foreground">Total</span>
+                <span className="text-lg font-bold text-foreground">{selectedReceipt.total}</span>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </AppLayout>
   );
 };
