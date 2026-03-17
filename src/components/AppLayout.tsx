@@ -83,7 +83,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-40 bg-background/80 backdrop-blur-sm" onClick={() => setMobileOpen(false)}>
           <div className="absolute top-14 left-0 right-0 bg-card border-b border-border p-4 space-y-1" onClick={(e) => e.stopPropagation()}>
-            {navItems.map((item) => {
+            {allNavItems.map((item) => {
               const active = location.pathname === item.to;
               return (
                 <Link
