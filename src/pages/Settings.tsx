@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User, Bell, CreditCard, Users, Shield, ChevronRight, Camera, Loader2, Check,
-  Plus, Trash2, Lock, Eye, EyeOff, LogOut
+  Plus, Trash2, Lock, Eye, EyeOff, LogOut, Pencil, X
 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -33,11 +33,18 @@ const Settings = () => {
   const [notifWeekly, setNotifWeekly] = useState(false);
   const [notifTips, setNotifTips] = useState(true);
 
-  // Foyer (local mock)
-  const [members, setMembers] = useState<{ name: string; email: string; role: string }[]>([
-    { name: "", email: "", role: "Membre" },
-  ]);
-  const [inviteEmail, setInviteEmail] = useState("");
+  // Foyer
+  type HouseholdMember = { id: string; full_name: string; email: string | null; relationship: string };
+  const [householdMembers, setHouseholdMembers] = useState<HouseholdMember[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [newMemberName, setNewMemberName] = useState("");
+  const [newMemberEmail, setNewMemberEmail] = useState("");
+  const [newMemberRelation, setNewMemberRelation] = useState("Membre");
+  const [addingMember, setAddingMember] = useState(false);
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editRelation, setEditRelation] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -116,10 +123,53 @@ const Settings = () => {
     }
   };
 
-  const handleInviteMember = () => {
-    if (!inviteEmail.trim()) return;
-    toast.success(`Invitation envoyée à ${inviteEmail} (fonctionnalité à venir)`);
-    setInviteEmail("");
+  // Load household members
+  useEffect(() => {
+    if (!user) return;
+    const loadMembers = async () => {
+      setLoadingMembers(true);
+      const { data } = await supabase
+        .from("household_members")
+        .select("id, full_name, email, relationship")
+        .eq("owner_id", user.id)
+        .order("created_at");
+      setHouseholdMembers((data as HouseholdMember[]) || []);
+      setLoadingMembers(false);
+    };
+    loadMembers();
+  }, [user]);
+
+  const handleAddMember = async () => {
+    if (!newMemberName.trim() || !user) return;
+    setAddingMember(true);
+    const { data, error } = await supabase
+      .from("household_members")
+      .insert({ owner_id: user.id, full_name: newMemberName.trim(), email: newMemberEmail.trim() || null, relationship: newMemberRelation })
+      .select("id, full_name, email, relationship")
+      .single();
+    setAddingMember(false);
+    if (error) { toast.error("Erreur lors de l'ajout"); return; }
+    setHouseholdMembers((prev) => [...prev, data as HouseholdMember]);
+    setNewMemberName(""); setNewMemberEmail(""); setNewMemberRelation("Membre");
+    toast.success("Membre ajouté !");
+  };
+
+  const handleDeleteMember = async (id: string) => {
+    const { error } = await supabase.from("household_members").delete().eq("id", id);
+    if (error) { toast.error("Erreur lors de la suppression"); return; }
+    setHouseholdMembers((prev) => prev.filter((m) => m.id !== id));
+    toast.success("Membre supprimé");
+  };
+
+  const handleUpdateMember = async (id: string) => {
+    const { error } = await supabase
+      .from("household_members")
+      .update({ full_name: editName.trim(), email: editEmail.trim() || null, relationship: editRelation })
+      .eq("id", id);
+    if (error) { toast.error("Erreur lors de la mise à jour"); return; }
+    setHouseholdMembers((prev) => prev.map((m) => m.id === id ? { ...m, full_name: editName.trim(), email: editEmail.trim() || null, relationship: editRelation } : m));
+    setEditingMemberId(null);
+    toast.success("Membre mis à jour");
   };
 
   const settingsItems = [
@@ -191,7 +241,7 @@ const Settings = () => {
           <div className="space-y-6">
             <div>
               <p className="text-sm font-medium text-foreground mb-1">Membres du foyer</p>
-              <p className="text-xs text-muted-foreground mb-4">Partagez vos dépenses avec votre famille ou vos colocataires.</p>
+              <p className="text-xs text-muted-foreground mb-4">Ajoutez les personnes de votre foyer pour suivre les dépenses ensemble.</p>
               
               {/* Current user */}
               <div className="flex items-center justify-between p-3 rounded-xl bg-secondary/50 mb-3">
@@ -206,30 +256,111 @@ const Settings = () => {
                     <p className="text-xs text-muted-foreground">{user?.email}</p>
                   </div>
                 </div>
-                <span className="text-[10px] font-medium bg-primary/10 text-primary px-2.5 py-1 rounded-full">Admin</span>
+                <span className="text-[10px] font-medium bg-primary/10 text-primary px-2.5 py-1 rounded-full">Propriétaire</span>
               </div>
+
+              {/* Household members list */}
+              {loadingMembers ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                householdMembers.map((m) => (
+                  <div key={m.id} className="flex items-center justify-between p-3 rounded-xl bg-secondary/50 mb-2">
+                    {editingMemberId === m.id ? (
+                      <div className="flex-1 space-y-2">
+                        <div className="flex gap-2">
+                          <input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Nom" className={inputClass} />
+                          <select value={editRelation} onChange={(e) => setEditRelation(e.target.value)} className={inputClass}>
+                            {["Membre", "Conjoint(e)", "Enfant", "Parent", "Colocataire", "Autre"].map((r) => (
+                              <option key={r} value={r}>{r}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="Email (optionnel)" className={inputClass} />
+                        <div className="flex gap-2">
+                          <button onClick={() => handleUpdateMember(m.id)} className="inline-flex items-center gap-1 bg-primary text-primary-foreground px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-90 transition-opacity">
+                            <Check className="h-3 w-3" /> Enregistrer
+                          </button>
+                          <button onClick={() => setEditingMemberId(null)} className="inline-flex items-center gap-1 text-muted-foreground px-3 py-1.5 rounded-lg text-xs font-medium hover:text-foreground transition-colors">
+                            <X className="h-3 w-3" /> Annuler
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-3">
+                          <div className="h-9 w-9 rounded-xl bg-accent/10 flex items-center justify-center">
+                            <span className="text-xs font-bold text-accent">{m.full_name[0].toUpperCase()}</span>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-foreground">{m.full_name}</p>
+                            <p className="text-xs text-muted-foreground">{m.email || "Pas d'email"}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-medium bg-secondary text-muted-foreground px-2.5 py-1 rounded-full">{m.relationship}</span>
+                          <button
+                            onClick={() => { setEditingMemberId(m.id); setEditName(m.full_name); setEditEmail(m.email || ""); setEditRelation(m.relationship); }}
+                            className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteMember(m.id)}
+                            className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
 
-            {/* Invite */}
+            {/* Add member */}
             <div>
-              <label className="text-sm font-medium text-foreground block mb-1.5">Inviter un membre</label>
-              <div className="flex gap-2">
-                <input
-                  type="email"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  placeholder="email@exemple.com"
-                  className={inputClass}
-                />
-                <button
-                  onClick={handleInviteMember}
-                  className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity whitespace-nowrap"
-                >
-                  <Plus className="h-4 w-4" />
-                  Inviter
-                </button>
+              <label className="text-sm font-medium text-foreground block mb-1.5">Ajouter un membre</label>
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newMemberName}
+                    onChange={(e) => setNewMemberName(e.target.value)}
+                    placeholder="Nom du membre *"
+                    className={inputClass}
+                  />
+                  <select
+                    value={newMemberRelation}
+                    onChange={(e) => setNewMemberRelation(e.target.value)}
+                    className={inputClass + " max-w-[160px]"}
+                  >
+                    {["Membre", "Conjoint(e)", "Enfant", "Parent", "Colocataire", "Autre"].map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={newMemberEmail}
+                    onChange={(e) => setNewMemberEmail(e.target.value)}
+                    placeholder="Email (optionnel)"
+                    className={inputClass}
+                  />
+                  <button
+                    onClick={handleAddMember}
+                    disabled={addingMember || !newMemberName.trim()}
+                    className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity whitespace-nowrap disabled:opacity-50"
+                  >
+                    {addingMember ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                    Ajouter
+                  </button>
+                </div>
               </div>
-              <p className="text-[11px] text-muted-foreground mt-2">L'invitation sera envoyée par email. Le membre pourra rejoindre votre foyer.</p>
+              <p className="text-[11px] text-muted-foreground mt-2">Le membre n'a pas besoin d'avoir un compte. Vous pouvez ajouter un email plus tard.</p>
             </div>
           </div>
         );
