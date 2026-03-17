@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Upload, Camera, FileText, ChevronRight } from "lucide-react";
+import { Upload, Camera, FileText, ChevronRight, Mail, Landmark } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 
 const receipts = [
