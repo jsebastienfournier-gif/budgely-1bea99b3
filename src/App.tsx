@@ -12,6 +12,7 @@ import Transactions from "./pages/Transactions";
 import Products from "./pages/Products";
 import Insights from "./pages/Insights";
 import Settings from "./pages/Settings";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
