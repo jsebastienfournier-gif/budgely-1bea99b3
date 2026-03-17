@@ -16,8 +16,8 @@ const Receipts = () => {
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Tickets de caisse</h1>
-            <p className="text-sm text-muted-foreground mt-1">Scannez et analysez vos tickets</p>
+            <h1 className="text-2xl font-bold text-foreground">Capture des dépenses</h1>
+            <p className="text-sm text-muted-foreground mt-1">Importez et centralisez toutes vos dépenses, quel que soit leur format.</p>
           </div>
         </div>
 
