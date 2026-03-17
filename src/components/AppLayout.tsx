@@ -19,6 +19,12 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { signOut } = useAuth();
+  const { isAdmin } = useIsAdmin();
+
+  const allNavItems = [
+    ...navItems,
+    ...(isAdmin ? [{ to: "/admin", icon: ShieldCheck, label: "Administration" }] : []),
+  ];
 
   const handleSignOut = async () => {
     await signOut();
