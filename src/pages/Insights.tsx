@@ -20,6 +20,7 @@ import AppLayout from "@/components/AppLayout";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 
 /* ─── Data ─── */
 
@@ -139,31 +140,54 @@ const Insights = () => {
 
         {/* Économies potentielles — hero card */}
         {isLoading ? (
-          <Skeleton className="h-32 rounded-2xl mb-8" />
+          <Skeleton className="h-48 rounded-2xl mb-8" />
         ) : (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-foreground rounded-2xl p-5 sm:p-6 mb-6 sm:mb-8"
           >
-            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
-                  Économies potentielles
-                </p>
-                <div className="flex items-baseline gap-3">
-                  <span className="text-4xl font-bold tabular-nums text-background">{totalMonthly}</span>
-                  <span className="text-sm text-muted-foreground">/mois</span>
-                  <span className="text-muted-foreground">·</span>
-                  <span className="text-lg font-semibold tabular-nums text-background/70">{totalYearly}</span>
-                  <span className="text-sm text-muted-foreground">/an</span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">Basé sur vos dépenses récentes</p>
-              </div>
-              <Badge className="bg-primary/20 text-primary border-0 text-[10px] font-bold uppercase self-start sm:self-auto">
-                Estimé
+            {/* Row: title + badge */}
+            <div className="flex items-start justify-between mb-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                Économies potentielles
+              </p>
+              <Badge className="bg-primary/20 text-primary border-0 text-[10px] font-bold uppercase">
+                Estimation
               </Badge>
             </div>
+
+            {/* Amounts */}
+            <div className="flex items-baseline gap-3 mb-1">
+              <span className="text-4xl font-bold tabular-nums text-primary">{totalMonthly}</span>
+              <span className="text-sm text-muted-foreground">/mois</span>
+              <span className="text-muted-foreground">—</span>
+              <span className="text-lg font-semibold tabular-nums text-background/70">{totalYearly}</span>
+              <span className="text-sm text-muted-foreground">/an</span>
+            </div>
+
+            <p className="text-xs text-muted-foreground mb-4">Basé sur vos dépenses des 90 derniers jours</p>
+
+            {/* Realized + remaining */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 mb-3">
+              <p className="text-xs text-background/60">
+                Économies déjà réalisées : <span className="font-semibold text-savings">€11,20</span> ce mois‑ci
+              </p>
+              <p className="text-xs text-background/60">
+                Potentiel restant : <span className="font-semibold text-background">97%</span>
+              </p>
+            </div>
+
+            {/* Progress bar */}
+            <div className="mb-4">
+              <Progress value={3} className="h-2 bg-background/10 rounded-full" />
+            </div>
+
+            {/* CTA */}
+            <Button variant="ghost" size="sm" className="text-background/70 hover:text-background hover:bg-background/10 text-xs">
+              Voir les optimisations
+              <ArrowRight className="h-3.5 w-3.5 ml-1" />
+            </Button>
           </motion.div>
         )}
 
