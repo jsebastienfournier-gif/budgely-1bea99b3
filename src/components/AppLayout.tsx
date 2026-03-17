@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { BarChart3, LayoutDashboard, Receipt, CreditCard, TrendingUp, Settings, LogOut, Menu, X, ShieldCheck } from "lucide-react";
+import { BarChart3, LayoutDashboard, Receipt, PieChart, TrendingUp, Settings, LogOut, Menu, X, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
@@ -8,7 +8,7 @@ import { useIsAdmin } from "@/hooks/useIsAdmin";
 const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
   { to: "/receipts", icon: Receipt, label: "Capture des dépenses" },
-  { to: "/transactions", icon: CreditCard, label: "Transactions" },
+  { to: "/transactions", icon: PieChart, label: "Analyses" },
   { to: "/insights", icon: TrendingUp, label: "Optimisations" },
   { to: "/settings", icon: Settings, label: "Paramètres" },
 ];
