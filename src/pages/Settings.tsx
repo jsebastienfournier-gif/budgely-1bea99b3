@@ -241,7 +241,7 @@ const Settings = () => {
           <div className="space-y-6">
             <div>
               <p className="text-sm font-medium text-foreground mb-1">Membres du foyer</p>
-              <p className="text-xs text-muted-foreground mb-4">Partagez vos dépenses avec votre famille ou vos colocataires.</p>
+              <p className="text-xs text-muted-foreground mb-4">Ajoutez les personnes de votre foyer pour suivre les dépenses ensemble.</p>
               
               {/* Current user */}
               <div className="flex items-center justify-between p-3 rounded-xl bg-secondary/50 mb-3">
@@ -256,30 +256,111 @@ const Settings = () => {
                     <p className="text-xs text-muted-foreground">{user?.email}</p>
                   </div>
                 </div>
-                <span className="text-[10px] font-medium bg-primary/10 text-primary px-2.5 py-1 rounded-full">Admin</span>
+                <span className="text-[10px] font-medium bg-primary/10 text-primary px-2.5 py-1 rounded-full">Propriétaire</span>
               </div>
+
+              {/* Household members list */}
+              {loadingMembers ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                householdMembers.map((m) => (
+                  <div key={m.id} className="flex items-center justify-between p-3 rounded-xl bg-secondary/50 mb-2">
+                    {editingMemberId === m.id ? (
+                      <div className="flex-1 space-y-2">
+                        <div className="flex gap-2">
+                          <input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Nom" className={inputClass} />
+                          <select value={editRelation} onChange={(e) => setEditRelation(e.target.value)} className={inputClass}>
+                            {["Membre", "Conjoint(e)", "Enfant", "Parent", "Colocataire", "Autre"].map((r) => (
+                              <option key={r} value={r}>{r}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="Email (optionnel)" className={inputClass} />
+                        <div className="flex gap-2">
+                          <button onClick={() => handleUpdateMember(m.id)} className="inline-flex items-center gap-1 bg-primary text-primary-foreground px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-90 transition-opacity">
+                            <Check className="h-3 w-3" /> Enregistrer
+                          </button>
+                          <button onClick={() => setEditingMemberId(null)} className="inline-flex items-center gap-1 text-muted-foreground px-3 py-1.5 rounded-lg text-xs font-medium hover:text-foreground transition-colors">
+                            <X className="h-3 w-3" /> Annuler
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-3">
+                          <div className="h-9 w-9 rounded-xl bg-accent/10 flex items-center justify-center">
+                            <span className="text-xs font-bold text-accent">{m.full_name[0].toUpperCase()}</span>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-foreground">{m.full_name}</p>
+                            <p className="text-xs text-muted-foreground">{m.email || "Pas d'email"}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-medium bg-secondary text-muted-foreground px-2.5 py-1 rounded-full">{m.relationship}</span>
+                          <button
+                            onClick={() => { setEditingMemberId(m.id); setEditName(m.full_name); setEditEmail(m.email || ""); setEditRelation(m.relationship); }}
+                            className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteMember(m.id)}
+                            className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
 
-            {/* Invite */}
+            {/* Add member */}
             <div>
-              <label className="text-sm font-medium text-foreground block mb-1.5">Inviter un membre</label>
-              <div className="flex gap-2">
-                <input
-                  type="email"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  placeholder="email@exemple.com"
-                  className={inputClass}
-                />
-                <button
-                  onClick={handleInviteMember}
-                  className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity whitespace-nowrap"
-                >
-                  <Plus className="h-4 w-4" />
-                  Inviter
-                </button>
+              <label className="text-sm font-medium text-foreground block mb-1.5">Ajouter un membre</label>
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newMemberName}
+                    onChange={(e) => setNewMemberName(e.target.value)}
+                    placeholder="Nom du membre *"
+                    className={inputClass}
+                  />
+                  <select
+                    value={newMemberRelation}
+                    onChange={(e) => setNewMemberRelation(e.target.value)}
+                    className={inputClass + " max-w-[160px]"}
+                  >
+                    {["Membre", "Conjoint(e)", "Enfant", "Parent", "Colocataire", "Autre"].map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={newMemberEmail}
+                    onChange={(e) => setNewMemberEmail(e.target.value)}
+                    placeholder="Email (optionnel)"
+                    className={inputClass}
+                  />
+                  <button
+                    onClick={handleAddMember}
+                    disabled={addingMember || !newMemberName.trim()}
+                    className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity whitespace-nowrap disabled:opacity-50"
+                  >
+                    {addingMember ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                    Ajouter
+                  </button>
+                </div>
               </div>
-              <p className="text-[11px] text-muted-foreground mt-2">L'invitation sera envoyée par email. Le membre pourra rejoindre votre foyer.</p>
+              <p className="text-[11px] text-muted-foreground mt-2">Le membre n'a pas besoin d'avoir un compte. Vous pouvez ajouter un email plus tard.</p>
             </div>
           </div>
         );
