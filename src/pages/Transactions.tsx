@@ -17,7 +17,7 @@ const Transactions = () => {
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-foreground">Analyses</h1>
-          <p className="text-sm text-muted-foreground mt-1">Répartition de vos dépenses par catégorie</p>
+          <p className="text-sm text-muted-foreground mt-1">Comprenez où va votre argent</p>
         </div>
 
         <div className="space-y-3">
