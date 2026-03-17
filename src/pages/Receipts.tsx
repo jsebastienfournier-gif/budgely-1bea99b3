@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Upload, Camera, FileText, ChevronRight } from "lucide-react";
+import { Upload, Camera, FileText, ChevronRight, Mail, Landmark } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 
 const receipts = [
@@ -43,6 +43,41 @@ const Receipts = () => {
             </button>
           </div>
         </motion.div>
+
+        {/* Connection Tiles */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-card rounded-2xl border border-border p-6 flex items-center gap-4 hover:border-primary/30 transition-colors cursor-pointer"
+          >
+            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Mail className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">📥 Emails : connexion messagerie</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Importez automatiquement vos reçus depuis votre boîte mail</p>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto shrink-0" />
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="bg-card rounded-2xl border border-border p-6 flex items-center gap-4 hover:border-primary/30 transition-colors cursor-pointer"
+          >
+            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Landmark className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">🏦 Banque : connexion sécurisée</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Synchronisez vos transactions bancaires en toute sécurité</p>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto shrink-0" />
+          </motion.div>
+        </div>
 
         {/* AI Extraction Steps */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="mb-8">
