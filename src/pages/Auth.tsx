@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { BarChart3, Mail, Lock, ArrowRight, User, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable/index";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect } from "react";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
