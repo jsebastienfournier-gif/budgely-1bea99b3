@@ -7,7 +7,7 @@ import { useIsAdmin } from "@/hooks/useIsAdmin";
 
 const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
-  { to: "/receipts", icon: Receipt, label: "Tickets de caisse" },
+  { to: "/receipts", icon: Receipt, label: "Capture des dépenses" },
   { to: "/transactions", icon: CreditCard, label: "Transactions" },
   { to: "/products", icon: Package, label: "Produits" },
   { to: "/insights", icon: Lightbulb, label: "Optimisations" },
