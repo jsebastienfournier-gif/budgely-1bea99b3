@@ -123,10 +123,53 @@ const Settings = () => {
     }
   };
 
-  const handleInviteMember = () => {
-    if (!inviteEmail.trim()) return;
-    toast.success(`Invitation envoyée à ${inviteEmail} (fonctionnalité à venir)`);
-    setInviteEmail("");
+  // Load household members
+  useEffect(() => {
+    if (!user) return;
+    const loadMembers = async () => {
+      setLoadingMembers(true);
+      const { data } = await supabase
+        .from("household_members")
+        .select("id, full_name, email, relationship")
+        .eq("owner_id", user.id)
+        .order("created_at");
+      setHouseholdMembers((data as HouseholdMember[]) || []);
+      setLoadingMembers(false);
+    };
+    loadMembers();
+  }, [user]);
+
+  const handleAddMember = async () => {
+    if (!newMemberName.trim() || !user) return;
+    setAddingMember(true);
+    const { data, error } = await supabase
+      .from("household_members")
+      .insert({ owner_id: user.id, full_name: newMemberName.trim(), email: newMemberEmail.trim() || null, relationship: newMemberRelation })
+      .select("id, full_name, email, relationship")
+      .single();
+    setAddingMember(false);
+    if (error) { toast.error("Erreur lors de l'ajout"); return; }
+    setHouseholdMembers((prev) => [...prev, data as HouseholdMember]);
+    setNewMemberName(""); setNewMemberEmail(""); setNewMemberRelation("Membre");
+    toast.success("Membre ajouté !");
+  };
+
+  const handleDeleteMember = async (id: string) => {
+    const { error } = await supabase.from("household_members").delete().eq("id", id);
+    if (error) { toast.error("Erreur lors de la suppression"); return; }
+    setHouseholdMembers((prev) => prev.filter((m) => m.id !== id));
+    toast.success("Membre supprimé");
+  };
+
+  const handleUpdateMember = async (id: string) => {
+    const { error } = await supabase
+      .from("household_members")
+      .update({ full_name: editName.trim(), email: editEmail.trim() || null, relationship: editRelation })
+      .eq("id", id);
+    if (error) { toast.error("Erreur lors de la mise à jour"); return; }
+    setHouseholdMembers((prev) => prev.map((m) => m.id === id ? { ...m, full_name: editName.trim(), email: editEmail.trim() || null, relationship: editRelation } : m));
+    setEditingMemberId(null);
+    toast.success("Membre mis à jour");
   };
 
   const settingsItems = [
