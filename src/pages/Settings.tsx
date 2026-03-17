@@ -33,11 +33,18 @@ const Settings = () => {
   const [notifWeekly, setNotifWeekly] = useState(false);
   const [notifTips, setNotifTips] = useState(true);
 
-  // Foyer (local mock)
-  const [members, setMembers] = useState<{ name: string; email: string; role: string }[]>([
-    { name: "", email: "", role: "Membre" },
-  ]);
-  const [inviteEmail, setInviteEmail] = useState("");
+  // Foyer
+  type HouseholdMember = { id: string; full_name: string; email: string | null; relationship: string };
+  const [householdMembers, setHouseholdMembers] = useState<HouseholdMember[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [newMemberName, setNewMemberName] = useState("");
+  const [newMemberEmail, setNewMemberEmail] = useState("");
+  const [newMemberRelation, setNewMemberRelation] = useState("Membre");
+  const [addingMember, setAddingMember] = useState(false);
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editRelation, setEditRelation] = useState("");
 
   useEffect(() => {
     if (!user) return;
