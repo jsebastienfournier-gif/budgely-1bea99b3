@@ -80,7 +80,7 @@ const Receipts = () => {
   const [newBankName, setNewBankName] = useState("");
   const [newBankLabel, setNewBankLabel] = useState("");
   const [saving, setSaving] = useState(false);
-
+  const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
   useEffect(() => {
     if (!user) return;
     const load = async () => {
