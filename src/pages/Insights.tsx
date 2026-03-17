@@ -138,56 +138,37 @@ const Insights = () => {
           <p className="text-sm text-muted-foreground mt-1">Agissez pour réduire durablement vos dépenses</p>
         </div>
 
-        {/* Économies potentielles — hero card */}
+        {/* KPI row */}
         {isLoading ? (
-          <Skeleton className="h-48 rounded-2xl mb-8" />
+          <div className="grid grid-cols-2 gap-3 mb-6 sm:mb-8">
+            <Skeleton className="h-24 rounded-2xl" />
+            <Skeleton className="h-24 rounded-2xl" />
+          </div>
         ) : (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-foreground rounded-2xl p-5 sm:p-6 mb-6 sm:mb-8"
+            className="grid grid-cols-2 gap-3 mb-6 sm:mb-8"
           >
-            {/* Row: title + badge */}
-            <div className="flex items-start justify-between mb-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Économies potentielles
-              </p>
-              <Badge className="bg-primary/20 text-primary border-0 text-[10px] font-bold uppercase">
-                Estimation
-              </Badge>
+            {/* Potentiel */}
+            <div className="bg-card rounded-2xl border border-border p-4 sm:p-5">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Potentiel</p>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-bold tabular-nums text-primary">{totalMonthly}</span>
+                <span className="text-xs text-muted-foreground">/mois</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">{totalYearly}/an · estimé</p>
             </div>
 
-            {/* Amounts */}
-            <div className="flex items-baseline gap-3 mb-1">
-              <span className="text-4xl font-bold tabular-nums text-primary">{totalMonthly}</span>
-              <span className="text-sm text-muted-foreground">/mois</span>
-              <span className="text-muted-foreground">—</span>
-              <span className="text-lg font-semibold tabular-nums text-background/70">{totalYearly}</span>
-              <span className="text-sm text-muted-foreground">/an</span>
+            {/* Réalisé */}
+            <div className="bg-card rounded-2xl border border-border p-4 sm:p-5">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Réalisé ce mois</p>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-bold tabular-nums text-savings">€11,20</span>
+                <span className="text-xs text-muted-foreground">/mois</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">3 actions effectuées</p>
             </div>
-
-            <p className="text-xs text-muted-foreground mb-4">Basé sur vos dépenses des 90 derniers jours</p>
-
-            {/* Realized + remaining */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 mb-3">
-              <p className="text-xs text-background/60">
-                Économies déjà réalisées : <span className="font-semibold text-savings">€11,20</span> ce mois‑ci
-              </p>
-              <p className="text-xs text-background/60">
-                Potentiel restant : <span className="font-semibold text-background">97%</span>
-              </p>
-            </div>
-
-            {/* Progress bar */}
-            <div className="mb-4">
-              <Progress value={3} className="h-2 bg-background/10 rounded-full" />
-            </div>
-
-            {/* CTA */}
-            <Button variant="ghost" size="sm" className="text-background/70 hover:text-background hover:bg-background/10 text-xs">
-              Voir les optimisations
-              <ArrowRight className="h-3.5 w-3.5 ml-1" />
-            </Button>
           </motion.div>
         )}
 
