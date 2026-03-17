@@ -12,12 +12,45 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 type ConnectedEmail = { id: string; email: string; provider: string; label: string | null; status: string; last_sync_at: string | null };
 type ConnectedBank = { id: string; bank_name: string; account_label: string | null; account_type: string | null; status: string; last_sync_at: string | null };
 
-const receipts = [
-  { id: 1, store: "Carrefour", date: "16 mars 2026", total: "€67.40", items: 12, status: "Analysé" },
-  { id: 2, store: "Leclerc", date: "13 mars 2026", total: "€89.20", items: 18, status: "Analysé" },
-  { id: 3, store: "Auchan", date: "10 mars 2026", total: "€45.60", items: 8, status: "Analysé" },
-  { id: 4, store: "Lidl", date: "7 mars 2026", total: "€34.80", items: 10, status: "Analysé" },
-  { id: 5, store: "Carrefour", date: "2 mars 2026", total: "€72.15", items: 14, status: "Analysé" },
+type ReceiptProduct = { name: string; qty: number; unit: string; unitPrice: number; total: number; pricePerUnit?: string };
+type Receipt = { id: number; store: string; date: string; total: string; items: number; status: string; products: ReceiptProduct[] };
+
+const receipts: Receipt[] = [
+  { id: 1, store: "Carrefour", date: "16 mars 2026", total: "€67.40", items: 12, status: "Analysé", products: [
+    { name: "Lait demi-écrémé 1L", qty: 2, unit: "L", unitPrice: 1.15, total: 2.30, pricePerUnit: "1,15 €/L" },
+    { name: "Pain de mie complet", qty: 1, unit: "pce", unitPrice: 1.89, total: 1.89 },
+    { name: "Poulet fermier 1,2kg", qty: 1, unit: "kg", unitPrice: 9.90, total: 11.88, pricePerUnit: "9,90 €/kg" },
+    { name: "Tomates grappe 1kg", qty: 1, unit: "kg", unitPrice: 2.49, total: 2.49, pricePerUnit: "2,49 €/kg" },
+    { name: "Pâtes penne 500g", qty: 2, unit: "pce", unitPrice: 1.25, total: 2.50, pricePerUnit: "2,50 €/kg" },
+    { name: "Huile d'olive 75cl", qty: 1, unit: "L", unitPrice: 6.99, total: 6.99, pricePerUnit: "9,32 €/L" },
+    { name: "Yaourts nature x8", qty: 1, unit: "pce", unitPrice: 2.10, total: 2.10 },
+    { name: "Bananes 1,5kg", qty: 1, unit: "kg", unitPrice: 1.99, total: 2.99, pricePerUnit: "1,99 €/kg" },
+    { name: "Fromage râpé 200g", qty: 1, unit: "pce", unitPrice: 2.15, total: 2.15, pricePerUnit: "10,75 €/kg" },
+    { name: "Eau minérale 6x1,5L", qty: 1, unit: "pce", unitPrice: 3.20, total: 3.20, pricePerUnit: "0,36 €/L" },
+    { name: "Beurre doux 250g", qty: 1, unit: "pce", unitPrice: 2.49, total: 2.49, pricePerUnit: "9,96 €/kg" },
+    { name: "Céréales muesli 450g", qty: 1, unit: "pce", unitPrice: 3.89, total: 3.89, pricePerUnit: "8,64 €/kg" },
+  ]},
+  { id: 2, store: "Leclerc", date: "13 mars 2026", total: "€89.20", items: 18, status: "Analysé", products: [
+    { name: "Steak haché 5% x4", qty: 1, unit: "pce", unitPrice: 5.99, total: 5.99, pricePerUnit: "14,98 €/kg" },
+    { name: "Saumon frais 300g", qty: 1, unit: "pce", unitPrice: 6.50, total: 6.50, pricePerUnit: "21,67 €/kg" },
+    { name: "Pommes de terre 2,5kg", qty: 1, unit: "kg", unitPrice: 1.59, total: 3.98, pricePerUnit: "1,59 €/kg" },
+    { name: "Lessive liquide 3L", qty: 1, unit: "L", unitPrice: 8.99, total: 8.99, pricePerUnit: "3,00 €/L" },
+  ]},
+  { id: 3, store: "Auchan", date: "10 mars 2026", total: "€45.60", items: 8, status: "Analysé", products: [
+    { name: "Riz basmati 1kg", qty: 2, unit: "kg", unitPrice: 2.29, total: 4.58, pricePerUnit: "2,29 €/kg" },
+    { name: "Sauce tomate 500g", qty: 1, unit: "pce", unitPrice: 1.49, total: 1.49, pricePerUnit: "2,98 €/kg" },
+    { name: "Café moulu 250g", qty: 1, unit: "pce", unitPrice: 3.99, total: 3.99, pricePerUnit: "15,96 €/kg" },
+  ]},
+  { id: 4, store: "Lidl", date: "7 mars 2026", total: "€34.80", items: 10, status: "Analysé", products: [
+    { name: "Œufs plein air x10", qty: 1, unit: "pce", unitPrice: 2.89, total: 2.89 },
+    { name: "Jambon blanc x4", qty: 1, unit: "pce", unitPrice: 2.19, total: 2.19, pricePerUnit: "10,95 €/kg" },
+    { name: "Carottes 1kg", qty: 2, unit: "kg", unitPrice: 0.99, total: 1.98, pricePerUnit: "0,99 €/kg" },
+  ]},
+  { id: 5, store: "Carrefour", date: "2 mars 2026", total: "€72.15", items: 14, status: "Analysé", products: [
+    { name: "Filet de dinde 500g", qty: 1, unit: "pce", unitPrice: 4.99, total: 4.99, pricePerUnit: "9,98 €/kg" },
+    { name: "Courgettes 1kg", qty: 1, unit: "kg", unitPrice: 2.29, total: 2.29, pricePerUnit: "2,29 €/kg" },
+    { name: "Crème fraîche 20cl", qty: 2, unit: "pce", unitPrice: 1.15, total: 2.30, pricePerUnit: "5,75 €/L" },
+  ]},
 ];
 
 const emailProviders = [
