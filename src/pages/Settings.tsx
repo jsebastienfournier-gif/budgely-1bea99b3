@@ -46,6 +46,16 @@ const Settings = () => {
   const [editEmail, setEditEmail] = useState("");
   const [editRelation, setEditRelation] = useState("");
 
+  // Connected emails
+  type ConnectedEmail = { id: string; email: string; provider: string; label: string | null; status: string; last_sync_at: string | null };
+  const [connectedEmails, setConnectedEmails] = useState<ConnectedEmail[]>([]);
+  const [loadingEmails, setLoadingEmails] = useState(false);
+
+  // Connected bank accounts
+  type ConnectedBank = { id: string; bank_name: string; account_label: string | null; account_type: string | null; status: string; last_sync_at: string | null };
+  const [connectedBanks, setConnectedBanks] = useState<ConnectedBank[]>([]);
+  const [loadingBanks, setLoadingBanks] = useState(false);
+
   useEffect(() => {
     if (!user) return;
     supabase
