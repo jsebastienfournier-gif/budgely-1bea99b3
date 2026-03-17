@@ -310,7 +310,7 @@ const Receipts = () => {
         <div className="bg-card rounded-2xl border border-border overflow-hidden">
           <div className="divide-y divide-border">
             {receipts.map((r) => (
-              <div key={r.id} className="grid grid-cols-[1fr_auto_auto_auto] md:grid-cols-[auto_1fr_auto_auto_auto] gap-4 p-4 items-center hover:bg-secondary/50 transition-colors cursor-pointer">
+              <div key={r.id} onClick={() => setSelectedReceipt(r)} className="grid grid-cols-[1fr_auto_auto_auto] md:grid-cols-[auto_1fr_auto_auto_auto] gap-4 p-4 items-center hover:bg-secondary/50 transition-colors cursor-pointer">
                 <div className="hidden md:flex h-10 w-10 rounded-xl bg-secondary items-center justify-center text-sm font-bold text-foreground">
                   {r.store[0]}
                 </div>
