@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User, Bell, CreditCard, Users, Shield, ChevronRight, Camera, Loader2, Check,
-  Plus, Trash2, Lock, Eye, EyeOff, LogOut, Pencil, X
+  Plus, Trash2, Lock, Eye, EyeOff, LogOut, Pencil, X, Mail, Landmark
 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -45,6 +45,16 @@ const Settings = () => {
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editRelation, setEditRelation] = useState("");
+
+  // Connected emails
+  type ConnectedEmail = { id: string; email: string; provider: string; label: string | null; status: string; last_sync_at: string | null };
+  const [connectedEmails, setConnectedEmails] = useState<ConnectedEmail[]>([]);
+  const [loadingEmails, setLoadingEmails] = useState(false);
+
+  // Connected bank accounts
+  type ConnectedBank = { id: string; bank_name: string; account_label: string | null; account_type: string | null; status: string; last_sync_at: string | null };
+  const [connectedBanks, setConnectedBanks] = useState<ConnectedBank[]>([]);
+  const [loadingBanks, setLoadingBanks] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -139,6 +149,38 @@ const Settings = () => {
     loadMembers();
   }, [user]);
 
+  // Load connected emails & banks
+  useEffect(() => {
+    if (!user) return;
+    const loadConnections = async () => {
+      setLoadingEmails(true);
+      setLoadingBanks(true);
+      const [emailRes, bankRes] = await Promise.all([
+        supabase.from("connected_emails").select("*").eq("user_id", user.id).order("created_at"),
+        supabase.from("connected_bank_accounts").select("*").eq("user_id", user.id).order("created_at"),
+      ]);
+      setConnectedEmails((emailRes.data as ConnectedEmail[]) || []);
+      setConnectedBanks((bankRes.data as ConnectedBank[]) || []);
+      setLoadingEmails(false);
+      setLoadingBanks(false);
+    };
+    loadConnections();
+  }, [user]);
+
+  const handleDeleteEmail = async (id: string) => {
+    const { error } = await supabase.from("connected_emails").delete().eq("id", id);
+    if (error) { toast.error("Erreur lors de la suppression"); return; }
+    setConnectedEmails(prev => prev.filter(e => e.id !== id));
+    toast.success("Email supprimé");
+  };
+
+  const handleDeleteBank = async (id: string) => {
+    const { error } = await supabase.from("connected_bank_accounts").delete().eq("id", id);
+    if (error) { toast.error("Erreur lors de la suppression"); return; }
+    setConnectedBanks(prev => prev.filter(b => b.id !== id));
+    toast.success("Compte bancaire supprimé");
+  };
+
   const handleAddMember = async () => {
     if (!newMemberName.trim() || !user) return;
     setAddingMember(true);
@@ -175,7 +217,8 @@ const Settings = () => {
   const settingsItems = [
     { icon: User, title: "Profil", desc: "Nom, email et photo de profil" },
     { icon: Users, title: "Foyer", desc: "Gérez les membres de votre foyer" },
-    { icon: CreditCard, title: "Comptes bancaires", desc: "Connectez et gérez vos comptes" },
+    { icon: Landmark, title: "Comptes bancaires", desc: "Gérez vos comptes bancaires connectés" },
+    { icon: Mail, title: "Adresses email", desc: "Gérez vos messageries connectées" },
     { icon: Bell, title: "Notifications", desc: "Alertes et rappels de dépenses" },
     { icon: Shield, title: "Sécurité", desc: "Mot de passe et authentification" },
   ];
@@ -369,27 +412,50 @@ const Settings = () => {
         return (
           <div className="space-y-6">
             <div>
-              <p className="text-sm font-medium text-foreground mb-1">Vos comptes connectés</p>
-              <p className="text-xs text-muted-foreground mb-4">Connectez vos comptes bancaires pour importer automatiquement vos transactions.</p>
+              <p className="text-sm font-medium text-foreground mb-1">Vos comptes bancaires connectés</p>
+              <p className="text-xs text-muted-foreground mb-4">Gérez vos comptes bancaires. Pour en ajouter un nouveau, rendez-vous sur la page Capture des dépenses.</p>
             </div>
 
-            {/* Empty state */}
-            <div className="border border-dashed border-border rounded-xl p-8 text-center">
-              <div className="h-12 w-12 rounded-2xl bg-secondary flex items-center justify-center mx-auto mb-3">
-                <CreditCard className="h-6 w-6 text-muted-foreground" />
+            {loadingBanks ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               </div>
-              <p className="text-sm font-medium text-foreground">Aucun compte connecté</p>
-              <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
-                Connectez votre banque pour importer vos transactions automatiquement et commencer à analyser vos dépenses.
-              </p>
-              <button
-                onClick={() => toast.info("Intégration bancaire à venir")}
-                className="mt-4 inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
-              >
-                <Plus className="h-4 w-4" />
-                Connecter un compte
-              </button>
-            </div>
+            ) : connectedBanks.length === 0 ? (
+              <div className="border border-dashed border-border rounded-xl p-8 text-center">
+                <div className="h-12 w-12 rounded-2xl bg-secondary flex items-center justify-center mx-auto mb-3">
+                  <Landmark className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-medium text-foreground">Aucun compte connecté</p>
+                <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
+                  Ajoutez un compte bancaire depuis la page Capture des dépenses.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {connectedBanks.map((b) => (
+                  <div key={b.id} className="flex items-center justify-between p-3 rounded-xl bg-secondary/50">
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <Landmark className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{b.bank_name}</p>
+                        <p className="text-xs text-muted-foreground">{b.account_label || b.account_type || "Compte"}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-medium bg-savings/10 text-savings px-2.5 py-1 rounded-full">{b.status === "active" ? "Actif" : "En attente"}</span>
+                      <button
+                        onClick={() => handleDeleteBank(b.id)}
+                        className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="bg-secondary/50 rounded-xl p-4">
               <p className="text-xs font-medium text-foreground mb-1">🔒 Sécurité des données</p>
@@ -397,6 +463,57 @@ const Settings = () => {
                 Vos identifiants bancaires ne sont jamais stockés sur nos serveurs. Nous utilisons des connexions sécurisées et chiffrées.
               </p>
             </div>
+          </div>
+        );
+
+      case "Adresses email":
+        return (
+          <div className="space-y-6">
+            <div>
+              <p className="text-sm font-medium text-foreground mb-1">Vos adresses email connectées</p>
+              <p className="text-xs text-muted-foreground mb-4">Gérez vos messageries. Pour en ajouter une nouvelle, rendez-vous sur la page Capture des dépenses.</p>
+            </div>
+
+            {loadingEmails ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : connectedEmails.length === 0 ? (
+              <div className="border border-dashed border-border rounded-xl p-8 text-center">
+                <div className="h-12 w-12 rounded-2xl bg-secondary flex items-center justify-center mx-auto mb-3">
+                  <Mail className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-medium text-foreground">Aucune adresse connectée</p>
+                <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
+                  Connectez une adresse email depuis la page Capture des dépenses.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {connectedEmails.map((e) => (
+                  <div key={e.id} className="flex items-center justify-between p-3 rounded-xl bg-secondary/50">
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <Mail className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{e.email}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{e.provider}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-medium bg-savings/10 text-savings px-2.5 py-1 rounded-full">{e.status === "active" ? "Actif" : "En attente"}</span>
+                      <button
+                        onClick={() => handleDeleteEmail(e.id)}
+                        className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
 
