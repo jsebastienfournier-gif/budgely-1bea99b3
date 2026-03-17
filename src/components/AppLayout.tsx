@@ -1,8 +1,9 @@
 import { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { BarChart3, LayoutDashboard, Receipt, CreditCard, Package, Lightbulb, Settings, LogOut, Menu, X } from "lucide-react";
+import { BarChart3, LayoutDashboard, Receipt, CreditCard, Package, Lightbulb, Settings, LogOut, Menu, X, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 
 const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
