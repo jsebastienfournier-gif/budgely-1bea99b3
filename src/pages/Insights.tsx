@@ -58,8 +58,8 @@ const Insights = () => {
     <AppLayout>
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-foreground">Optimisations</h1>
-          <p className="text-sm text-muted-foreground mt-1">Suggestions intelligentes pour réduire vos dépenses</p>
+          <h1 className="text-2xl font-bold text-foreground">Analyses & optimisations</h1>
+          <p className="text-sm text-muted-foreground mt-1">Explorez vos habitudes, optimisez votre budget</p>
         </div>
 
         {/* Summary */}
