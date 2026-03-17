@@ -42,7 +42,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
           <span className="text-lg font-semibold text-foreground">Budgely</span>
         </Link>
         <nav className="flex-1 space-y-1">
-          {navItems.map((item) => {
+          {allNavItems.map((item) => {
             const active = location.pathname === item.to;
             return (
               <Link
