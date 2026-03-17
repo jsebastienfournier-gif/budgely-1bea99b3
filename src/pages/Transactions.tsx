@@ -1,5 +1,8 @@
 import { motion } from "framer-motion";
+import { AlertTriangle, Copy, TrendingUp, CreditCard } from "lucide-react";
+import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
+import { Badge } from "@/components/ui/badge";
 
 const categories = [
   { name: "Alimentation", emoji: "🛒", percent: 35, color: "hsl(var(--savings))" },
