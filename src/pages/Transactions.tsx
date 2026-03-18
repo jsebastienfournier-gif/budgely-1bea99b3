@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { AlertTriangle, Copy, TrendingUp, CreditCard, ArrowRight, Inbox } from "lucide-react";
 import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
+import PremiumCTA from "@/components/PremiumCTA";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 

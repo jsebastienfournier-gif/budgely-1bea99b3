@@ -616,6 +616,32 @@ const Settings = () => {
           </div>
         );
 
+      case "Abonnement":
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-foreground">Plan actuel</p>
+                <p className="text-lg font-bold text-foreground mt-1">Découverte <span className="text-sm font-normal text-muted-foreground">— Gratuit</span></p>
+              </div>
+            </div>
+            <div className="rounded-xl bg-secondary/50 p-4">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Limitations</p>
+              <ul className="space-y-1.5 text-sm text-muted-foreground">
+                <li>• 5 analyses mail par mois</li>
+                <li>• Catégorisation basique uniquement</li>
+                <li>• Pas de connexion bancaire</li>
+                <li>• Pas de recommandations personnalisées</li>
+              </ul>
+            </div>
+            <Link to="/subscription">
+              <Button className="w-full" size="lg">
+                Gérer mon abonnement
+              </Button>
+            </Link>
+          </div>
+        );
+
       default:
         return null;
     }
