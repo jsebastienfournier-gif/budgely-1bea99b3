@@ -217,6 +217,7 @@ const Settings = () => {
   const settingsItems = [
     { icon: User, title: "Profil", desc: "Nom, email et photo de profil" },
     { icon: Users, title: "Foyer", desc: "Gérez les membres de votre foyer" },
+    { icon: CreditCard, title: "Abonnement", desc: "Votre plan actuel et options de mise à niveau" },
     { icon: Landmark, title: "Comptes bancaires", desc: "Gérez vos comptes bancaires connectés" },
     { icon: Mail, title: "Adresses email", desc: "Gérez vos messageries connectées" },
     { icon: Bell, title: "Notifications", desc: "Alertes et rappels de dépenses" },
