@@ -180,6 +180,11 @@ const Receipts = () => {
           </div>
         </motion.div>
 
+        {/* Premium CTA */}
+        <div className="mb-8">
+          <PremiumCTA message="Analyse mail illimitée avec Premium — limite de 5/mois atteinte" />
+        </div>
+
         {/* Connection Tiles */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
           {/* Email tile */}
