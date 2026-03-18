@@ -299,6 +299,11 @@ const Insights = () => {
           )}
         </div>
 
+        {/* Premium CTA */}
+        <div className="mb-6">
+          <PremiumCTA message="Débloquez les recommandations d'économies personnalisées avec Premium" />
+        </div>
+
         {/* Footer */}
         <div className="pt-6 border-t border-border text-center space-y-3">
           <p className="text-sm text-muted-foreground">Chaque action améliore durablement votre budget.</p>
