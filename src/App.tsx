@@ -13,6 +13,7 @@ import Products from "./pages/Products";
 import Insights from "./pages/Insights";
 import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
+import Subscription from "./pages/Subscription";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/insights" element={<Insights />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/subscription" element={<Subscription />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

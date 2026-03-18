@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Upload, Camera, FileText, ChevronRight, Mail, Landmark, RefreshCw, Plus, Check, Loader2, X, ShoppingCart } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import AppLayout from "@/components/AppLayout";
+import PremiumCTA from "@/components/PremiumCTA";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -178,6 +179,11 @@ const Receipts = () => {
             </button>
           </div>
         </motion.div>
+
+        {/* Premium CTA */}
+        <div className="mb-8">
+          <PremiumCTA message="Analyse mail illimitée avec Premium — limite de 5/mois atteinte" />
+        </div>
 
         {/* Connection Tiles */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">

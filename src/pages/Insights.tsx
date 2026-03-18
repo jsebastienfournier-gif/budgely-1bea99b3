@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
+import PremiumCTA from "@/components/PremiumCTA";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -297,6 +298,11 @@ const Insights = () => {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Premium CTA */}
+        <div className="mb-6">
+          <PremiumCTA message="Débloquez les recommandations d'économies personnalisées avec Premium" />
         </div>
 
         {/* Footer */}
