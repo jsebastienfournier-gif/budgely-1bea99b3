@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Upload, Camera, FileText, ChevronRight, Mail, Landmark, RefreshCw, Plus, Check, Loader2, X, ShoppingCart } from "lucide-react";
+import { Upload, Camera, FileText, ChevronRight, Mail, Landmark, RefreshCw, Plus, Check, Loader2, X, ShoppingCart, Sparkles } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import AppLayout from "@/components/AppLayout";
 import PremiumCTA from "@/components/PremiumCTA";
@@ -9,50 +9,23 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 
 type ConnectedEmail = { id: string; email: string; provider: string; label: string | null; status: string; last_sync_at: string | null };
 type ConnectedBank = { id: string; bank_name: string; account_label: string | null; account_type: string | null; status: string; last_sync_at: string | null };
 
 type ReceiptProduct = { name: string; qty: number; unit: string; unitPrice: number; total: number; pricePerUnit?: string };
-type Receipt = { id: number; store: string; date: string; total: string; items: number; status: string; products: ReceiptProduct[] };
-
-const receipts: Receipt[] = [
-  { id: 1, store: "Carrefour", date: "16 mars 2026", total: "€67.40", items: 12, status: "Analysé", products: [
-    { name: "Lait demi-écrémé 1L", qty: 2, unit: "L", unitPrice: 1.15, total: 2.30, pricePerUnit: "1,15 €/L" },
-    { name: "Pain de mie complet", qty: 1, unit: "pce", unitPrice: 1.89, total: 1.89 },
-    { name: "Poulet fermier 1,2kg", qty: 1, unit: "kg", unitPrice: 9.90, total: 11.88, pricePerUnit: "9,90 €/kg" },
-    { name: "Tomates grappe 1kg", qty: 1, unit: "kg", unitPrice: 2.49, total: 2.49, pricePerUnit: "2,49 €/kg" },
-    { name: "Pâtes penne 500g", qty: 2, unit: "pce", unitPrice: 1.25, total: 2.50, pricePerUnit: "2,50 €/kg" },
-    { name: "Huile d'olive 75cl", qty: 1, unit: "L", unitPrice: 6.99, total: 6.99, pricePerUnit: "9,32 €/L" },
-    { name: "Yaourts nature x8", qty: 1, unit: "pce", unitPrice: 2.10, total: 2.10 },
-    { name: "Bananes 1,5kg", qty: 1, unit: "kg", unitPrice: 1.99, total: 2.99, pricePerUnit: "1,99 €/kg" },
-    { name: "Fromage râpé 200g", qty: 1, unit: "pce", unitPrice: 2.15, total: 2.15, pricePerUnit: "10,75 €/kg" },
-    { name: "Eau minérale 6x1,5L", qty: 1, unit: "pce", unitPrice: 3.20, total: 3.20, pricePerUnit: "0,36 €/L" },
-    { name: "Beurre doux 250g", qty: 1, unit: "pce", unitPrice: 2.49, total: 2.49, pricePerUnit: "9,96 €/kg" },
-    { name: "Céréales muesli 450g", qty: 1, unit: "pce", unitPrice: 3.89, total: 3.89, pricePerUnit: "8,64 €/kg" },
-  ]},
-  { id: 2, store: "Leclerc", date: "13 mars 2026", total: "€89.20", items: 18, status: "Analysé", products: [
-    { name: "Steak haché 5% x4", qty: 1, unit: "pce", unitPrice: 5.99, total: 5.99, pricePerUnit: "14,98 €/kg" },
-    { name: "Saumon frais 300g", qty: 1, unit: "pce", unitPrice: 6.50, total: 6.50, pricePerUnit: "21,67 €/kg" },
-    { name: "Pommes de terre 2,5kg", qty: 1, unit: "kg", unitPrice: 1.59, total: 3.98, pricePerUnit: "1,59 €/kg" },
-    { name: "Lessive liquide 3L", qty: 1, unit: "L", unitPrice: 8.99, total: 8.99, pricePerUnit: "3,00 €/L" },
-  ]},
-  { id: 3, store: "Auchan", date: "10 mars 2026", total: "€45.60", items: 8, status: "Analysé", products: [
-    { name: "Riz basmati 1kg", qty: 2, unit: "kg", unitPrice: 2.29, total: 4.58, pricePerUnit: "2,29 €/kg" },
-    { name: "Sauce tomate 500g", qty: 1, unit: "pce", unitPrice: 1.49, total: 1.49, pricePerUnit: "2,98 €/kg" },
-    { name: "Café moulu 250g", qty: 1, unit: "pce", unitPrice: 3.99, total: 3.99, pricePerUnit: "15,96 €/kg" },
-  ]},
-  { id: 4, store: "Lidl", date: "7 mars 2026", total: "€34.80", items: 10, status: "Analysé", products: [
-    { name: "Œufs plein air x10", qty: 1, unit: "pce", unitPrice: 2.89, total: 2.89 },
-    { name: "Jambon blanc x4", qty: 1, unit: "pce", unitPrice: 2.19, total: 2.19, pricePerUnit: "10,95 €/kg" },
-    { name: "Carottes 1kg", qty: 2, unit: "kg", unitPrice: 0.99, total: 1.98, pricePerUnit: "0,99 €/kg" },
-  ]},
-  { id: 5, store: "Carrefour", date: "2 mars 2026", total: "€72.15", items: 14, status: "Analysé", products: [
-    { name: "Filet de dinde 500g", qty: 1, unit: "pce", unitPrice: 4.99, total: 4.99, pricePerUnit: "9,98 €/kg" },
-    { name: "Courgettes 1kg", qty: 1, unit: "kg", unitPrice: 2.29, total: 2.29, pricePerUnit: "2,29 €/kg" },
-    { name: "Crème fraîche 20cl", qty: 2, unit: "pce", unitPrice: 1.15, total: 2.30, pricePerUnit: "5,75 €/L" },
-  ]},
-];
+type Receipt = {
+  id: string;
+  store: string;
+  date: string;
+  total: string;
+  items: number;
+  status: string;
+  products: ReceiptProduct[];
+  source?: string;
+};
 
 const emailProviders = [
   { id: "gmail", label: "Gmail", icon: "📧" },
@@ -69,9 +42,14 @@ const bankList = [
 const Receipts = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [emails, setEmails] = useState<ConnectedEmail[]>([]);
   const [banks, setBanks] = useState<ConnectedBank[]>([]);
+  const [expenses, setExpenses] = useState<Receipt[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [analysisStep, setAnalysisStep] = useState("");
 
   // Dialog state
   const [showEmailDialog, setShowEmailDialog] = useState(false);
@@ -82,20 +60,194 @@ const Receipts = () => {
   const [newBankLabel, setNewBankLabel] = useState("");
   const [saving, setSaving] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
+
   useEffect(() => {
     if (!user) return;
     const load = async () => {
       setLoading(true);
-      const [emailRes, bankRes] = await Promise.all([
+      const [emailRes, bankRes, expenseRes] = await Promise.all([
         supabase.from("connected_emails").select("*").eq("user_id", user.id).order("created_at"),
         supabase.from("connected_bank_accounts").select("*").eq("user_id", user.id).order("created_at"),
+        supabase.from("expenses").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
       ]);
       setEmails((emailRes.data as ConnectedEmail[]) || []);
       setBanks((bankRes.data as ConnectedBank[]) || []);
+
+      // Map expenses to Receipt format
+      const mapped = (expenseRes.data || []).map((e: any) => {
+        const articles = (e.articles || []).map((a: any) => ({
+          name: a.nom || a.name || "",
+          qty: a.quantite || a.qty || 1,
+          unit: a.unite || a.unit || "pce",
+          unitPrice: a.prix_unitaire || a.unitPrice || 0,
+          total: a.prix_total || a.total || 0,
+          pricePerUnit: a.prix_unitaire ? `${a.prix_unitaire.toFixed(2)} €` : undefined,
+        }));
+        return {
+          id: e.id,
+          store: e.magasin || e.fournisseur || "Inconnu",
+          date: e.date_expense ? new Date(e.date_expense).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "Date inconnue",
+          total: `€${(e.montant_total || 0).toFixed(2)}`,
+          items: articles.length,
+          status: "Analysé",
+          products: articles,
+          source: e.source,
+        };
+      });
+      setExpenses(mapped);
       setLoading(false);
     };
     load();
   }, [user]);
+
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !user) return;
+
+    const file = files[0];
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error("Fichier trop volumineux (max 10 Mo)");
+      return;
+    }
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("Format non supporté. Utilisez JPG, PNG, WebP ou PDF.");
+      return;
+    }
+
+    setUploading(true);
+    setAnalysisProgress(10);
+    setAnalysisStep("Upload du fichier…");
+
+    try {
+      // 1. Upload to storage
+      const filePath = `${user.id}/${Date.now()}_${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("documents")
+        .upload(filePath, file);
+
+      if (uploadError) throw new Error("Erreur d'upload: " + uploadError.message);
+
+      setAnalysisProgress(25);
+      setAnalysisStep("Création du document…");
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("documents")
+        .getPublicUrl(filePath);
+
+      // 2. Create document record
+      const source = file.type === "application/pdf" ? "invoice" : "receipt";
+      const { data: doc, error: docError } = await supabase
+        .from("documents")
+        .insert({
+          user_id: user.id,
+          source,
+          file_url: publicUrl,
+          file_name: file.name,
+          file_size: file.size,
+          mime_type: file.type,
+          status: "pending" as any,
+        })
+        .select()
+        .single();
+
+      if (docError) throw new Error("Erreur document: " + docError.message);
+
+      setAnalysisProgress(40);
+      setAnalysisStep("Extraction du texte…");
+
+      // 3. Extract text (for images, convert to base64 for AI vision)
+      let rawText = "";
+      if (file.type === "application/pdf") {
+        rawText = `[Fichier PDF: ${file.name}] Contenu à analyser.`;
+        // In production, use a PDF parser service
+      } else {
+        // Convert image to base64 for description
+        const reader = new FileReader();
+        rawText = await new Promise<string>((resolve) => {
+          reader.onload = () => {
+            const base64 = (reader.result as string).split(",")[1];
+            resolve(`[Image de ticket de caisse encodée en base64]\nNom du fichier: ${file.name}\nVeuillez analyser cette image de ticket de caisse et extraire les informations.`);
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      setAnalysisProgress(60);
+      setAnalysisStep("Analyse IA en cours…");
+
+      // 4. Call AI analysis
+      const { data: result, error: fnError } = await supabase.functions.invoke("analyze-document", {
+        body: {
+          document_id: doc.id,
+          source,
+          raw_text: rawText,
+        },
+      });
+
+      if (fnError) {
+        // Check for plan limit errors
+        if (fnError.message?.includes("limit_reached")) {
+          toast.error("Limite mensuelle atteinte. Passez à Premium pour des analyses illimitées !");
+          return;
+        }
+        throw new Error(fnError.message || "Erreur d'analyse");
+      }
+
+      if (result?.error) {
+        if (result.error === "limit_reached") {
+          toast.error(result.message || "Limite atteinte");
+          return;
+        }
+        throw new Error(result.error);
+      }
+
+      setAnalysisProgress(90);
+      setAnalysisStep("Enregistrement…");
+
+      // 5. Add to local state
+      if (result?.expense) {
+        const e = result.expense;
+        const articles = (e.articles || []).map((a: any) => ({
+          name: a.nom || a.name || "",
+          qty: a.quantite || a.qty || 1,
+          unit: a.unite || a.unit || "pce",
+          unitPrice: a.prix_unitaire || a.unitPrice || 0,
+          total: a.prix_total || a.total || 0,
+        }));
+        const newReceipt: Receipt = {
+          id: e.id,
+          store: e.magasin || e.fournisseur || "Inconnu",
+          date: e.date_expense ? new Date(e.date_expense).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "Aujourd'hui",
+          total: `€${(e.montant_total || 0).toFixed(2)}`,
+          items: articles.length,
+          status: "Analysé",
+          products: articles,
+          source: e.source,
+        };
+        setExpenses(prev => [newReceipt, ...prev]);
+      }
+
+      setAnalysisProgress(100);
+      setAnalysisStep("Terminé !");
+      toast.success("Ticket analysé avec succès !");
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      toast.error(err.message || "Erreur lors de l'analyse");
+    } finally {
+      setTimeout(() => {
+        setUploading(false);
+        setAnalysisProgress(0);
+        setAnalysisStep("");
+      }, 1500);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    handleFileUpload(e.dataTransfer.files);
+  };
 
   const handleAddEmail = async () => {
     if (!newEmail.trim() || !user) return;
@@ -147,6 +299,16 @@ const Receipts = () => {
 
   const inputClass = "w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all";
 
+  const sourceIcon = (source?: string) => {
+    switch (source) {
+      case "receipt": return "🧾";
+      case "invoice": return "📄";
+      case "email": return "📧";
+      case "bank": return "🏦";
+      default: return "🧾";
+    }
+  };
+
   return (
     <AppLayout>
       <div className="max-w-7xl mx-auto px-6 py-8">
@@ -157,27 +319,62 @@ const Receipts = () => {
           </div>
         </div>
 
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,application/pdf"
+          className="hidden"
+          onChange={(e) => handleFileUpload(e.target.files)}
+        />
+
         {/* Upload Area */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-card rounded-2xl border-2 border-dashed border-border p-10 text-center mb-8 hover:border-primary/30 transition-colors cursor-pointer"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={handleDrop}
+          onClick={() => !uploading && fileInputRef.current?.click()}
+          className={`bg-card rounded-2xl border-2 border-dashed p-10 text-center mb-8 transition-colors cursor-pointer ${
+            uploading ? "border-primary/50 bg-primary/5" : "border-border hover:border-primary/30"
+          }`}
         >
-          <div className="mx-auto h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-            <Upload className="h-6 w-6 text-primary" />
-          </div>
-          <p className="text-sm font-medium text-foreground">Glissez un ticket ici ou cliquez pour importer</p>
-          <p className="text-xs text-muted-foreground mt-1">JPG, PNG ou PDF — max 10 Mo</p>
-          <div className="flex items-center justify-center gap-4 mt-6">
-            <button className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
-              <Camera className="h-4 w-4" />
-              Prendre une photo
-            </button>
-            <button className="inline-flex items-center gap-2 bg-card text-foreground border border-border px-4 py-2 rounded-lg text-sm font-medium hover:bg-secondary transition-colors">
-              <FileText className="h-4 w-4" />
-              Importer un fichier
-            </button>
-          </div>
+          {uploading ? (
+            <div className="space-y-4">
+              <div className="mx-auto h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Loader2 className="h-6 w-6 text-primary animate-spin" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">{analysisStep}</p>
+                <Progress value={analysisProgress} className="mt-3 max-w-xs mx-auto h-2" />
+                <p className="text-xs text-muted-foreground mt-2">{analysisProgress}%</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="mx-auto h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
+                <Upload className="h-6 w-6 text-primary" />
+              </div>
+              <p className="text-sm font-medium text-foreground">Glissez un ticket ici ou cliquez pour importer</p>
+              <p className="text-xs text-muted-foreground mt-1">JPG, PNG, WebP ou PDF — max 10 Mo</p>
+              <div className="flex items-center justify-center gap-4 mt-6">
+                <button
+                  onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                  className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+                >
+                  <Camera className="h-4 w-4" />
+                  Prendre une photo
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                  className="inline-flex items-center gap-2 bg-card text-foreground border border-border px-4 py-2 rounded-lg text-sm font-medium hover:bg-secondary transition-colors"
+                >
+                  <FileText className="h-4 w-4" />
+                  Importer un fichier
+                </button>
+              </div>
+            </>
+          )}
         </motion.div>
 
         {/* Premium CTA */}
@@ -203,9 +400,7 @@ const Receipts = () => {
                 {hasEmails ? (
                   <>
                     <p className="text-sm font-semibold text-foreground">📥 {emails.length} email{emails.length > 1 ? "s" : ""} connecté{emails.length > 1 ? "s" : ""}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                      {emails.map(e => e.email).join(", ")}
-                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{emails.map(e => e.email).join(", ")}</p>
                   </>
                 ) : (
                   <>
@@ -257,9 +452,7 @@ const Receipts = () => {
                 {hasBanks ? (
                   <>
                     <p className="text-sm font-semibold text-foreground">🏦 {banks.length} compte{banks.length > 1 ? "s" : ""} connecté{banks.length > 1 ? "s" : ""}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                      {banks.map(b => b.account_label || b.bank_name).join(", ")}
-                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{banks.map(b => b.account_label || b.bank_name).join(", ")}</p>
                   </>
                 ) : (
                   <>
@@ -299,14 +492,14 @@ const Receipts = () => {
         {/* AI Extraction Steps */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="mb-8">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Processus d'extraction IA</p>
-          <div className="flex items-center gap-2">
-            {["Lecture", "Extraction des articles", "Recherche d'alternatives"].map((step, i) => (
+          <div className="flex items-center gap-2 flex-wrap">
+            {["Lecture OCR", "Extraction IA", "Catégorisation", "Stockage"].map((step, i) => (
               <div key={step} className="flex items-center gap-2">
                 <div className="flex items-center gap-2 bg-card rounded-lg px-3 py-2 border border-border">
                   <div className="h-5 w-5 rounded-full bg-savings/20 text-savings text-[10px] font-bold flex items-center justify-center">{i + 1}</div>
                   <span className="text-xs font-medium text-foreground">{step}</span>
                 </div>
-                {i < 2 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+                {i < 3 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
               </div>
             ))}
           </div>
@@ -314,22 +507,41 @@ const Receipts = () => {
 
         {/* Receipt List */}
         <div className="bg-card rounded-2xl border border-border overflow-hidden">
-          <div className="divide-y divide-border">
-            {receipts.map((r) => (
-              <div key={r.id} onClick={() => setSelectedReceipt(r)} className="grid grid-cols-[1fr_auto_auto_auto] md:grid-cols-[auto_1fr_auto_auto_auto] gap-4 p-4 items-center hover:bg-secondary/50 transition-colors cursor-pointer">
-                <div className="hidden md:flex h-10 w-10 rounded-xl bg-secondary items-center justify-center text-sm font-bold text-foreground">
-                  {r.store[0]}
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">{r.store}</p>
-                  <p className="text-[10px] text-muted-foreground">{r.date} · {r.items} articles</p>
-                </div>
-                <span className="bg-savings/10 text-savings px-2 py-0.5 rounded text-[10px] font-bold uppercase">{r.status}</span>
-                <span className="text-sm font-semibold tabular-nums text-foreground">{r.total}</span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </div>
-            ))}
+          <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+            <p className="text-sm font-semibold text-foreground">Dépenses analysées</p>
+            <Badge variant="secondary" className="text-xs">{expenses.length} résultat{expenses.length > 1 ? "s" : ""}</Badge>
           </div>
+          {loading ? (
+            <div className="p-8 text-center">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mx-auto" />
+              <p className="text-xs text-muted-foreground mt-2">Chargement…</p>
+            </div>
+          ) : expenses.length === 0 ? (
+            <div className="p-8 text-center">
+              <div className="mx-auto h-12 w-12 rounded-xl bg-muted flex items-center justify-center mb-3">
+                <Sparkles className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-medium text-foreground">Aucune dépense analysée</p>
+              <p className="text-xs text-muted-foreground mt-1">Importez un ticket ou une facture pour commencer</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {expenses.map((r) => (
+                <div key={r.id} onClick={() => setSelectedReceipt(r)} className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-4 p-4 items-center hover:bg-secondary/50 transition-colors cursor-pointer">
+                  <div className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center text-lg">
+                    {sourceIcon(r.source)}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{r.store}</p>
+                    <p className="text-[10px] text-muted-foreground">{r.date} · {r.items} articles</p>
+                  </div>
+                  <Badge variant="outline" className="text-[10px] text-savings border-savings/30">{r.status}</Badge>
+                  <span className="text-sm font-semibold tabular-nums text-foreground">{r.total}</span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -432,8 +644,8 @@ const Receipts = () => {
             <>
               <SheetHeader className="pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
-                    {selectedReceipt.store[0]}
+                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-lg">
+                    {sourceIcon(selectedReceipt.source)}
                   </div>
                   <div>
                     <SheetTitle className="text-lg">{selectedReceipt.store}</SheetTitle>
@@ -442,7 +654,6 @@ const Receipts = () => {
                 </div>
               </SheetHeader>
 
-              {/* Summary bar */}
               <div className="flex items-center justify-between bg-secondary/50 rounded-xl px-4 py-3 mb-4">
                 <div className="flex items-center gap-2">
                   <ShoppingCart className="h-4 w-4 text-muted-foreground" />
@@ -451,33 +662,33 @@ const Receipts = () => {
                 <span className="text-base font-bold text-foreground">{selectedReceipt.total}</span>
               </div>
 
-              {/* Products list */}
-              <div className="space-y-1">
-                {/* Header */}
-                <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  <span>Produit</span>
-                  <span className="text-right w-20">Prix unit.</span>
-                  <span className="text-right w-16">Total</span>
-                </div>
-
-                {selectedReceipt.products.map((p, i) => (
-                  <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2.5 rounded-lg hover:bg-secondary/50 transition-colors items-center">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{p.name}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px] text-muted-foreground">Qté: {p.qty}</span>
-                        {p.pricePerUnit && (
-                          <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">{p.pricePerUnit}</span>
-                        )}
-                      </div>
-                    </div>
-                    <span className="text-xs tabular-nums text-muted-foreground text-right w-20">{p.unitPrice.toFixed(2)} €</span>
-                    <span className="text-sm tabular-nums font-semibold text-foreground text-right w-16">{p.total.toFixed(2)} €</span>
+              {selectedReceipt.products.length > 0 ? (
+                <div className="space-y-1">
+                  <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <span>Produit</span>
+                    <span className="text-right w-20">Prix unit.</span>
+                    <span className="text-right w-16">Total</span>
                   </div>
-                ))}
-              </div>
+                  {selectedReceipt.products.map((p, i) => (
+                    <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2.5 rounded-lg hover:bg-secondary/50 transition-colors items-center">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{p.name}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] text-muted-foreground">Qté: {p.qty}</span>
+                          {p.pricePerUnit && (
+                            <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">{p.pricePerUnit}</span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-xs tabular-nums text-muted-foreground text-right w-20">{p.unitPrice.toFixed(2)} €</span>
+                      <span className="text-sm tabular-nums font-semibold text-foreground text-right w-16">{p.total.toFixed(2)} €</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">Aucun détail d'articles disponible</p>
+              )}
 
-              {/* Total bar */}
               <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
                 <span className="text-sm font-medium text-muted-foreground">Total</span>
                 <span className="text-lg font-bold text-foreground">{selectedReceipt.total}</span>
