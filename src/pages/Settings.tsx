@@ -9,6 +9,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 
 const Settings = () => {
   const { user, signOut } = useAuth();
