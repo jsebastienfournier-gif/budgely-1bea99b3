@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { ArrowRight, Receipt, CreditCard, Mail, Brain, Users, TrendingDown, BarChart3, Shield } from "lucide-react";
+import PricingSection from "@/components/PricingSection";
 
 const fadeUp = {
   initial: { opacity: 0, y: 20 },
@@ -36,6 +37,7 @@ const Landing = () => {
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Fonctionnalités</a>
             <a href="#how" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Comment ça marche</a>
+            <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Tarifs</a>
             <Link to="/auth" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Connexion</Link>
             <Link
               to="/auth"
@@ -215,6 +217,9 @@ const Landing = () => {
           </div>
         </div>
       </section>
+
+      {/* Pricing */}
+      <PricingSection />
 
       {/* CTA */}
       <section className="px-6 py-20">
