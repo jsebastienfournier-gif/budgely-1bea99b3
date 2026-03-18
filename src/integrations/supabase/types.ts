@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_usage: {
+        Row: {
+          created_at: string
+          id: string
+          month_year: string
+          source: Database["public"]["Enums"]["document_source"]
+          updated_at: string
+          usage_count: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          month_year: string
+          source: Database["public"]["Enums"]["document_source"]
+          updated_at?: string
+          usage_count?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          month_year?: string
+          source?: Database["public"]["Enums"]["document_source"]
+          updated_at?: string
+          usage_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       connected_bank_accounts: {
         Row: {
           account_label: string | null
@@ -92,6 +122,134 @@ export type Database = {
         }
         Relationships: []
       }
+      documents: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          file_name: string | null
+          file_size: number | null
+          file_url: string | null
+          id: string
+          mime_type: string | null
+          raw_text: string | null
+          source: Database["public"]["Enums"]["document_source"]
+          status: Database["public"]["Enums"]["analysis_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          file_name?: string | null
+          file_size?: number | null
+          file_url?: string | null
+          id?: string
+          mime_type?: string | null
+          raw_text?: string | null
+          source: Database["public"]["Enums"]["document_source"]
+          status?: Database["public"]["Enums"]["analysis_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          file_name?: string | null
+          file_size?: number | null
+          file_url?: string | null
+          id?: string
+          mime_type?: string | null
+          raw_text?: string | null
+          source?: Database["public"]["Enums"]["document_source"]
+          status?: Database["public"]["Enums"]["analysis_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      expenses: {
+        Row: {
+          abonnement_detecte: boolean | null
+          articles: Json | null
+          categorie: string | null
+          commentaire: string | null
+          created_at: string
+          date_expense: string | null
+          description: string | null
+          devise: string | null
+          document_id: string | null
+          fournisseur: string | null
+          id: string
+          magasin: string | null
+          montant_total: number | null
+          moyen_paiement: string | null
+          numero_facture: string | null
+          raw_ai_response: Json | null
+          recurrence: string | null
+          source: Database["public"]["Enums"]["document_source"]
+          type_depense: string | null
+          type_document: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          abonnement_detecte?: boolean | null
+          articles?: Json | null
+          categorie?: string | null
+          commentaire?: string | null
+          created_at?: string
+          date_expense?: string | null
+          description?: string | null
+          devise?: string | null
+          document_id?: string | null
+          fournisseur?: string | null
+          id?: string
+          magasin?: string | null
+          montant_total?: number | null
+          moyen_paiement?: string | null
+          numero_facture?: string | null
+          raw_ai_response?: Json | null
+          recurrence?: string | null
+          source: Database["public"]["Enums"]["document_source"]
+          type_depense?: string | null
+          type_document?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          abonnement_detecte?: boolean | null
+          articles?: Json | null
+          categorie?: string | null
+          commentaire?: string | null
+          created_at?: string
+          date_expense?: string | null
+          description?: string | null
+          devise?: string | null
+          document_id?: string | null
+          fournisseur?: string | null
+          id?: string
+          magasin?: string | null
+          montant_total?: number | null
+          moyen_paiement?: string | null
+          numero_facture?: string | null
+          raw_ai_response?: Json | null
+          recurrence?: string | null
+          source?: Database["public"]["Enums"]["document_source"]
+          type_depense?: string | null
+          type_document?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       household_members: {
         Row: {
           avatar_url: string | null
@@ -152,6 +310,95 @@ export type Database = {
         }
         Relationships: []
       }
+      subscriptions: {
+        Row: {
+          categorie: string | null
+          created_at: string
+          date_debut: string | null
+          date_fin: string | null
+          detected_from_document_id: string | null
+          devise: string | null
+          fournisseur: string
+          id: string
+          montant: number | null
+          recurrence: string | null
+          source: Database["public"]["Enums"]["document_source"] | null
+          statut: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          categorie?: string | null
+          created_at?: string
+          date_debut?: string | null
+          date_fin?: string | null
+          detected_from_document_id?: string | null
+          devise?: string | null
+          fournisseur: string
+          id?: string
+          montant?: number | null
+          recurrence?: string | null
+          source?: Database["public"]["Enums"]["document_source"] | null
+          statut?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          categorie?: string | null
+          created_at?: string
+          date_debut?: string | null
+          date_fin?: string | null
+          detected_from_document_id?: string | null
+          devise?: string | null
+          fournisseur?: string
+          id?: string
+          montant?: number | null
+          recurrence?: string | null
+          source?: Database["public"]["Enums"]["document_source"] | null
+          statut?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_detected_from_document_id_fkey"
+            columns: ["detected_from_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_plans: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          plan: string
+          started_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          plan?: string
+          started_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          plan?: string
+          started_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -185,9 +432,18 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_ai_usage: {
+        Args: {
+          _source: Database["public"]["Enums"]["document_source"]
+          _user_id: string
+        }
+        Returns: number
+      }
     }
     Enums: {
+      analysis_status: "pending" | "processing" | "completed" | "failed"
       app_role: "admin" | "moderator" | "user"
+      document_source: "receipt" | "invoice" | "email" | "bank"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -315,7 +571,9 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      analysis_status: ["pending", "processing", "completed", "failed"],
       app_role: ["admin", "moderator", "user"],
+      document_source: ["receipt", "invoice", "email", "bank"],
     },
   },
 } as const
