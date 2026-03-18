@@ -206,6 +206,11 @@ const Transactions = () => {
           )}
         </div>
 
+        {/* Premium CTA */}
+        <div className="mt-8">
+          <PremiumCTA message="Analyse illimitée disponible avec Premium" />
+        </div>
+
         {/* Footer */}
         <div className="mt-8 sm:mt-10 pt-6 border-t border-border text-center">
           <Link
