@@ -298,6 +298,50 @@ export type Database = {
           },
         ]
       }
+      gmail_tokens: {
+        Row: {
+          access_token: string
+          connected_email_id: string | null
+          created_at: string
+          email: string
+          id: string
+          refresh_token: string
+          token_expires_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          connected_email_id?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          refresh_token: string
+          token_expires_at: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          connected_email_id?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          refresh_token?: string
+          token_expires_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gmail_tokens_connected_email_id_fkey"
+            columns: ["connected_email_id"]
+            isOneToOne: false
+            referencedRelation: "connected_emails"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       household_members: {
         Row: {
           avatar_url: string | null
