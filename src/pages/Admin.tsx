@@ -64,6 +64,20 @@ const Admin = () => {
     if (user) loadUsers();
   }, [user]);
 
+  useEffect(() => {
+    setMaintenanceMsg(maintenance.message);
+  }, [maintenance.message]);
+
+  const handleToggleMaintenance = async () => {
+    const newEnabled = !maintenance.enabled;
+    const { error } = await toggleMaintenance(newEnabled, maintenanceMsg);
+    if (error) {
+      toast.error("Erreur lors de la mise à jour");
+    } else {
+      toast.success(newEnabled ? "Mode maintenance activé" : "Mode maintenance désactivé");
+    }
+  };
+
   const handleSetRole = async (targetUserId: string, role: string, remove: boolean) => {
     try {
       await callAdmin({ action: "set_role", target_user_id: targetUserId, role, remove });
