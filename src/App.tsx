@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { usePageTracking } from "@/hooks/usePageTracking";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
