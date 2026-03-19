@@ -33,6 +33,8 @@ const Admin = () => {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const { maintenance, toggleMaintenance } = useMaintenanceMode();
+  const [maintenanceMsg, setMaintenanceMsg] = useState("");
 
   const callAdmin = async (body: Record<string, unknown>) => {
     const { data, error } = await supabase.functions.invoke("admin-users", { body });
