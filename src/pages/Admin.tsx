@@ -156,6 +156,10 @@ const Admin = () => {
               <Wrench className="h-3.5 w-3.5" />
               Maintenance
             </TabsTrigger>
+            <TabsTrigger value="messages" className="gap-1.5">
+              <MessageSquare className="h-3.5 w-3.5" />
+              Messages
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="analytics">
