@@ -42,6 +42,7 @@ const bankList = [
 const Receipts = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [emails, setEmails] = useState<ConnectedEmail[]>([]);
   const [banks, setBanks] = useState<ConnectedBank[]>([]);
@@ -50,6 +51,7 @@ const Receipts = () => {
   const [uploading, setUploading] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [analysisStep, setAnalysisStep] = useState("");
+  const [syncing, setSyncing] = useState(false);
 
   // Dialog state
   const [showEmailDialog, setShowEmailDialog] = useState(false);
@@ -60,6 +62,25 @@ const Receipts = () => {
   const [newBankLabel, setNewBankLabel] = useState("");
   const [saving, setSaving] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
+
+  // Handle Gmail OAuth callback params
+  useEffect(() => {
+    if (searchParams.get("gmail_connected") === "true") {
+      const email = searchParams.get("email") || "";
+      toast.success(`Gmail connecté : ${email}`);
+      setSearchParams({}, { replace: true });
+      // Reload emails
+      if (user) {
+        supabase.from("connected_emails").select("*").eq("user_id", user.id).order("created_at").then(({ data }) => {
+          setEmails((data as ConnectedEmail[]) || []);
+        });
+      }
+    }
+    if (searchParams.get("gmail_error")) {
+      toast.error("Erreur de connexion Gmail : " + searchParams.get("gmail_error"));
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!user) return;
