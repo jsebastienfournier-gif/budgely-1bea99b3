@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AnalyticsDashboard from "@/components/admin/AnalyticsDashboard";
+import ContactMessages from "@/components/admin/ContactMessages";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
