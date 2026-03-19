@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { Shield, Trash2, UserCog, Loader2, Crown, AlertTriangle } from "lucide-react";
+import { Shield, Trash2, UserCog, Loader2, Crown, AlertTriangle, Wrench } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -32,6 +33,8 @@ const Admin = () => {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const { maintenance, toggleMaintenance } = useMaintenanceMode();
+  const [maintenanceMsg, setMaintenanceMsg] = useState("");
 
   const callAdmin = async (body: Record<string, unknown>) => {
     const { data, error } = await supabase.functions.invoke("admin-users", { body });
@@ -60,6 +63,20 @@ const Admin = () => {
   useEffect(() => {
     if (user) loadUsers();
   }, [user]);
+
+  useEffect(() => {
+    setMaintenanceMsg(maintenance.message);
+  }, [maintenance.message]);
+
+  const handleToggleMaintenance = async () => {
+    const newEnabled = !maintenance.enabled;
+    const { error } = await toggleMaintenance(newEnabled, maintenanceMsg);
+    if (error) {
+      toast.error("Erreur lors de la mise à jour");
+    } else {
+      toast.success(newEnabled ? "Mode maintenance activé" : "Mode maintenance désactivé");
+    }
+  };
 
   const handleSetRole = async (targetUserId: string, role: string, remove: boolean) => {
     try {
@@ -139,6 +156,45 @@ const Admin = () => {
               <p className="text-2xl font-bold text-foreground">{s.value}</p>
             </div>
           ))}
+        </div>
+
+        {/* Maintenance Mode */}
+        <div className={`bg-card border rounded-xl p-5 mb-8 ${maintenance.enabled ? "border-destructive/50 bg-destructive/5" : "border-border"}`}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${maintenance.enabled ? "bg-destructive/10" : "bg-primary/10"}`}>
+                <Wrench className={`h-4 w-4 ${maintenance.enabled ? "text-destructive" : "text-primary"}`} />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Mode maintenance</h3>
+                <p className="text-xs text-muted-foreground">
+                  {maintenance.enabled ? "L'application est actuellement bloquée" : "L'application est accessible à tous"}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleToggleMaintenance}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                maintenance.enabled
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              }`}
+            >
+              {maintenance.enabled ? "Désactiver" : "Activer"}
+            </button>
+          </div>
+          <input
+            type="text"
+            value={maintenanceMsg}
+            onChange={(e) => setMaintenanceMsg(e.target.value)}
+            onBlur={() => {
+              if (maintenanceMsg !== maintenance.message) {
+                toggleMaintenance(maintenance.enabled, maintenanceMsg);
+              }
+            }}
+            placeholder="Message affiché aux utilisateurs..."
+            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+          />
         </div>
 
         {/* Users table */}
