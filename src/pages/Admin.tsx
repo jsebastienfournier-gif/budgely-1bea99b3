@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
-import { Shield, Trash2, UserCog, Loader2, Crown, AlertTriangle, Wrench } from "lucide-react";
+import { Shield, Trash2, UserCog, Loader2, Crown, AlertTriangle, Wrench, BarChart3 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import AnalyticsDashboard from "@/components/admin/AnalyticsDashboard";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
