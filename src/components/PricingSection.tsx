@@ -128,10 +128,14 @@ const PricingSection = () => {
     if (plan.key === currentPlan) return;
 
     const stripePlan = STRIPE_PLANS[plan.key];
-    const priceId =
-      plan.key === "premium" && billingCycle === "annual"
-        ? stripePlan.prices.annual
-        : stripePlan.prices.monthly;
+    let priceId: string | undefined;
+    if (plan.key === "premium") {
+      priceId = billingCycle === "annual"
+        ? STRIPE_PLANS.premium.prices.annual
+        : STRIPE_PLANS.premium.prices.monthly;
+    } else if (plan.key === "essentiel") {
+      priceId = STRIPE_PLANS.essentiel.prices.monthly;
+    }
 
     if (priceId) checkout(priceId);
   };
