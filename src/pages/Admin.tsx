@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Shield, Trash2, UserCog, Loader2, Crown, AlertTriangle, Wrench, BarChart3 } from "lucide-react";
+import { Shield, Trash2, UserCog, Loader2, Crown, AlertTriangle, Wrench, BarChart3, MessageSquare } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AnalyticsDashboard from "@/components/admin/AnalyticsDashboard";
+import ContactMessages from "@/components/admin/ContactMessages";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -154,6 +155,10 @@ const Admin = () => {
             <TabsTrigger value="maintenance" className="gap-1.5">
               <Wrench className="h-3.5 w-3.5" />
               Maintenance
+            </TabsTrigger>
+            <TabsTrigger value="messages" className="gap-1.5">
+              <MessageSquare className="h-3.5 w-3.5" />
+              Messages
             </TabsTrigger>
           </TabsList>
 
@@ -308,6 +313,10 @@ const Admin = () => {
                 className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
               />
             </div>
+          </TabsContent>
+
+          <TabsContent value="messages">
+            <ContactMessages />
           </TabsContent>
         </Tabs>
       </div>
