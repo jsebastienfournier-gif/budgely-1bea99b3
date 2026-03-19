@@ -36,6 +36,11 @@ const MaintenanceGate = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const PageTracker = () => {
+  usePageTracking();
+  return null;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -44,6 +49,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <SubscriptionProvider>
+            <PageTracker />
             <MaintenanceGate>
               <Routes>
                 <Route path="/" element={<Landing />} />

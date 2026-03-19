@@ -141,163 +141,175 @@ const Admin = () => {
           </p>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          {[
-            { label: "Utilisateurs", value: users.length, icon: UserCog },
-            { label: "Admins", value: users.filter((u) => u.roles.includes("admin")).length, icon: Crown },
-            { label: "Modérateurs", value: users.filter((u) => u.roles.includes("moderator")).length, icon: Shield },
-          ].map((s) => (
-            <div key={s.label} className="bg-card border border-border rounded-xl p-5">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <s.icon className="h-4 w-4 text-primary" />
-                </div>
-                <span className="text-sm text-muted-foreground">{s.label}</span>
-              </div>
-              <p className="text-2xl font-bold text-foreground">{s.value}</p>
-            </div>
-          ))}
-        </div>
+        <Tabs defaultValue="analytics" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="analytics" className="gap-1.5">
+              <BarChart3 className="h-3.5 w-3.5" />
+              Analytiques
+            </TabsTrigger>
+            <TabsTrigger value="users" className="gap-1.5">
+              <UserCog className="h-3.5 w-3.5" />
+              Utilisateurs
+            </TabsTrigger>
+            <TabsTrigger value="maintenance" className="gap-1.5">
+              <Wrench className="h-3.5 w-3.5" />
+              Maintenance
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Maintenance Mode */}
-        <div className={`bg-card border rounded-xl p-5 mb-8 ${maintenance.enabled ? "border-destructive/50 bg-destructive/5" : "border-border"}`}>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${maintenance.enabled ? "bg-destructive/10" : "bg-primary/10"}`}>
-                <Wrench className={`h-4 w-4 ${maintenance.enabled ? "text-destructive" : "text-primary"}`} />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">Mode maintenance</h3>
-                <p className="text-xs text-muted-foreground">
-                  {maintenance.enabled ? "L'application est actuellement bloquée" : "L'application est accessible à tous"}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleToggleMaintenance}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                maintenance.enabled
-                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                  : "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              }`}
-            >
-              {maintenance.enabled ? "Désactiver" : "Activer"}
-            </button>
-          </div>
-          <input
-            type="text"
-            value={maintenanceMsg}
-            onChange={(e) => setMaintenanceMsg(e.target.value)}
-            onBlur={() => {
-              if (maintenanceMsg !== maintenance.message) {
-                toggleMaintenance(maintenance.enabled, maintenanceMsg);
-              }
-            }}
-            placeholder="Message affiché aux utilisateurs..."
-            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
-          />
-        </div>
+          <TabsContent value="analytics">
+            <AnalyticsDashboard />
+          </TabsContent>
 
-        {/* Users table */}
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-border">
-            <h2 className="text-sm font-semibold text-foreground">Liste des utilisateurs</h2>
-          </div>
-
-          <div className="divide-y divide-border">
-            {users.map((u) => {
-              const isSelf = u.id === user?.id;
-              return (
-                <div key={u.id} className="px-5 py-4 flex items-center gap-4">
-                  {/* Avatar */}
-                  <div className="h-10 w-10 rounded-xl bg-secondary flex-shrink-0 flex items-center justify-center overflow-hidden">
-                    {u.avatar_url ? (
-                      <img src={u.avatar_url} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <span className="text-sm font-bold text-muted-foreground">
-                        {(u.full_name || u.email || "?")[0].toUpperCase()}
-                      </span>
-                    )}
+          <TabsContent value="users" className="space-y-6">
+            {/* Stats */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                { label: "Utilisateurs", value: users.length, icon: UserCog },
+                { label: "Admins", value: users.filter((u) => u.roles.includes("admin")).length, icon: Crown },
+                { label: "Modérateurs", value: users.filter((u) => u.roles.includes("moderator")).length, icon: Shield },
+              ].map((s) => (
+                <div key={s.label} className="bg-card border border-border rounded-xl p-5">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <s.icon className="h-4 w-4 text-primary" />
+                    </div>
+                    <span className="text-sm text-muted-foreground">{s.label}</span>
                   </div>
+                  <p className="text-2xl font-bold text-foreground">{s.value}</p>
+                </div>
+              ))}
+            </div>
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {u.full_name || "Sans nom"}
-                      {isSelf && <span className="text-xs text-muted-foreground ml-2">(vous)</span>}
+            {/* Users table */}
+            <div className="bg-card border border-border rounded-xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-border">
+                <h2 className="text-sm font-semibold text-foreground">Liste des utilisateurs</h2>
+              </div>
+              <div className="divide-y divide-border">
+                {users.map((u) => {
+                  const isSelf = u.id === user?.id;
+                  return (
+                    <div key={u.id} className="px-5 py-4 flex items-center gap-4">
+                      <div className="h-10 w-10 rounded-xl bg-secondary flex-shrink-0 flex items-center justify-center overflow-hidden">
+                        {u.avatar_url ? (
+                          <img src={u.avatar_url} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="text-sm font-bold text-muted-foreground">
+                            {(u.full_name || u.email || "?")[0].toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {u.full_name || "Sans nom"}
+                          {isSelf && <span className="text-xs text-muted-foreground ml-2">(vous)</span>}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                      </div>
+                      <div className="hidden sm:flex items-center gap-1.5">
+                        {u.roles.length === 0 && (
+                          <span className="text-[10px] font-medium px-2 py-1 rounded-full bg-secondary text-muted-foreground">
+                            Aucun rôle
+                          </span>
+                        )}
+                        {u.roles.map((r) => {
+                          const style = ROLE_LABELS[r] || { label: r, color: "bg-secondary text-foreground" };
+                          return (
+                            <span key={r} className={`text-[10px] font-medium px-2 py-1 rounded-full ${style.color}`}>
+                              {style.label}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <p className="hidden md:block text-xs text-muted-foreground whitespace-nowrap">
+                        {new Date(u.created_at).toLocaleDateString("fr-FR")}
+                      </p>
+                      <div className="flex items-center gap-1">
+                        {(["admin", "moderator", "user"] as const).map((role) => {
+                          const hasRole = u.roles.includes(role);
+                          const style = ROLE_LABELS[role];
+                          const disabled = isSelf && role === "admin";
+                          return (
+                            <button
+                              key={role}
+                              disabled={disabled}
+                              onClick={() => handleSetRole(u.id, role, hasRole)}
+                              title={
+                                disabled
+                                  ? "Vous ne pouvez pas retirer votre propre rôle admin"
+                                  : hasRole
+                                    ? `Retirer ${style.label}`
+                                    : `Attribuer ${style.label}`
+                              }
+                              className={`text-[10px] font-medium px-2 py-1 rounded-full transition-all ${
+                                hasRole
+                                  ? `${style.color} ring-1 ring-current/20`
+                                  : "bg-secondary text-muted-foreground hover:bg-secondary/80"
+                              } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                            >
+                              {style.label}
+                            </button>
+                          );
+                        })}
+                        {!isSelf && (
+                          <button
+                            onClick={() => setDeleteTarget(u)}
+                            className="ml-2 h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                            title="Supprimer l'utilisateur"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="maintenance">
+            {/* Maintenance Mode */}
+            <div className={`bg-card border rounded-xl p-5 ${maintenance.enabled ? "border-destructive/50 bg-destructive/5" : "border-border"}`}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${maintenance.enabled ? "bg-destructive/10" : "bg-primary/10"}`}>
+                    <Wrench className={`h-4 w-4 ${maintenance.enabled ? "text-destructive" : "text-primary"}`} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">Mode maintenance</h3>
+                    <p className="text-xs text-muted-foreground">
+                      {maintenance.enabled ? "L'application est actuellement bloquée" : "L'application est accessible à tous"}
                     </p>
-                    <p className="text-xs text-muted-foreground truncate">{u.email}</p>
-                  </div>
-
-                  {/* Roles */}
-                  <div className="hidden sm:flex items-center gap-1.5">
-                    {u.roles.length === 0 && (
-                      <span className="text-[10px] font-medium px-2 py-1 rounded-full bg-secondary text-muted-foreground">
-                        Aucun rôle
-                      </span>
-                    )}
-                    {u.roles.map((r) => {
-                      const style = ROLE_LABELS[r] || { label: r, color: "bg-secondary text-foreground" };
-                      return (
-                        <span key={r} className={`text-[10px] font-medium px-2 py-1 rounded-full ${style.color}`}>
-                          {style.label}
-                        </span>
-                      );
-                    })}
-                  </div>
-
-                  {/* Date */}
-                  <p className="hidden md:block text-xs text-muted-foreground whitespace-nowrap">
-                    {new Date(u.created_at).toLocaleDateString("fr-FR")}
-                  </p>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-1">
-                    {/* Role toggles */}
-                    {(["admin", "moderator", "user"] as const).map((role) => {
-                      const hasRole = u.roles.includes(role);
-                      const style = ROLE_LABELS[role];
-                      const disabled = isSelf && role === "admin";
-                      return (
-                        <button
-                          key={role}
-                          disabled={disabled}
-                          onClick={() => handleSetRole(u.id, role, hasRole)}
-                          title={
-                            disabled
-                              ? "Vous ne pouvez pas retirer votre propre rôle admin"
-                              : hasRole
-                                ? `Retirer ${style.label}`
-                                : `Attribuer ${style.label}`
-                          }
-                          className={`text-[10px] font-medium px-2 py-1 rounded-full transition-all ${
-                            hasRole
-                              ? `${style.color} ring-1 ring-current/20`
-                              : "bg-secondary text-muted-foreground hover:bg-secondary/80"
-                          } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-                        >
-                          {style.label}
-                        </button>
-                      );
-                    })}
-
-                    {/* Delete */}
-                    {!isSelf && (
-                      <button
-                        onClick={() => setDeleteTarget(u)}
-                        className="ml-2 h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                        title="Supprimer l'utilisateur"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
+                <button
+                  onClick={handleToggleMaintenance}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    maintenance.enabled
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  }`}
+                >
+                  {maintenance.enabled ? "Désactiver" : "Activer"}
+                </button>
+              </div>
+              <input
+                type="text"
+                value={maintenanceMsg}
+                onChange={(e) => setMaintenanceMsg(e.target.value)}
+                onBlur={() => {
+                  if (maintenanceMsg !== maintenance.message) {
+                    toggleMaintenance(maintenance.enabled, maintenanceMsg);
+                  }
+                }}
+                placeholder="Message affiché aux utilisateurs..."
+                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+              />
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Delete confirmation */}
