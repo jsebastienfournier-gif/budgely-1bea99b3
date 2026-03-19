@@ -223,6 +223,9 @@ const Landing = () => {
       {/* Pricing */}
       <PricingSection />
 
+      {/* Contact */}
+      <ContactSection />
+
       {/* CTA */}
       <section className="px-6 py-20">
         <motion.div
