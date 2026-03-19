@@ -503,7 +503,7 @@ const Receipts = () => {
               </div>
               {hasEmails ? (
                 <div className="flex items-center gap-2 shrink-0">
-                  <RefreshCw className="h-4 w-4 text-primary" />
+                  <RefreshCw className={`h-4 w-4 text-primary ${syncing ? "animate-spin" : ""}`} />
                   <button
                     onClick={(e) => { e.stopPropagation(); setShowEmailDialog(true); }}
                     className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
