@@ -481,7 +481,7 @@ const Receipts = () => {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            onClick={() => hasEmails ? toast.info("Synchronisation en cours…") : setShowEmailDialog(true)}
+            onClick={() => hasEmails ? handleSyncGmail(emails[0]?.email) : setShowEmailDialog(true)}
             className="bg-card rounded-2xl border border-border p-6 hover:border-primary/30 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-4">
