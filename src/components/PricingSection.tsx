@@ -278,10 +278,15 @@ const PricingSection = () => {
                   disabled={isCurrentPlan(plan) || loading !== null}
                   onClick={() => handlePlanClick(plan)}
                 >
-                  {loading ===
-                    (plan.key === "premium" && billingCycle === "annual"
+                  {loading !== null && loading === (
+                    plan.key === "premium" && billingCycle === "annual"
                       ? STRIPE_PLANS.premium.prices.annual
-                      : STRIPE_PLANS[plan.key]?.prices?.monthly) ? (
+                      : plan.key === "premium"
+                      ? STRIPE_PLANS.premium.prices.monthly
+                      : plan.key === "essentiel"
+                      ? STRIPE_PLANS.essentiel.prices.monthly
+                      : null
+                  ) ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   ) : null}
                   {getButtonLabel(plan)}
