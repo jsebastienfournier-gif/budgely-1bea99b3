@@ -271,7 +271,28 @@ const Receipts = () => {
   };
 
   const handleAddEmail = async () => {
-    if (!newEmail.trim() || !user) return;
+    if (!user) return;
+
+    if (newEmailProvider === "gmail") {
+      // Trigger Gmail OAuth flow
+      setSaving(true);
+      try {
+        const { data, error } = await supabase.functions.invoke("gmail-auth");
+        if (error) throw error;
+        if (data?.url) {
+          window.location.href = data.url;
+          return;
+        }
+        throw new Error("Aucune URL d'autorisation reçue");
+      } catch (err: any) {
+        toast.error("Erreur : " + (err.message || "Impossible de lancer la connexion Gmail"));
+        setSaving(false);
+      }
+      return;
+    }
+
+    // For non-Gmail providers, keep manual flow
+    if (!newEmail.trim()) return;
     setSaving(true);
     const { data, error } = await supabase
       .from("connected_emails")
@@ -285,6 +306,56 @@ const Receipts = () => {
     setNewEmailProvider("gmail");
     setShowEmailDialog(false);
     toast.success("Adresse email connectée !");
+  };
+
+  const handleSyncGmail = async (email: string) => {
+    if (!user || syncing) return;
+    setSyncing(true);
+    toast.info("Synchronisation Gmail en cours…");
+    try {
+      const { data, error } = await supabase.functions.invoke("gmail-sync", {
+        body: { email },
+      });
+      if (error) throw error;
+      if (data?.analyzed > 0) {
+        toast.success(`${data.analyzed} email(s) analysé(s) sur ${data.total}`);
+        // Reload expenses
+        const { data: expenseRes } = await supabase
+          .from("expenses")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(50);
+        const mapped = (expenseRes || []).map((e: any) => {
+          const articles = (e.articles || []).map((a: any) => ({
+            name: a.nom || a.name || "",
+            qty: a.quantite || a.qty || 1,
+            unit: a.unite || a.unit || "pce",
+            unitPrice: a.prix_unitaire || a.unitPrice || 0,
+            total: a.prix_total || a.total || 0,
+          }));
+          return {
+            id: e.id,
+            store: e.magasin || e.fournisseur || "Inconnu",
+            date: e.date_expense ? new Date(e.date_expense).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "Date inconnue",
+            total: `€${(e.montant_total || 0).toFixed(2)}`,
+            items: articles.length,
+            status: "Analysé",
+            products: articles,
+            source: e.source,
+          };
+        });
+        setExpenses(mapped);
+        // Update last_sync_at in local state
+        setEmails(prev => prev.map(em => em.email === email ? { ...em, last_sync_at: new Date().toISOString() } : em));
+      } else {
+        toast.info(data?.message || "Aucun email financier trouvé");
+      }
+    } catch (err: any) {
+      toast.error("Erreur de synchronisation : " + (err.message || "Erreur inconnue"));
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const handleAddBank = async () => {
