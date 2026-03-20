@@ -21,6 +21,7 @@ import Subscription from "./pages/Subscription";
 import LegalNotice from "./pages/LegalNotice";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
+import Unsubscribe from "./pages/Unsubscribe";
 import NotFound from "./pages/NotFound";
 import Maintenance from "./pages/Maintenance";
 
@@ -68,6 +69,7 @@ const App = () => (
                 <Route path="/mentions-legales" element={<LegalNotice />} />
                 <Route path="/confidentialite" element={<PrivacyPolicy />} />
                 <Route path="/cgu" element={<TermsOfService />} />
+                <Route path="/unsubscribe" element={<Unsubscribe />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </MaintenanceGate>

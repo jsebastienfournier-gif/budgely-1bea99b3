@@ -31,7 +31,7 @@ const Auth = () => {
         toast.success("Connexion réussie !");
         navigate("/dashboard");
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -40,6 +40,17 @@ const Auth = () => {
           },
         });
         if (error) throw error;
+        // Send welcome email
+        if (data.user) {
+          supabase.functions.invoke("send-transactional-email", {
+            body: {
+              templateName: "welcome",
+              recipientEmail: email,
+              idempotencyKey: `welcome-${data.user.id}`,
+              templateData: { name: fullName },
+            },
+          });
+        }
         toast.success("Compte créé ! Vérifiez votre email.");
       }
     } catch (error: any) {
