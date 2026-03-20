@@ -247,15 +247,36 @@ const Landing = () => {
       </section>
 
       {/* Footer */}
-      <footer className="px-6 py-10 border-t border-border">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded bg-primary flex items-center justify-center">
-              <BarChart3 className="h-3 w-3 text-primary-foreground" />
+      <footer className="px-6 pt-12 pb-8 border-t border-border">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-8">
+            <div className="flex items-center gap-2">
+              <div className="h-6 w-6 rounded bg-primary flex items-center justify-center">
+                <BarChart3 className="h-3 w-3 text-primary-foreground" />
+              </div>
+              <span className="text-sm font-semibold text-foreground">Budgely</span>
             </div>
-            <span className="text-sm font-semibold text-foreground">Budgely</span>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+              <Link to="/mentions-legales" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                Mentions légales
+              </Link>
+              <Link to="/confidentialite" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                Politique de confidentialité
+              </Link>
+              <Link to="/cgu" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                CGU
+              </Link>
+              <a href="#contact" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                Contact
+              </a>
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground">© 2026 Budgely. Tous droits réservés.</p>
+          <div className="border-t border-border pt-6 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">© 2026 Budgely. Tous droits réservés.</p>
+            <p className="text-xs text-muted-foreground">
+              Fait avec soin en France 🇫🇷
+            </p>
+          </div>
         </div>
       </footer>
     </div>

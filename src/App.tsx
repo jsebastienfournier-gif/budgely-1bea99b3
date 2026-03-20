@@ -18,6 +18,9 @@ import Insights from "./pages/Insights";
 import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
 import Subscription from "./pages/Subscription";
+import LegalNotice from "./pages/LegalNotice";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 import NotFound from "./pages/NotFound";
 import Maintenance from "./pages/Maintenance";
 
