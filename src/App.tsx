@@ -30,7 +30,7 @@ const MaintenanceGate = ({ children }: { children: React.ReactNode }) => {
 
   // Allow admin and auth page through
   if (loading) return null;
-  if (maintenance.enabled && !isAdmin && location.pathname !== "/auth") {
+  if (maintenance.enabled && !isAdmin && location.pathname !== "/auth" && location.pathname !== "/admin") {
     return <Maintenance message={maintenance.message} />;
   }
   return <>{children}</>;
