@@ -337,18 +337,19 @@ const Receipts = () => {
     toast.success("Adresse email connectée !");
   };
 
-  const handleSyncGmail = async (email: string) => {
+  const handleSyncEmail = async (emailAddr: string, provider: string) => {
     if (!user || syncing) return;
     setSyncing(true);
-    toast.info("Synchronisation Gmail en cours…");
+    const funcName = provider === "microsoft" ? "microsoft-sync" : "gmail-sync";
+    const providerLabel = provider === "microsoft" ? "Outlook" : "Gmail";
+    toast.info(`Synchronisation ${providerLabel} en cours…`);
     try {
-      const { data, error } = await supabase.functions.invoke("gmail-sync", {
-        body: { email },
+      const { data, error } = await supabase.functions.invoke(funcName, {
+        body: { email: emailAddr },
       });
       if (error) throw error;
       if (data?.analyzed > 0) {
         toast.success(`${data.analyzed} email(s) analysé(s) sur ${data.total}`);
-        // Reload expenses
         const { data: expenseRes } = await supabase
           .from("expenses")
           .select("*")
@@ -375,8 +376,7 @@ const Receipts = () => {
           };
         });
         setExpenses(mapped);
-        // Update last_sync_at in local state
-        setEmails(prev => prev.map(em => em.email === email ? { ...em, last_sync_at: new Date().toISOString() } : em));
+        setEmails(prev => prev.map(em => em.email === emailAddr ? { ...em, last_sync_at: new Date().toISOString() } : em));
       } else {
         toast.info(data?.message || "Aucun email financier trouvé");
       }
