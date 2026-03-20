@@ -19,7 +19,9 @@ const ContactSection = () => {
     }
 
     setSending(true);
+    const id = crypto.randomUUID();
     const { error } = await (supabase as any).from("contact_messages").insert({
+      id,
       name: name.trim(),
       email: email.trim(),
       message: message.trim(),
@@ -28,6 +30,15 @@ const ContactSection = () => {
     if (error) {
       toast.error("Erreur lors de l'envoi. Veuillez réessayer.");
     } else {
+      // Send confirmation email
+      supabase.functions.invoke("send-transactional-email", {
+        body: {
+          templateName: "contact-confirmation",
+          recipientEmail: email.trim(),
+          idempotencyKey: `contact-confirm-${id}`,
+          templateData: { name: name.trim() },
+        },
+      });
       setSent(true);
       setName("");
       setEmail("");
