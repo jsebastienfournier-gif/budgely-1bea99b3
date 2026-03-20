@@ -63,21 +63,34 @@ const Receipts = () => {
   const [saving, setSaving] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
 
-  // Handle Gmail OAuth callback params
+  // Handle Gmail/Microsoft OAuth callback params
   useEffect(() => {
-    if (searchParams.get("gmail_connected") === "true") {
-      const email = searchParams.get("email") || "";
-      toast.success(`Gmail connecté : ${email}`);
-      setSearchParams({}, { replace: true });
-      // Reload emails
+    const reloadEmails = () => {
       if (user) {
         supabase.from("connected_emails").select("*").eq("user_id", user.id).order("created_at").then(({ data }) => {
           setEmails((data as ConnectedEmail[]) || []);
         });
       }
+    };
+
+    if (searchParams.get("gmail_connected") === "true") {
+      const email = searchParams.get("email") || "";
+      toast.success(`Gmail connecté : ${email}`);
+      setSearchParams({}, { replace: true });
+      reloadEmails();
     }
     if (searchParams.get("gmail_error")) {
       toast.error("Erreur de connexion Gmail : " + searchParams.get("gmail_error"));
+      setSearchParams({}, { replace: true });
+    }
+    if (searchParams.get("microsoft_connected") === "true") {
+      const email = searchParams.get("email") || "";
+      toast.success(`Outlook connecté : ${email}`);
+      setSearchParams({}, { replace: true });
+      reloadEmails();
+    }
+    if (searchParams.get("microsoft_error")) {
+      toast.error("Erreur de connexion Outlook : " + searchParams.get("microsoft_error"));
       setSearchParams({}, { replace: true });
     }
   }, [searchParams]);
