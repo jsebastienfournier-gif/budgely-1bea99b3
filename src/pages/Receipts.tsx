@@ -63,21 +63,34 @@ const Receipts = () => {
   const [saving, setSaving] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
 
-  // Handle Gmail OAuth callback params
+  // Handle Gmail/Microsoft OAuth callback params
   useEffect(() => {
-    if (searchParams.get("gmail_connected") === "true") {
-      const email = searchParams.get("email") || "";
-      toast.success(`Gmail connecté : ${email}`);
-      setSearchParams({}, { replace: true });
-      // Reload emails
+    const reloadEmails = () => {
       if (user) {
         supabase.from("connected_emails").select("*").eq("user_id", user.id).order("created_at").then(({ data }) => {
           setEmails((data as ConnectedEmail[]) || []);
         });
       }
+    };
+
+    if (searchParams.get("gmail_connected") === "true") {
+      const email = searchParams.get("email") || "";
+      toast.success(`Gmail connecté : ${email}`);
+      setSearchParams({}, { replace: true });
+      reloadEmails();
     }
     if (searchParams.get("gmail_error")) {
       toast.error("Erreur de connexion Gmail : " + searchParams.get("gmail_error"));
+      setSearchParams({}, { replace: true });
+    }
+    if (searchParams.get("microsoft_connected") === "true") {
+      const email = searchParams.get("email") || "";
+      toast.success(`Outlook connecté : ${email}`);
+      setSearchParams({}, { replace: true });
+      reloadEmails();
+    }
+    if (searchParams.get("microsoft_error")) {
+      toast.error("Erreur de connexion Outlook : " + searchParams.get("microsoft_error"));
       setSearchParams({}, { replace: true });
     }
   }, [searchParams]);
@@ -274,7 +287,6 @@ const Receipts = () => {
     if (!user) return;
 
     if (newEmailProvider === "gmail") {
-      // Trigger Gmail OAuth flow
       setSaving(true);
       try {
         const { data, error } = await supabase.functions.invoke("gmail-auth");
@@ -291,7 +303,24 @@ const Receipts = () => {
       return;
     }
 
-    // For non-Gmail providers, keep manual flow
+    if (newEmailProvider === "outlook") {
+      setSaving(true);
+      try {
+        const { data, error } = await supabase.functions.invoke("microsoft-auth");
+        if (error) throw error;
+        if (data?.url) {
+          window.location.href = data.url;
+          return;
+        }
+        throw new Error("Aucune URL d'autorisation reçue");
+      } catch (err: any) {
+        toast.error("Erreur : " + (err.message || "Impossible de lancer la connexion Outlook"));
+        setSaving(false);
+      }
+      return;
+    }
+
+    // For other providers, keep manual flow
     if (!newEmail.trim()) return;
     setSaving(true);
     const { data, error } = await supabase
@@ -308,18 +337,19 @@ const Receipts = () => {
     toast.success("Adresse email connectée !");
   };
 
-  const handleSyncGmail = async (email: string) => {
+  const handleSyncEmail = async (emailAddr: string, provider: string) => {
     if (!user || syncing) return;
     setSyncing(true);
-    toast.info("Synchronisation Gmail en cours…");
+    const funcName = provider === "microsoft" ? "microsoft-sync" : "gmail-sync";
+    const providerLabel = provider === "microsoft" ? "Outlook" : "Gmail";
+    toast.info(`Synchronisation ${providerLabel} en cours…`);
     try {
-      const { data, error } = await supabase.functions.invoke("gmail-sync", {
-        body: { email },
+      const { data, error } = await supabase.functions.invoke(funcName, {
+        body: { email: emailAddr },
       });
       if (error) throw error;
       if (data?.analyzed > 0) {
         toast.success(`${data.analyzed} email(s) analysé(s) sur ${data.total}`);
-        // Reload expenses
         const { data: expenseRes } = await supabase
           .from("expenses")
           .select("*")
@@ -346,8 +376,7 @@ const Receipts = () => {
           };
         });
         setExpenses(mapped);
-        // Update last_sync_at in local state
-        setEmails(prev => prev.map(em => em.email === email ? { ...em, last_sync_at: new Date().toISOString() } : em));
+        setEmails(prev => prev.map(em => em.email === emailAddr ? { ...em, last_sync_at: new Date().toISOString() } : em));
       } else {
         toast.info(data?.message || "Aucun email financier trouvé");
       }
@@ -481,7 +510,7 @@ const Receipts = () => {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            onClick={() => hasEmails ? handleSyncGmail(emails[0]?.email) : setShowEmailDialog(true)}
+            onClick={() => hasEmails ? handleSyncEmail(emails[0]?.email, emails[0]?.provider) : setShowEmailDialog(true)}
             className="bg-card rounded-2xl border border-border p-6 hover:border-primary/30 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-4">
@@ -684,6 +713,29 @@ const Receipts = () => {
                   Se connecter avec Google
                 </button>
               </>
+            ) : newEmailProvider === "outlook" ? (
+              <>
+                <div className="bg-secondary/50 rounded-xl p-3">
+                  <p className="text-[11px] text-muted-foreground">🔒 Connexion sécurisée via Microsoft OAuth. Nous n'accédons qu'en lecture seule à vos emails.</p>
+                </div>
+                <button
+                  onClick={handleAddEmail}
+                  disabled={saving}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-[#0078d4] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <svg className="h-4 w-4" viewBox="0 0 23 23">
+                      <path fill="#f35325" d="M1 1h10v10H1z"/>
+                      <path fill="#81bc06" d="M12 1h10v10H12z"/>
+                      <path fill="#05a6f0" d="M1 12h10v10H1z"/>
+                      <path fill="#ffba08" d="M12 12h10v10H12z"/>
+                    </svg>
+                  )}
+                  Se connecter avec Microsoft
+                </button>
+              </>
             ) : (
               <>
                 <div>
@@ -697,7 +749,7 @@ const Receipts = () => {
                   />
                 </div>
                 <div className="bg-secondary/50 rounded-xl p-3">
-                  <p className="text-[11px] text-muted-foreground">⚠️ L'import automatique n'est disponible que pour Gmail. Les autres fournisseurs nécessitent un import manuel.</p>
+                  <p className="text-[11px] text-muted-foreground">⚠️ L'import automatique n'est disponible que pour Gmail et Outlook. Les autres fournisseurs nécessitent un import manuel.</p>
                 </div>
                 <button
                   onClick={handleAddEmail}

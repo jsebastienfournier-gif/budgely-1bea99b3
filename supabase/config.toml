@@ -8,3 +8,12 @@ verify_jwt = false
 
 [functions.gmail-sync]
 verify_jwt = false
+
+[functions.microsoft-auth]
+verify_jwt = false
+
+[functions.microsoft-callback]
+verify_jwt = false
+
+[functions.microsoft-sync]
+verify_jwt = false
