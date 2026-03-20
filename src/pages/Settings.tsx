@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import NotificationToggle from "@/components/NotificationToggle";
 
 const Settings = () => {
   const { user, signOut } = useAuth();
