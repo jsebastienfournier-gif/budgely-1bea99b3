@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import NotificationToggle from "@/components/NotificationToggle";
 
 const Settings = () => {
   const { user, signOut } = useAuth();
@@ -524,6 +525,12 @@ const Settings = () => {
         return (
           <div className="space-y-5">
             <div>
+              <p className="text-sm font-medium text-foreground mb-1">Notifications push</p>
+              <p className="text-xs text-muted-foreground mb-4">Recevez des alertes directement sur votre appareil.</p>
+              <NotificationToggle />
+            </div>
+
+            <div className="mt-6">
               <p className="text-sm font-medium text-foreground mb-1">Préférences de notifications</p>
               <p className="text-xs text-muted-foreground mb-4">Choisissez les alertes que vous souhaitez recevoir.</p>
             </div>
