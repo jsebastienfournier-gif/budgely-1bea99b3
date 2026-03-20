@@ -155,8 +155,26 @@ Deno.serve(async (req) => {
       }
 
       case "reset_password": {
-        const { target_user_id, new_password } = params;
+        const { target_user_id, new_password, send_link } = params;
         if (!target_user_id) throw new Error("Missing target_user_id");
+
+        if (send_link) {
+          // Get user email to send reset link
+          const { data: { user: targetUser }, error: getUserErr } = await adminClient.auth.admin.getUserById(target_user_id);
+          if (getUserErr || !targetUser?.email) throw new Error("Could not find user email");
+
+          // Use generateLink to create a recovery link
+          const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+            type: "recovery",
+            email: targetUser.email,
+            options: {
+              redirectTo: `${Deno.env.get("SITE_URL") || supabaseUrl.replace(".supabase.co", ".lovable.app")}`,
+            },
+          });
+          if (linkError) throw linkError;
+
+          return json({ success: true, method: "link_sent" });
+        }
 
         if (new_password) {
           const { error } = await adminClient.auth.admin.updateUserById(target_user_id, { password: new_password });
