@@ -274,6 +274,10 @@ const Admin = () => {
           <TabsContent value="messages">
             <ContactMessages />
           </TabsContent>
+
+          <TabsContent value="notifications">
+            <AdminNotifications />
+          </TabsContent>
         </Tabs>
       </div>
 
