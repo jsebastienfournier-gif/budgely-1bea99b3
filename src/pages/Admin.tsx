@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Shield, Trash2, UserCog, Loader2, Crown, AlertTriangle, Wrench, BarChart3, MessageSquare } from "lucide-react";
+import { Shield, UserCog, Loader2, Crown, Wrench, BarChart3, MessageSquare, Eye, Ban } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,10 +8,7 @@ import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AnalyticsDashboard from "@/components/admin/AnalyticsDashboard";
 import ContactMessages from "@/components/admin/ContactMessages";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import AdminUserDetail from "@/components/admin/AdminUserDetail";
 
 type AdminUser = {
   id: string;
@@ -21,6 +18,8 @@ type AdminUser = {
   created_at: string;
   last_sign_in_at: string | null;
   roles: string[];
+  plan?: string;
+  banned?: boolean;
 };
 
 const ROLE_LABELS: Record<string, { label: string; color: string }> = {
@@ -34,8 +33,8 @@ const Admin = () => {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
   const { maintenance, toggleMaintenance } = useMaintenanceMode();
   const [maintenanceMsg, setMaintenanceMsg] = useState("");
 
@@ -81,29 +80,9 @@ const Admin = () => {
     }
   };
 
-  const handleSetRole = async (targetUserId: string, role: string, remove: boolean) => {
-    try {
-      await callAdmin({ action: "set_role", target_user_id: targetUserId, role, remove });
-      toast.success(remove ? "Rôle retiré" : "Rôle attribué");
-      await loadUsers();
-    } catch {
-      toast.error("Erreur lors de la modification du rôle");
-    }
-  };
-
-  const handleDeleteUser = async () => {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    try {
-      await callAdmin({ action: "delete_user", target_user_id: deleteTarget.id });
-      toast.success("Utilisateur supprimé");
-      setDeleteTarget(null);
-      await loadUsers();
-    } catch (err: any) {
-      toast.error(err.message || "Erreur lors de la suppression");
-    } finally {
-      setDeleting(false);
-    }
+  const openUserDetail = (u: AdminUser) => {
+    setSelectedUser(u);
+    setDetailOpen(true);
   };
 
   if (loading) {
@@ -195,7 +174,11 @@ const Admin = () => {
                 {users.map((u) => {
                   const isSelf = u.id === user?.id;
                   return (
-                    <div key={u.id} className="px-5 py-4 flex items-center gap-4">
+                    <div
+                      key={u.id}
+                      className="px-5 py-4 flex items-center gap-4 hover:bg-secondary/30 transition-colors cursor-pointer"
+                      onClick={() => openUserDetail(u)}
+                    >
                       <div className="h-10 w-10 rounded-xl bg-secondary flex-shrink-0 flex items-center justify-center overflow-hidden">
                         {u.avatar_url ? (
                           <img src={u.avatar_url} alt="" className="h-full w-full object-cover" />
@@ -213,7 +196,12 @@ const Admin = () => {
                         <p className="text-xs text-muted-foreground truncate">{u.email}</p>
                       </div>
                       <div className="hidden sm:flex items-center gap-1.5">
-                        {u.roles.length === 0 && (
+                        {u.banned && (
+                          <span className="text-[10px] font-medium px-2 py-1 rounded-full bg-destructive/10 text-destructive flex items-center gap-1">
+                            <Ban className="h-2.5 w-2.5" /> Suspendu
+                          </span>
+                        )}
+                        {u.roles.length === 0 && !u.banned && (
                           <span className="text-[10px] font-medium px-2 py-1 rounded-full bg-secondary text-muted-foreground">
                             Aucun rôle
                           </span>
@@ -230,43 +218,7 @@ const Admin = () => {
                       <p className="hidden md:block text-xs text-muted-foreground whitespace-nowrap">
                         {new Date(u.created_at).toLocaleDateString("fr-FR")}
                       </p>
-                      <div className="flex items-center gap-1">
-                        {(["admin", "moderator", "user"] as const).map((role) => {
-                          const hasRole = u.roles.includes(role);
-                          const style = ROLE_LABELS[role];
-                          const disabled = isSelf && role === "admin";
-                          return (
-                            <button
-                              key={role}
-                              disabled={disabled}
-                              onClick={() => handleSetRole(u.id, role, hasRole)}
-                              title={
-                                disabled
-                                  ? "Vous ne pouvez pas retirer votre propre rôle admin"
-                                  : hasRole
-                                    ? `Retirer ${style.label}`
-                                    : `Attribuer ${style.label}`
-                              }
-                              className={`text-[10px] font-medium px-2 py-1 rounded-full transition-all ${
-                                hasRole
-                                  ? `${style.color} ring-1 ring-current/20`
-                                  : "bg-secondary text-muted-foreground hover:bg-secondary/80"
-                              } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-                            >
-                              {style.label}
-                            </button>
-                          );
-                        })}
-                        {!isSelf && (
-                          <button
-                            onClick={() => setDeleteTarget(u)}
-                            className="ml-2 h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                            title="Supprimer l'utilisateur"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </div>
+                      <Eye className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     </div>
                   );
                 })}
@@ -275,7 +227,6 @@ const Admin = () => {
           </TabsContent>
 
           <TabsContent value="maintenance">
-            {/* Maintenance Mode */}
             <div className={`bg-card border rounded-xl p-5 ${maintenance.enabled ? "border-destructive/50 bg-destructive/5" : "border-border"}`}>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -321,32 +272,13 @@ const Admin = () => {
         </Tabs>
       </div>
 
-      {/* Delete confirmation */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              Supprimer l'utilisateur
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Êtes-vous sûr de vouloir supprimer <strong>{deleteTarget?.full_name || deleteTarget?.email}</strong> ?
-              Cette action est irréversible. Toutes les données associées seront supprimées.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteUser}
-              disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Supprimer
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <AdminUserDetail
+        user={selectedUser}
+        currentUserId={user?.id}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        onRefresh={loadUsers}
+      />
     </AppLayout>
   );
 };
