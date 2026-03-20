@@ -120,17 +120,26 @@ export default function AdminUserDetail({ user: targetUser, currentUserId, open,
     }
   };
 
-  const handleResetPassword = async () => {
+  const handleResetPassword = async (method: "set" | "temp" | "link") => {
     setActionLoading(true);
     try {
-      const data = await callAdmin({
+      const body: Record<string, unknown> = {
         action: "reset_password",
         target_user_id: u.id,
-        ...(newPassword ? { new_password: newPassword } : {}),
-      });
-      if (data.temp_password) {
+      };
+      if (method === "set" && newPassword) {
+        body.new_password = newPassword;
+      } else if (method === "link") {
+        body.send_link = true;
+      }
+
+      const data = await callAdmin(body);
+      if (data.method === "temp_password") {
         setTempPassword(data.temp_password);
         toast.success("Mot de passe temporaire généré");
+      } else if (data.method === "link_sent") {
+        toast.success("Lien de réinitialisation envoyé par email");
+        setResetDialog(false);
       } else {
         toast.success("Mot de passe modifié");
         setResetDialog(false);
