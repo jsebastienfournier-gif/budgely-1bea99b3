@@ -438,14 +438,40 @@ export default function AdminUserDetail({ user: targetUser, currentUserId, open,
               Réinitialiser le mot de passe
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
-              <div className="space-y-3">
-                <p>Définissez un nouveau mot de passe ou générez un mot de passe temporaire.</p>
-                <Input
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Nouveau mot de passe (laisser vide = temporaire)"
-                  type="text"
-                />
+              <div className="space-y-4">
+                {/* Option 1: Send reset link */}
+                <button
+                  onClick={() => handleResetPassword("link")}
+                  disabled={actionLoading}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-left"
+                >
+                  <Send className="h-4 w-4 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium">Envoyer un lien par email</p>
+                    <p className="text-xs text-muted-foreground">L'utilisateur recevra un email pour choisir son nouveau mot de passe</p>
+                  </div>
+                </button>
+
+                {/* Option 2: Set specific password */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Définir un mot de passe manuellement"
+                      type="text"
+                    />
+                    <button
+                      onClick={() => newPassword ? handleResetPassword("set") : handleResetPassword("temp")}
+                      disabled={actionLoading}
+                      className="px-4 py-2 rounded-lg text-sm font-medium bg-secondary hover:bg-secondary/80 transition-colors text-foreground whitespace-nowrap"
+                    >
+                      {actionLoading && <Loader2 className="h-4 w-4 animate-spin mr-1 inline" />}
+                      {newPassword ? "Définir" : "Temporaire"}
+                    </button>
+                  </div>
+                </div>
+
                 {tempPassword && (
                   <div className="bg-secondary rounded-lg p-3 space-y-1">
                     <p className="text-xs text-muted-foreground">Mot de passe temporaire :</p>
@@ -465,10 +491,6 @@ export default function AdminUserDetail({ user: targetUser, currentUserId, open,
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={actionLoading}>Fermer</AlertDialogCancel>
-            <AlertDialogAction onClick={handleResetPassword} disabled={actionLoading}>
-              {actionLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              {newPassword ? "Définir" : "Générer temporaire"}
-            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
