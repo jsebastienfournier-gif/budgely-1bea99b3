@@ -65,6 +65,9 @@ const App = () => (
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/subscription" element={<Subscription />} />
+                <Route path="/mentions-legales" element={<LegalNotice />} />
+                <Route path="/confidentialite" element={<PrivacyPolicy />} />
+                <Route path="/cgu" element={<TermsOfService />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </MaintenanceGate>
