@@ -287,7 +287,6 @@ const Receipts = () => {
     if (!user) return;
 
     if (newEmailProvider === "gmail") {
-      // Trigger Gmail OAuth flow
       setSaving(true);
       try {
         const { data, error } = await supabase.functions.invoke("gmail-auth");
@@ -304,7 +303,24 @@ const Receipts = () => {
       return;
     }
 
-    // For non-Gmail providers, keep manual flow
+    if (newEmailProvider === "outlook") {
+      setSaving(true);
+      try {
+        const { data, error } = await supabase.functions.invoke("microsoft-auth");
+        if (error) throw error;
+        if (data?.url) {
+          window.location.href = data.url;
+          return;
+        }
+        throw new Error("Aucune URL d'autorisation reçue");
+      } catch (err: any) {
+        toast.error("Erreur : " + (err.message || "Impossible de lancer la connexion Outlook"));
+        setSaving(false);
+      }
+      return;
+    }
+
+    // For other providers, keep manual flow
     if (!newEmail.trim()) return;
     setSaving(true);
     const { data, error } = await supabase
