@@ -23,7 +23,6 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Client with user's token to verify identity
     const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -36,10 +35,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Admin client for privileged operations
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    // Check if user is admin
     const { data: roleData } = await adminClient
       .from("user_roles")
       .select("role")
@@ -55,20 +52,25 @@ Deno.serve(async (req) => {
     }
 
     const { action, ...params } = await req.json();
+    const json = (data: unknown, status = 200) =>
+      new Response(JSON.stringify(data), {
+        status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
 
     switch (action) {
       case "list_users": {
         const { data, error } = await adminClient.auth.admin.listUsers({ perPage: 100 });
         if (error) throw error;
 
-        // Get all roles
         const { data: roles } = await adminClient.from("user_roles").select("*");
-        // Get all profiles
         const { data: profiles } = await adminClient.from("profiles").select("*");
+        const { data: plans } = await adminClient.from("user_plans").select("*");
 
         const users = data.users.map((u) => {
           const profile = profiles?.find((p) => p.user_id === u.id);
           const userRoles = roles?.filter((r) => r.user_id === u.id).map((r) => r.role) || [];
+          const userPlan = plans?.find((p) => p.user_id === u.id);
           return {
             id: u.id,
             email: u.email,
@@ -77,12 +79,144 @@ Deno.serve(async (req) => {
             created_at: u.created_at,
             last_sign_in_at: u.last_sign_in_at,
             roles: userRoles,
+            plan: userPlan?.plan || "free",
+            banned: u.banned_until ? true : false,
+            banned_until: u.banned_until || null,
+            email_confirmed_at: u.email_confirmed_at || null,
+            phone: u.phone || null,
           };
         });
 
-        return new Response(JSON.stringify({ users }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        return json({ users });
+      }
+
+      case "get_user_detail": {
+        const { target_user_id } = params;
+        if (!target_user_id) throw new Error("Missing target_user_id");
+
+        const { data: { user: targetUser }, error } = await adminClient.auth.admin.getUserById(target_user_id);
+        if (error) throw error;
+
+        const { data: profile } = await adminClient.from("profiles").select("*").eq("user_id", target_user_id).maybeSingle();
+        const { data: userRoles } = await adminClient.from("user_roles").select("role").eq("user_id", target_user_id);
+        const { data: plan } = await adminClient.from("user_plans").select("*").eq("user_id", target_user_id).maybeSingle();
+        const { data: expenses } = await adminClient.from("expenses").select("id", { count: "exact", head: true }).eq("user_id", target_user_id);
+        const { data: documents } = await adminClient.from("documents").select("id", { count: "exact", head: true }).eq("user_id", target_user_id);
+        const { data: subscriptions } = await adminClient.from("subscriptions").select("id", { count: "exact", head: true }).eq("user_id", target_user_id);
+
+        return json({
+          user: {
+            id: targetUser.id,
+            email: targetUser.email,
+            full_name: profile?.full_name || null,
+            avatar_url: profile?.avatar_url || null,
+            created_at: targetUser.created_at,
+            last_sign_in_at: targetUser.last_sign_in_at,
+            email_confirmed_at: targetUser.email_confirmed_at || null,
+            phone: targetUser.phone || null,
+            banned: targetUser.banned_until ? true : false,
+            banned_until: targetUser.banned_until || null,
+            roles: userRoles?.map((r) => r.role) || [],
+            plan: plan?.plan || "free",
+            stats: {
+              expenses_count: expenses?.length ?? 0,
+              documents_count: documents?.length ?? 0,
+              subscriptions_count: subscriptions?.length ?? 0,
+            },
+          },
         });
+      }
+
+      case "update_profile": {
+        const { target_user_id, full_name, avatar_url } = params;
+        if (!target_user_id) throw new Error("Missing target_user_id");
+
+        const updates: Record<string, unknown> = {};
+        if (full_name !== undefined) updates.full_name = full_name;
+        if (avatar_url !== undefined) updates.avatar_url = avatar_url;
+
+        const { error } = await adminClient
+          .from("profiles")
+          .update(updates)
+          .eq("user_id", target_user_id);
+        if (error) throw error;
+
+        return json({ success: true });
+      }
+
+      case "update_email": {
+        const { target_user_id, email } = params;
+        if (!target_user_id || !email) throw new Error("Missing target_user_id or email");
+
+        const { error } = await adminClient.auth.admin.updateUserById(target_user_id, { email });
+        if (error) throw error;
+
+        return json({ success: true });
+      }
+
+      case "reset_password": {
+        const { target_user_id, new_password } = params;
+        if (!target_user_id) throw new Error("Missing target_user_id");
+
+        if (new_password) {
+          const { error } = await adminClient.auth.admin.updateUserById(target_user_id, { password: new_password });
+          if (error) throw error;
+          return json({ success: true, method: "password_set" });
+        }
+
+        // Generate a random temporary password
+        const tempPassword = crypto.randomUUID().slice(0, 16) + "A1!";
+        const { error } = await adminClient.auth.admin.updateUserById(target_user_id, { password: tempPassword });
+        if (error) throw error;
+
+        return json({ success: true, method: "temp_password", temp_password: tempPassword });
+      }
+
+      case "suspend_user": {
+        const { target_user_id, duration } = params;
+        if (!target_user_id) throw new Error("Missing target_user_id");
+        if (target_user_id === user.id) throw new Error("Cannot suspend yourself");
+
+        let banUntil: string;
+        if (duration === "permanent") {
+          banUntil = "2999-12-31T23:59:59Z";
+        } else {
+          const days = parseInt(duration) || 30;
+          const date = new Date();
+          date.setDate(date.getDate() + days);
+          banUntil = date.toISOString();
+        }
+
+        const { error } = await adminClient.auth.admin.updateUserById(target_user_id, {
+          ban_duration: duration === "permanent" ? "876000h" : `${(parseInt(duration) || 30) * 24}h`,
+        });
+        if (error) throw error;
+
+        return json({ success: true });
+      }
+
+      case "unsuspend_user": {
+        const { target_user_id } = params;
+        if (!target_user_id) throw new Error("Missing target_user_id");
+
+        const { error } = await adminClient.auth.admin.updateUserById(target_user_id, {
+          ban_duration: "none",
+        });
+        if (error) throw error;
+
+        return json({ success: true });
+      }
+
+      case "confirm_email": {
+        const { target_user_id } = params;
+        if (!target_user_id) throw new Error("Missing target_user_id");
+
+        const { error } = await adminClient.auth.admin.updateUserById(target_user_id, {
+          email_confirm: true,
+        });
+        if (error) throw error;
+
+        return json({ success: true });
       }
 
       case "set_role": {
@@ -101,9 +235,7 @@ Deno.serve(async (req) => {
             .upsert({ user_id: target_user_id, role }, { onConflict: "user_id,role" });
         }
 
-        return new Response(JSON.stringify({ success: true }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return json({ success: true });
       }
 
       case "delete_user": {
@@ -114,16 +246,11 @@ Deno.serve(async (req) => {
         const { error } = await adminClient.auth.admin.deleteUser(target_user_id);
         if (error) throw error;
 
-        return new Response(JSON.stringify({ success: true }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return json({ success: true });
       }
 
       default:
-        return new Response(JSON.stringify({ error: "Unknown action" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return json({ error: "Unknown action" }, 400);
     }
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), {
