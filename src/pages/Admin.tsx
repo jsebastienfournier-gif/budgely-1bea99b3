@@ -140,6 +140,10 @@ const Admin = () => {
               <MessageSquare className="h-3.5 w-3.5" />
               Messages
             </TabsTrigger>
+            <TabsTrigger value="notifications" className="gap-1.5">
+              <Bell className="h-3.5 w-3.5" />
+              Notifications
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="analytics">
