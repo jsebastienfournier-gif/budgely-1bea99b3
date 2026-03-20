@@ -713,6 +713,29 @@ const Receipts = () => {
                   Se connecter avec Google
                 </button>
               </>
+            ) : newEmailProvider === "outlook" ? (
+              <>
+                <div className="bg-secondary/50 rounded-xl p-3">
+                  <p className="text-[11px] text-muted-foreground">🔒 Connexion sécurisée via Microsoft OAuth. Nous n'accédons qu'en lecture seule à vos emails.</p>
+                </div>
+                <button
+                  onClick={handleAddEmail}
+                  disabled={saving}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-[#0078d4] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <svg className="h-4 w-4" viewBox="0 0 23 23">
+                      <path fill="#f35325" d="M1 1h10v10H1z"/>
+                      <path fill="#81bc06" d="M12 1h10v10H12z"/>
+                      <path fill="#05a6f0" d="M1 12h10v10H1z"/>
+                      <path fill="#ffba08" d="M12 12h10v10H12z"/>
+                    </svg>
+                  )}
+                  Se connecter avec Microsoft
+                </button>
+              </>
             ) : (
               <>
                 <div>
@@ -726,7 +749,7 @@ const Receipts = () => {
                   />
                 </div>
                 <div className="bg-secondary/50 rounded-xl p-3">
-                  <p className="text-[11px] text-muted-foreground">⚠️ L'import automatique n'est disponible que pour Gmail. Les autres fournisseurs nécessitent un import manuel.</p>
+                  <p className="text-[11px] text-muted-foreground">⚠️ L'import automatique n'est disponible que pour Gmail et Outlook. Les autres fournisseurs nécessitent un import manuel.</p>
                 </div>
                 <button
                   onClick={handleAddEmail}
