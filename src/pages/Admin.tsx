@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Shield, UserCog, Loader2, Crown, Wrench, BarChart3, MessageSquare, Eye, Ban, Bell } from "lucide-react";
+import { Shield, UserCog, Loader2, Crown, Wrench, BarChart3, MessageSquare, Eye, Ban, Bell, Mail } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,7 @@ import AnalyticsDashboard from "@/components/admin/AnalyticsDashboard";
 import ContactMessages from "@/components/admin/ContactMessages";
 import AdminUserDetail from "@/components/admin/AdminUserDetail";
 import AdminNotifications from "@/components/admin/AdminNotifications";
+import AdminEmailTemplates from "@/components/admin/AdminEmailTemplates";
 
 type AdminUser = {
   id: string;
@@ -144,6 +145,10 @@ const Admin = () => {
               <Bell className="h-3.5 w-3.5" />
               Notifications
             </TabsTrigger>
+            <TabsTrigger value="emails" className="gap-1.5">
+              <Mail className="h-3.5 w-3.5" />
+              Emails
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="analytics">
@@ -277,6 +282,10 @@ const Admin = () => {
 
           <TabsContent value="notifications">
             <AdminNotifications />
+          </TabsContent>
+
+          <TabsContent value="emails">
+            <AdminEmailTemplates />
           </TabsContent>
         </Tabs>
       </div>

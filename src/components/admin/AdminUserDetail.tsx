@@ -2,10 +2,11 @@ import { useState } from "react";
 import {
   Shield, Trash2, Loader2, Crown, UserCog, Eye, Ban, RotateCcw,
   KeyRound, Mail, CheckCircle, Copy, AlertTriangle, X, User,
-  FileText, CreditCard, Receipt, Send
+  FileText, CreditCard, Receipt, Send, Bell
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -70,6 +71,10 @@ export default function AdminUserDetail({ user: targetUser, currentUserId, open,
   const [suspendDuration, setSuspendDuration] = useState("30");
   const [confirmAction, setConfirmAction] = useState<{ title: string; desc: string; onConfirm: () => void } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [notifDialog, setNotifDialog] = useState(false);
+  const [notifTitle, setNotifTitle] = useState("");
+  const [notifBody, setNotifBody] = useState("");
+  const [notifSending, setNotifSending] = useState(false);
 
   const isSelf = targetUser?.id === currentUserId;
 
@@ -218,6 +223,31 @@ export default function AdminUserDetail({ user: targetUser, currentUserId, open,
       toast.error(err.message || "Erreur");
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleSendNotification = async () => {
+    if (!notifTitle.trim() || !notifBody.trim()) return;
+    setNotifSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-push", {
+        body: {
+          action: "notify_user",
+          user_id: u.id,
+          title: notifTitle.trim(),
+          body: notifBody.trim(),
+          url: "/dashboard",
+        },
+      });
+      if (error) throw error;
+      toast.success(`Notification envoyée (${data?.sent || 0} appareil(s))`);
+      setNotifDialog(false);
+      setNotifTitle("");
+      setNotifBody("");
+    } catch (err: any) {
+      toast.error(err.message || "Erreur lors de l'envoi");
+    } finally {
+      setNotifSending(false);
     }
   };
 
@@ -384,6 +414,14 @@ export default function AdminUserDetail({ user: targetUser, currentUserId, open,
                   >
                     <KeyRound className="h-4 w-4" />
                     Réinitialiser le mot de passe
+                  </button>
+
+                  <button
+                    onClick={() => setNotifDialog(true)}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm bg-secondary hover:bg-secondary/80 transition-colors text-foreground"
+                  >
+                    <Bell className="h-4 w-4" />
+                    Envoyer une notification
                   </button>
 
                   {!isSelf && (
@@ -562,6 +600,48 @@ export default function AdminUserDetail({ user: targetUser, currentUserId, open,
             >
               {actionLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Confirmer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Notification dialog */}
+      <AlertDialog open={notifDialog} onOpenChange={setNotifDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              Envoyer une notification
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Envoyer une notification push à {u.full_name || u.email}
+                </p>
+                <Input
+                  value={notifTitle}
+                  onChange={(e) => setNotifTitle(e.target.value)}
+                  placeholder="Titre de la notification"
+                  maxLength={100}
+                />
+                <Textarea
+                  value={notifBody}
+                  onChange={(e) => setNotifBody(e.target.value)}
+                  placeholder="Message..."
+                  rows={3}
+                  maxLength={500}
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={notifSending}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleSendNotification}
+              disabled={notifSending || !notifTitle.trim() || !notifBody.trim()}
+            >
+              {notifSending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Envoyer
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
