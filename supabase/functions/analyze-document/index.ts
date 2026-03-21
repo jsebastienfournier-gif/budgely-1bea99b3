@@ -44,21 +44,30 @@ Analyse le texte suivant et renvoie UNIQUEMENT un JSON strict avec ces champs :
 }
 Règles : remplis tous les champs. Les champs manquants = chaînes vides. Aucune interprétation non justifiée.`,
 
-  email: `Tu es un assistant spécialisé dans l'analyse de mails financiers.
-Analyse le texte suivant et renvoie UNIQUEMENT un JSON strict avec ces champs :
+  email: `Tu es un assistant spécialisé dans l'extraction de données financières à partir d'emails.
+Analyse attentivement le texte suivant et extrais les informations de paiement/dépense.
+Renvoie UNIQUEMENT un JSON strict avec ces champs :
 {
   "type_document": "",
   "fournisseur": "",
-  "montant": 0,
+  "montant_total": 0,
   "devise": "EUR",
   "date": "",
   "categorie": "",
   "recurrence": "",
   "description": "",
   "numero_facture": "",
-  "moyen_paiement": ""
+  "moyen_paiement": "",
+  "abonnement_detecte": false
 }
-Règles : type_document peut être facture, reçu, abonnement, renouvellement. Champs manquants = chaînes vides.`,
+Règles IMPORTANTES :
+- montant_total DOIT contenir le montant payé/facturé trouvé dans l'email (total TTC). Cherche des patterns comme "Total", "Montant", "Amount", "Prix", "€", "$", nombres suivis de devises. Ne JAMAIS laisser à 0 si un montant est mentionné dans le texte.
+- type_document peut être : facture, reçu, abonnement, renouvellement, confirmation_commande, notification_paiement.
+- fournisseur : nom de l'entreprise/service qui envoie l'email.
+- date : date du paiement ou de la facture au format YYYY-MM-DD.
+- abonnement_detecte : true si c'est un paiement récurrent (abonnement, renouvellement).
+- recurrence : mensuel, annuel, trimestriel, ou vide si pas récurrent.
+- Champs manquants = chaînes vides, sauf montant_total qui doit être 0 uniquement si aucun montant n'est trouvé.`,
 
   bank: `Tu es un assistant spécialisé dans l'analyse de transactions bancaires.
 Analyse les transactions suivantes et renvoie UNIQUEMENT un JSON strict avec ces champs pour CHAQUE transaction :

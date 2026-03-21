@@ -33,7 +33,7 @@ async function refreshAccessToken(refreshToken: string): Promise<{ access_token:
 // Search Gmail for financial emails
 async function searchFinancialEmails(accessToken: string, maxResults = 10): Promise<any[]> {
   const query = encodeURIComponent(
-    "subject:(facture OR invoice OR reçu OR receipt OR confirmation OR commande OR order OR paiement OR payment) newer_than:30d"
+    "subject:(facture OR invoice OR reçu OR receipt OR confirmation OR commande OR order OR paiement OR payment) newer_than:90d"
   );
 
   const listRes = await fetch(
