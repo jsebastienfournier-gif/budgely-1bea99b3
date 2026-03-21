@@ -423,6 +423,8 @@ export default function AdminUserDetail({ user: targetUser, currentUserId, open,
                     <Bell className="h-4 w-4" />
                     Envoyer une notification
                   </button>
+
+                  {!isSelf && (
                     <>
                       {u.banned ? (
                         <button
