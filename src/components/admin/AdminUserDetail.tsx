@@ -70,6 +70,10 @@ export default function AdminUserDetail({ user: targetUser, currentUserId, open,
   const [suspendDuration, setSuspendDuration] = useState("30");
   const [confirmAction, setConfirmAction] = useState<{ title: string; desc: string; onConfirm: () => void } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [notifDialog, setNotifDialog] = useState(false);
+  const [notifTitle, setNotifTitle] = useState("");
+  const [notifBody, setNotifBody] = useState("");
+  const [notifSending, setNotifSending] = useState(false);
 
   const isSelf = targetUser?.id === currentUserId;
 
