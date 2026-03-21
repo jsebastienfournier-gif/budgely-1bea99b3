@@ -416,7 +416,13 @@ export default function AdminUserDetail({ user: targetUser, currentUserId, open,
                     Réinitialiser le mot de passe
                   </button>
 
-                  {!isSelf && (
+                  <button
+                    onClick={() => setNotifDialog(true)}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm bg-secondary hover:bg-secondary/80 transition-colors text-foreground"
+                  >
+                    <Bell className="h-4 w-4" />
+                    Envoyer une notification
+                  </button>
                     <>
                       {u.banned ? (
                         <button
