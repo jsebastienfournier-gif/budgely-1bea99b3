@@ -604,6 +604,48 @@ export default function AdminUserDetail({ user: targetUser, currentUserId, open,
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Notification dialog */}
+      <AlertDialog open={notifDialog} onOpenChange={setNotifDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              Envoyer une notification
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Envoyer une notification push à {u.full_name || u.email}
+                </p>
+                <Input
+                  value={notifTitle}
+                  onChange={(e) => setNotifTitle(e.target.value)}
+                  placeholder="Titre de la notification"
+                  maxLength={100}
+                />
+                <Textarea
+                  value={notifBody}
+                  onChange={(e) => setNotifBody(e.target.value)}
+                  placeholder="Message..."
+                  rows={3}
+                  maxLength={500}
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={notifSending}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleSendNotification}
+              disabled={notifSending || !notifTitle.trim() || !notifBody.trim()}
+            >
+              {notifSending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Envoyer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
