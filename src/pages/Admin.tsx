@@ -10,6 +10,7 @@ import AnalyticsDashboard from "@/components/admin/AnalyticsDashboard";
 import ContactMessages from "@/components/admin/ContactMessages";
 import AdminUserDetail from "@/components/admin/AdminUserDetail";
 import AdminNotifications from "@/components/admin/AdminNotifications";
+import AdminEmailTemplates from "@/components/admin/AdminEmailTemplates";
 
 type AdminUser = {
   id: string;
