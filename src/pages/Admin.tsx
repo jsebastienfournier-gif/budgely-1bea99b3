@@ -145,6 +145,10 @@ const Admin = () => {
               <Bell className="h-3.5 w-3.5" />
               Notifications
             </TabsTrigger>
+            <TabsTrigger value="emails" className="gap-1.5">
+              <Mail className="h-3.5 w-3.5" />
+              Emails
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="analytics">
