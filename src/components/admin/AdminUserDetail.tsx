@@ -2,10 +2,11 @@ import { useState } from "react";
 import {
   Shield, Trash2, Loader2, Crown, UserCog, Eye, Ban, RotateCcw,
   KeyRound, Mail, CheckCircle, Copy, AlertTriangle, X, User,
-  FileText, CreditCard, Receipt, Send
+  FileText, CreditCard, Receipt, Send, Bell
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
