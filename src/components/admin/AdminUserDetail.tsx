@@ -226,6 +226,31 @@ export default function AdminUserDetail({ user: targetUser, currentUserId, open,
     }
   };
 
+  const handleSendNotification = async () => {
+    if (!notifTitle.trim() || !notifBody.trim()) return;
+    setNotifSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-push", {
+        body: {
+          action: "notify_user",
+          user_id: u.id,
+          title: notifTitle.trim(),
+          body: notifBody.trim(),
+          url: "/dashboard",
+        },
+      });
+      if (error) throw error;
+      toast.success(`Notification envoyée (${data?.sent || 0} appareil(s))`);
+      setNotifDialog(false);
+      setNotifTitle("");
+      setNotifBody("");
+    } catch (err: any) {
+      toast.error(err.message || "Erreur lors de l'envoi");
+    } finally {
+      setNotifSending(false);
+    }
+  };
+
   const profileChanged = editName !== (u.full_name || "") || editEmail !== (u.email || "");
 
   return (
