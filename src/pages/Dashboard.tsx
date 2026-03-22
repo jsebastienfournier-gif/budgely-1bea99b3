@@ -16,12 +16,12 @@ const summaryCards = [
 ];
 
 const categoryData = [
-  { name: "Alimentation", value: 890, color: "hsl(221, 83%, 53%)" },
-  { name: "Transport", value: 420, color: "hsl(221, 83%, 70%)" },
-  { name: "Loisirs", value: 310, color: "hsl(142, 71%, 45%)" },
-  { name: "Logement", value: 1200, color: "hsl(215, 16%, 47%)" },
-  { name: "Santé", value: 180, color: "hsl(221, 83%, 85%)" },
-  { name: "Abonnements", value: 240, color: "hsl(142, 71%, 70%)" },
+  { name: "Alimentation", value: 890, color: "hsl(var(--savings))" },
+  { name: "Transport", value: 420, color: "hsl(221, 83%, 53%)" },
+  { name: "Loisirs", value: 310, color: "hsl(25, 90%, 55%)" },
+  { name: "Logement", value: 1200, color: "hsl(262, 60%, 55%)" },
+  { name: "Santé", value: 180, color: "hsl(340, 70%, 55%)" },
+  { name: "Abonnements", value: 240, color: "hsl(250, 60%, 55%)" },
 ];
 
 const monthlyData = [
