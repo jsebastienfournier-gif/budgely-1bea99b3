@@ -894,6 +894,32 @@ const Receipts = () => {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Cash expense dialog */}
+      <CashExpenseDialog
+        open={showCashDialog}
+        onOpenChange={setShowCashDialog}
+        onExpenseAdded={(data) => {
+          const articles = (data.articles || []).map((a: any) => ({
+            name: a.nom || a.name || "",
+            qty: a.quantite || a.qty || 1,
+            unit: a.unite || a.unit || "pce",
+            unitPrice: a.prix_unitaire || a.unitPrice || 0,
+            total: a.prix_total || a.total || 0,
+          }));
+          const newReceipt: Receipt = {
+            id: data.id,
+            store: data.magasin || "Inconnu",
+            date: data.date_expense ? new Date(data.date_expense).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "Aujourd'hui",
+            total: `€${(data.montant_total || 0).toFixed(2)}`,
+            items: articles.length,
+            status: "Analysé",
+            products: articles,
+            source: data.source,
+          };
+          setExpenses(prev => [newReceipt, ...prev]);
+        }}
+      />
     </AppLayout>
   );
 };
