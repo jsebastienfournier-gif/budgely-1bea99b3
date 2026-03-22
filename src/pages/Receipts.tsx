@@ -63,6 +63,7 @@ const Receipts = () => {
   const [newBankLabel, setNewBankLabel] = useState("");
   const [saving, setSaving] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
+  const [showCashDialog, setShowCashDialog] = useState(false);
 
   // Handle Gmail/Microsoft OAuth callback params
   useEffect(() => {
