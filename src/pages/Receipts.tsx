@@ -610,6 +610,26 @@ const Receipts = () => {
               </div>
             )}
           </motion.div>
+
+          {/* Cash expense tile */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            onClick={() => setShowCashDialog(true)}
+            className="bg-card rounded-2xl border border-border p-6 hover:border-primary/30 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <Coins className="h-6 w-6 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground">💵 Espèces : saisie manuelle</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Ajoutez vos dépenses réglées en espèces</p>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+            </div>
+          </motion.div>
         </div>
 
         {/* AI Extraction Steps */}
