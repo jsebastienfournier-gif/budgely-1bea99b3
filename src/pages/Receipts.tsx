@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Upload, Camera, FileText, ChevronRight, Mail, Landmark, RefreshCw, Plus, Check, Loader2, X, ShoppingCart, Sparkles } from "lucide-react";
+import { Upload, Camera, FileText, ChevronRight, Mail, Landmark, RefreshCw, Plus, Check, Loader2, X, ShoppingCart, Sparkles, Coins } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import AppLayout from "@/components/AppLayout";
 import PremiumCTA from "@/components/PremiumCTA";
@@ -11,6 +11,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import CashExpenseDialog from "@/components/CashExpenseDialog";
 
 type ConnectedEmail = { id: string; email: string; provider: string; label: string | null; status: string; last_sync_at: string | null };
 type ConnectedBank = { id: string; bank_name: string; account_label: string | null; account_type: string | null; status: string; last_sync_at: string | null };
@@ -62,6 +63,7 @@ const Receipts = () => {
   const [newBankLabel, setNewBankLabel] = useState("");
   const [saving, setSaving] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
+  const [showCashDialog, setShowCashDialog] = useState(false);
 
   // Handle Gmail/Microsoft OAuth callback params
   useEffect(() => {
@@ -504,7 +506,7 @@ const Receipts = () => {
         </div>
 
         {/* Connection Tiles */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           {/* Email tile */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
@@ -607,6 +609,26 @@ const Receipts = () => {
                 </button>
               </div>
             )}
+          </motion.div>
+
+          {/* Cash expense tile */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            onClick={() => setShowCashDialog(true)}
+            className="bg-card rounded-2xl border border-border p-6 hover:border-primary/30 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <Coins className="h-6 w-6 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground">💵 Espèces : saisie manuelle</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Ajoutez vos dépenses réglées en espèces</p>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+            </div>
           </motion.div>
         </div>
 
@@ -872,6 +894,32 @@ const Receipts = () => {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Cash expense dialog */}
+      <CashExpenseDialog
+        open={showCashDialog}
+        onOpenChange={setShowCashDialog}
+        onExpenseAdded={(data) => {
+          const articles = (data.articles || []).map((a: any) => ({
+            name: a.nom || a.name || "",
+            qty: a.quantite || a.qty || 1,
+            unit: a.unite || a.unit || "pce",
+            unitPrice: a.prix_unitaire || a.unitPrice || 0,
+            total: a.prix_total || a.total || 0,
+          }));
+          const newReceipt: Receipt = {
+            id: data.id,
+            store: data.magasin || "Inconnu",
+            date: data.date_expense ? new Date(data.date_expense).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "Aujourd'hui",
+            total: `€${(data.montant_total || 0).toFixed(2)}`,
+            items: articles.length,
+            status: "Analysé",
+            products: articles,
+            source: data.source,
+          };
+          setExpenses(prev => [newReceipt, ...prev]);
+        }}
+      />
     </AppLayout>
   );
 };
