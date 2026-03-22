@@ -199,7 +199,7 @@ const Landing = () => {
           </motion.div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
-              { step: "01", title: "Ajoutez vos dépenses", desc: "Banque, emails ou tickets de caisse — importez vos dépenses en quelques clics." },
+              { step: "01", title: "Ajoutez vos dépenses", desc: "Banque, emails, tickets, factures ou dépenses en espèces — importez vos dépenses en quelques clics." },
               { step: "02", title: "L'IA analyse tout", desc: "Extraction automatique des produits, catégorisation et détection des tendances." },
               { step: "03", title: "Optimisez vos dépenses", desc: "Recevez des suggestions concrètes pour économiser sur vos achats récurrents." },
             ].map((s, i) => (
