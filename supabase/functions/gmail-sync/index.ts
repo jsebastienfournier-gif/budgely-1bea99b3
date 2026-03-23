@@ -158,7 +158,7 @@ serve(async (req) => {
     }
 
     // Search financial emails
-    const messages = await searchFinancialEmails(accessToken, 5);
+    const messages = await searchFinancialEmails(accessToken, 10);
 
     if (messages.length === 0) {
       // Update last_sync_at
