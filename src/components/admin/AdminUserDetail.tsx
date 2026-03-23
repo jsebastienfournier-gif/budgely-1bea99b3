@@ -75,6 +75,7 @@ export default function AdminUserDetail({ user: targetUser, currentUserId, open,
   const [notifTitle, setNotifTitle] = useState("");
   const [notifBody, setNotifBody] = useState("");
   const [notifSending, setNotifSending] = useState(false);
+  const [resetDataDialog, setResetDataDialog] = useState(false);
 
   const isSelf = targetUser?.id === currentUserId;
 

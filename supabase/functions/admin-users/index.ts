@@ -256,6 +256,25 @@ Deno.serve(async (req) => {
         return json({ success: true });
       }
 
+      case "reset_user_data": {
+        const { target_user_id } = params;
+        if (!target_user_id) throw new Error("Missing target_user_id");
+        if (target_user_id === user.id) throw new Error("Cannot reset your own data");
+
+        // Delete expenses, documents, subscriptions, ai_usage for the user
+        // Keep: profiles, connected_emails, connected_bank_accounts, gmail_tokens, microsoft_tokens
+        const delExpenses = adminClient.from("expenses").delete().eq("user_id", target_user_id);
+        const delDocuments = adminClient.from("documents").delete().eq("user_id", target_user_id);
+        const delSubscriptions = adminClient.from("subscriptions").delete().eq("user_id", target_user_id);
+        const delAiUsage = adminClient.from("ai_usage").delete().eq("user_id", target_user_id);
+
+        const results = await Promise.all([delExpenses, delDocuments, delSubscriptions, delAiUsage]);
+        const firstError = results.find((r) => r.error);
+        if (firstError?.error) throw firstError.error;
+
+        return json({ success: true });
+      }
+
       case "delete_user": {
         const { target_user_id } = params;
         if (!target_user_id) throw new Error("Missing target_user_id");
