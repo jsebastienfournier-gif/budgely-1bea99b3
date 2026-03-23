@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   Shield, Trash2, Loader2, Crown, UserCog, Eye, Ban, RotateCcw,
   KeyRound, Mail, CheckCircle, Copy, AlertTriangle, X, User,
-  FileText, CreditCard, Receipt, Send, Bell
+  FileText, CreditCard, Receipt, Send, Bell, RefreshCw
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -75,6 +75,7 @@ export default function AdminUserDetail({ user: targetUser, currentUserId, open,
   const [notifTitle, setNotifTitle] = useState("");
   const [notifBody, setNotifBody] = useState("");
   const [notifSending, setNotifSending] = useState(false);
+  const [resetDataDialog, setResetDataDialog] = useState(false);
 
   const isSelf = targetUser?.id === currentUserId;
 
@@ -197,6 +198,21 @@ export default function AdminUserDetail({ user: targetUser, currentUserId, open,
       toast.error(err.message || "Erreur");
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleResetUserData = async () => {
+    setActionLoading(true);
+    try {
+      await callAdmin({ action: "reset_user_data", target_user_id: u.id });
+      toast.success("Données utilisateur réinitialisées");
+      onRefresh();
+      loadDetail();
+    } catch (err: any) {
+      toast.error(err.message || "Erreur");
+    } finally {
+      setActionLoading(false);
+      setResetDataDialog(false);
     }
   };
 
@@ -446,6 +462,14 @@ export default function AdminUserDetail({ user: targetUser, currentUserId, open,
                       )}
 
                       <button
+                        onClick={() => setResetDataDialog(true)}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 transition-colors"
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                        Remettre à zéro les données
+                      </button>
+
+                      <button
                         onClick={() =>
                           setConfirmAction({
                             title: "Supprimer l'utilisateur",
@@ -642,6 +666,31 @@ export default function AdminUserDetail({ user: targetUser, currentUserId, open,
             >
               {notifSending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Envoyer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      {/* Reset data dialog */}
+      <AlertDialog open={resetDataDialog} onOpenChange={setResetDataDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5" />
+              Remettre à zéro les données
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action supprimera toutes les dépenses, documents, abonnements détectés et statistiques d'utilisation de {u.full_name || u.email}. Les connexions email et bancaires seront conservées. Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={actionLoading}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleResetUserData}
+              disabled={actionLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {actionLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Confirmer la remise à zéro
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
