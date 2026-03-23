@@ -322,6 +322,7 @@ export type Database = {
           raw_ai_response: Json | null
           recurrence: string | null
           source: Database["public"]["Enums"]["document_source"]
+          source_id: string | null
           type_depense: string | null
           type_document: string | null
           updated_at: string
@@ -346,6 +347,7 @@ export type Database = {
           raw_ai_response?: Json | null
           recurrence?: string | null
           source: Database["public"]["Enums"]["document_source"]
+          source_id?: string | null
           type_depense?: string | null
           type_document?: string | null
           updated_at?: string
@@ -370,6 +372,7 @@ export type Database = {
           raw_ai_response?: Json | null
           recurrence?: string | null
           source?: Database["public"]["Enums"]["document_source"]
+          source_id?: string | null
           type_depense?: string | null
           type_document?: string | null
           updated_at?: string
