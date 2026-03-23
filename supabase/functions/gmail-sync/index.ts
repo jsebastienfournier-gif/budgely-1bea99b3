@@ -211,6 +211,7 @@ serve(async (req) => {
           body: JSON.stringify({
             source: "email",
             raw_text: msg.raw_text,
+            source_id: `gmail_${msg.gmail_id}`,
           }),
         });
 
