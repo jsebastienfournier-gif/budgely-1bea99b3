@@ -462,6 +462,14 @@ export default function AdminUserDetail({ user: targetUser, currentUserId, open,
                       )}
 
                       <button
+                        onClick={() => setResetDataDialog(true)}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 transition-colors"
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                        Remettre à zéro les données
+                      </button>
+
+                      <button
                         onClick={() =>
                           setConfirmAction({
                             title: "Supprimer l'utilisateur",
