@@ -201,7 +201,22 @@ export default function AdminUserDetail({ user: targetUser, currentUserId, open,
     }
   };
 
-  const handleSetRole = async (role: string, remove: boolean) => {
+  const handleResetUserData = async () => {
+    setActionLoading(true);
+    try {
+      await callAdmin({ action: "reset_user_data", target_user_id: u.id });
+      toast.success("Données utilisateur réinitialisées");
+      onRefresh();
+      loadDetail();
+    } catch (err: any) {
+      toast.error(err.message || "Erreur");
+    } finally {
+      setActionLoading(false);
+      setResetDataDialog(false);
+    }
+  };
+
+
     try {
       await callAdmin({ action: "set_role", target_user_id: u.id, role, remove });
       toast.success(remove ? "Rôle retiré" : "Rôle attribué");
