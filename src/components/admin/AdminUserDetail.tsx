@@ -670,6 +670,31 @@ export default function AdminUserDetail({ user: targetUser, currentUserId, open,
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* Reset data dialog */}
+      <AlertDialog open={resetDataDialog} onOpenChange={setResetDataDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5" />
+              Remettre à zéro les données
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action supprimera toutes les dépenses, documents, abonnements détectés et statistiques d'utilisation de {u.full_name || u.email}. Les connexions email et bancaires seront conservées. Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={actionLoading}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleResetUserData}
+              disabled={actionLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {actionLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Confirmer la remise à zéro
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
