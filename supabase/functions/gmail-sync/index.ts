@@ -174,14 +174,34 @@ serve(async (req) => {
       });
     }
 
-    // Analyze each email via analyze-document function
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!lovableApiKey) throw new Error("LOVABLE_API_KEY not configured");
+    // Check which gmail IDs were already processed
+    const gmailIds = messages.map((m) => `gmail_${m.gmail_id}`);
+    const { data: existingExpenses } = await supabaseAdmin
+      .from("expenses")
+      .select("source_id")
+      .eq("user_id", user.id)
+      .in("source_id", gmailIds);
 
+    const alreadyProcessed = new Set((existingExpenses || []).map((e: any) => e.source_id));
+    const newMessages = messages.filter((m) => !alreadyProcessed.has(`gmail_${m.gmail_id}`));
+
+    if (newMessages.length === 0) {
+      await supabaseAdmin
+        .from("connected_emails")
+        .update({ last_sync_at: new Date().toISOString() })
+        .eq("user_id", user.id)
+        .eq("email", email);
+
+      return new Response(JSON.stringify({ success: true, analyzed: 0, message: "Tous les emails ont déjà été analysés" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Analyze each new email via analyze-document function
     const results = [];
-    for (const msg of messages) {
+    for (const msg of newMessages) {
       try {
-        // Call analyze-document internally
         const analyzeRes = await fetch(`${supabaseUrl}/functions/v1/analyze-document`, {
           method: "POST",
           headers: {
