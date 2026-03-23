@@ -121,7 +121,7 @@ serve(async (req) => {
     // Service role client for admin operations
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-    const { document_id, source, raw_text } = await req.json();
+    const { document_id, source, raw_text, source_id } = await req.json();
 
     if (!source || !raw_text) {
       return new Response(JSON.stringify({ error: "source et raw_text requis" }), {
@@ -228,6 +228,7 @@ serve(async (req) => {
       user_id: user.id,
       document_id: document_id || null,
       source,
+      source_id: source_id || null,
       type_document: parsed.type_document || "",
       fournisseur: parsed.fournisseur || parsed.magasin || "",
       magasin: parsed.magasin || "",
