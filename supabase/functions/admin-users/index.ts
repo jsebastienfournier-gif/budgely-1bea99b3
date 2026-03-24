@@ -294,7 +294,7 @@ Deno.serve(async (req) => {
         const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
         const { limit = 50, starting_after } = params;
-        const listParams: Record<string, unknown> = { limit, expand: ["data.customer", "data.charge"] };
+        const listParams: Record<string, unknown> = { limit, expand: ["data.customer", "data.latest_charge"] };
         if (starting_after) listParams.starting_after = starting_after;
 
         const paymentIntents = await stripe.paymentIntents.list(listParams);
