@@ -150,6 +150,10 @@ const Admin = () => {
               <Mail className="h-3.5 w-3.5" />
               Emails
             </TabsTrigger>
+            <TabsTrigger value="payments" className="gap-1.5">
+              <CreditCard className="h-3.5 w-3.5" />
+              Paiements
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="analytics">
