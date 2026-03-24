@@ -347,6 +347,134 @@ Deno.serve(async (req) => {
         return json({ payments, has_more: paymentIntents.has_more });
       }
 
+      case "get_payment_detail": {
+        const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+        if (!stripeKey) throw new Error("STRIPE_SECRET_KEY not configured");
+
+        const { default: Stripe } = await import("https://esm.sh/stripe@18.5.0");
+        const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
+
+        const { payment_id } = params;
+        if (!payment_id) return json({ error: "payment_id required" }, 400);
+
+        // Fetch the payment intent with expanded charge and invoice
+        const pi = await stripe.paymentIntents.retrieve(payment_id, {
+          expand: ["latest_charge", "customer", "invoice"],
+        });
+
+        const customerEmail = typeof pi.customer === "object" ? pi.customer?.email : null;
+        const customerId = typeof pi.customer === "object" ? pi.customer?.id : pi.customer;
+
+        // Match user
+        let matchedUser = null;
+        if (customerEmail) {
+          const { data: authUsers } = await adminClient.auth.admin.listUsers({ perPage: 500 });
+          const { data: profiles } = await adminClient.from("profiles").select("user_id, full_name");
+          const au = authUsers?.users?.find((u) => u.email?.toLowerCase() === customerEmail.toLowerCase());
+          if (au) {
+            const profile = profiles?.find((p) => p.user_id === au.id);
+            matchedUser = { id: au.id, email: au.email, full_name: profile?.full_name || null };
+          }
+        }
+
+        // Get subscription info for this customer
+        let subscriptionInfo = null;
+        let subscriptionHistory: any[] = [];
+        if (customerId) {
+          const subs = await stripe.subscriptions.list({
+            customer: customerId,
+            limit: 10,
+            expand: ["data.items.data.price.product"],
+          });
+
+          if (subs.data.length > 0) {
+            const activeSub = subs.data[0];
+            const item = activeSub.items.data[0];
+            const price = item?.price;
+            const product = typeof price?.product === "object" ? price.product : null;
+
+            subscriptionInfo = {
+              id: activeSub.id,
+              status: activeSub.status,
+              plan_name: product?.name || "Inconnu",
+              interval: price?.recurring?.interval === "year" ? "annuel" : "mensuel",
+              current_period_start: new Date(activeSub.current_period_start * 1000).toISOString(),
+              current_period_end: new Date(activeSub.current_period_end * 1000).toISOString(),
+              created: new Date(activeSub.created * 1000).toISOString(),
+            };
+          }
+
+          // Fetch subscription events (invoices as history proxy)
+          const invoices = await stripe.invoices.list({
+            customer: customerId,
+            limit: 20,
+          });
+
+          subscriptionHistory = invoices.data.map((inv: any) => {
+            let eventType = "Paiement";
+            if (inv.billing_reason === "subscription_create") eventType = "Souscription";
+            else if (inv.billing_reason === "subscription_cycle") eventType = "Renouvellement";
+            else if (inv.billing_reason === "subscription_update") eventType = "Mise à jour";
+            else if (inv.billing_reason === "manual") eventType = "Facture manuelle";
+
+            return {
+              id: inv.id,
+              date: new Date(inv.created * 1000).toISOString(),
+              event_type: eventType,
+              amount: (inv.amount_paid || 0) / 100,
+              currency: inv.currency?.toUpperCase() || "EUR",
+              status: inv.status === "paid" ? "payé" : inv.status === "open" ? "en attente" : inv.status,
+              invoice_pdf: inv.invoice_pdf || null,
+              hosted_invoice_url: inv.hosted_invoice_url || null,
+            };
+          });
+        }
+
+        // Invoice linked to this payment
+        let invoiceDetail = null;
+        if (pi.invoice && typeof pi.invoice === "object") {
+          const inv = pi.invoice as any;
+          invoiceDetail = {
+            id: inv.id,
+            number: inv.number || null,
+            status: inv.status === "paid" ? "payé" : inv.status,
+            amount: (inv.amount_paid || 0) / 100,
+            currency: inv.currency?.toUpperCase() || "EUR",
+            invoice_pdf: inv.invoice_pdf || null,
+            hosted_invoice_url: inv.hosted_invoice_url || null,
+          };
+        }
+
+        // Charge details
+        const charge = typeof pi.latest_charge === "object" ? pi.latest_charge : null;
+
+        let status: string;
+        if (pi.status === "succeeded") status = "réussi";
+        else if (pi.status === "canceled") status = "annulé";
+        else if (charge && charge.refunded) status = "remboursé";
+        else if (pi.status === "requires_payment_method" || pi.status === "requires_action") status = "échoué";
+        else status = pi.status;
+
+        return json({
+          id: pi.id,
+          amount: pi.amount / 100,
+          currency: pi.currency?.toUpperCase() || "EUR",
+          status,
+          created: new Date(pi.created * 1000).toISOString(),
+          description: pi.description || null,
+          payment_method_type: charge?.payment_method_details?.type || null,
+          payment_method_last4: charge?.payment_method_details?.card?.last4 || null,
+          payment_method_brand: charge?.payment_method_details?.card?.brand || null,
+          customer_email: customerEmail || null,
+          user_id: matchedUser?.id || null,
+          user_name: matchedUser?.full_name || null,
+          user_email: matchedUser?.email || customerEmail || null,
+          subscription: subscriptionInfo,
+          history: subscriptionHistory,
+          invoice: invoiceDetail,
+        });
+      }
+
       default:
         return json({ error: "Unknown action" }, 400);
     }
