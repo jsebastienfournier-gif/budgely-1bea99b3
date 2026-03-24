@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Shield, UserCog, Loader2, Crown, Wrench, BarChart3, MessageSquare, Eye, Ban, Bell, Mail } from "lucide-react";
+import { Shield, UserCog, Loader2, Crown, Wrench, BarChart3, MessageSquare, Eye, Ban, Bell, Mail, CreditCard } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
