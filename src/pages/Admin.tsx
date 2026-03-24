@@ -292,6 +292,10 @@ const Admin = () => {
           <TabsContent value="emails">
             <AdminEmailTemplates />
           </TabsContent>
+
+          <TabsContent value="payments">
+            <AdminPayments />
+          </TabsContent>
         </Tabs>
       </div>
 
