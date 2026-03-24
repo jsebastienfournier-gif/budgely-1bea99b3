@@ -127,7 +127,7 @@ const AdminPayments = () => {
 
           <div className="divide-y divide-border">
             {payments.map((p) => (
-              <div key={p.id} className="px-5 py-3.5 sm:grid sm:grid-cols-[1fr_100px_100px_120px_140px] sm:gap-4 sm:items-center flex flex-col gap-2">
+              <div key={p.id} className="px-5 py-3.5 sm:grid sm:grid-cols-[1fr_100px_100px_120px_140px] sm:gap-4 sm:items-center flex flex-col gap-2 hover:bg-secondary/30 transition-colors cursor-pointer" onClick={() => { setSelectedPaymentId(p.id); setDetailOpen(true); }}>
                 {/* User */}
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">
