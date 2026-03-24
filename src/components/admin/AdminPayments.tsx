@@ -181,6 +181,12 @@ const AdminPayments = () => {
           )}
         </div>
       )}
+
+      <AdminPaymentDetail
+        paymentId={selectedPaymentId}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+      />
     </div>
   );
 };
