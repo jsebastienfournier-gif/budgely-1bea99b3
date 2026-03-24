@@ -11,6 +11,7 @@ import ContactMessages from "@/components/admin/ContactMessages";
 import AdminUserDetail from "@/components/admin/AdminUserDetail";
 import AdminNotifications from "@/components/admin/AdminNotifications";
 import AdminEmailTemplates from "@/components/admin/AdminEmailTemplates";
+import AdminPayments from "@/components/admin/AdminPayments";
 
 type AdminUser = {
   id: string;
