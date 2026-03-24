@@ -286,6 +286,67 @@ Deno.serve(async (req) => {
         return json({ success: true });
       }
 
+      case "list_payments": {
+        const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+        if (!stripeKey) throw new Error("STRIPE_SECRET_KEY not configured");
+
+        const { default: Stripe } = await import("https://esm.sh/stripe@18.5.0");
+        const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
+
+        const { limit = 50, starting_after } = params;
+        const listParams: Record<string, unknown> = { limit, expand: ["data.customer", "data.charge"] };
+        if (starting_after) listParams.starting_after = starting_after;
+
+        const paymentIntents = await stripe.paymentIntents.list(listParams);
+
+        // Get all user emails for mapping
+        const { data: authUsers } = await adminClient.auth.admin.listUsers({ perPage: 500 });
+        const emailToUser = new Map<string, { id: string; email: string; full_name: string | null }>();
+        const { data: profiles } = await adminClient.from("profiles").select("user_id, full_name");
+
+        for (const au of authUsers?.users || []) {
+          const profile = profiles?.find((p) => p.user_id === au.id);
+          emailToUser.set(au.email?.toLowerCase() || "", {
+            id: au.id,
+            email: au.email || "",
+            full_name: profile?.full_name || null,
+          });
+        }
+
+        const payments = paymentIntents.data.map((pi: any) => {
+          const customerEmail = typeof pi.customer === "object" ? pi.customer?.email?.toLowerCase() : null;
+          const matchedUser = customerEmail ? emailToUser.get(customerEmail) : null;
+
+          let status: string;
+          if (pi.status === "succeeded") status = "réussi";
+          else if (pi.status === "canceled") status = "annulé";
+          else if (pi.latest_charge && typeof pi.latest_charge === "object" && pi.latest_charge.refunded) status = "remboursé";
+          else if (pi.status === "requires_payment_method" || pi.status === "requires_action") status = "échoué";
+          else status = pi.status;
+
+          const charge = typeof pi.latest_charge === "object" ? pi.latest_charge : null;
+
+          return {
+            id: pi.id,
+            amount: pi.amount / 100,
+            currency: pi.currency?.toUpperCase() || "EUR",
+            status,
+            created: new Date(pi.created * 1000).toISOString(),
+            payment_method_type: charge?.payment_method_details?.type || null,
+            payment_method_last4: charge?.payment_method_details?.card?.last4 || null,
+            payment_method_brand: charge?.payment_method_details?.card?.brand || null,
+            customer_email: customerEmail || null,
+            user_id: matchedUser?.id || null,
+            user_name: matchedUser?.full_name || null,
+            user_email: matchedUser?.email || customerEmail || null,
+            description: pi.description || null,
+            invoice_id: pi.invoice || null,
+          };
+        });
+
+        return json({ payments, has_more: paymentIntents.has_more });
+      }
+
       default:
         return json({ error: "Unknown action" }, 400);
     }
