@@ -34,6 +34,8 @@ const AdminPayments = () => {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const loadPayments = async (startingAfter?: string) => {
     try {
