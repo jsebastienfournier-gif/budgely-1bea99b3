@@ -80,8 +80,19 @@ serve(async (req) => {
     }
 
     const productId = sub.items.data[0].price.product as string;
-    const subscriptionEnd = new Date(sub.current_period_end * 1000).toISOString();
     const priceId = sub.items.data[0].price.id;
+
+    // Handle current_period_end - may be unix timestamp (number) or ISO string depending on API version
+    let subscriptionEnd: string;
+    const rawEnd = sub.current_period_end;
+    if (typeof rawEnd === "number") {
+      subscriptionEnd = new Date(rawEnd * 1000).toISOString();
+    } else if (typeof rawEnd === "string") {
+      subscriptionEnd = new Date(rawEnd).toISOString();
+    } else {
+      subscriptionEnd = new Date().toISOString();
+    }
+    logStep("Parsed subscription end", { rawEnd, typeof: typeof rawEnd, subscriptionEnd });
 
     // Map product to plan name
     let plan = "free";
