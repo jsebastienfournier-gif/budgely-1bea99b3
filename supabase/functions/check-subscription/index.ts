@@ -45,6 +45,7 @@ serve(async (req) => {
 
     if (customers.data.length === 0) {
       logStep("No customer found");
+      await supabaseClient.from("user_plans").upsert({ user_id: user.id, plan: "free", expires_at: null }, { onConflict: "user_id" });
       return new Response(
         JSON.stringify({ subscribed: false, plan: "free", product_id: null, subscription_end: null }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
@@ -73,6 +74,7 @@ serve(async (req) => {
 
     if (!sub) {
       logStep("No active subscription");
+      await supabaseClient.from("user_plans").upsert({ user_id: user.id, plan: "free", expires_at: null }, { onConflict: "user_id" });
       return new Response(
         JSON.stringify({ subscribed: false, plan: "free", product_id: null, subscription_end: null }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
@@ -101,6 +103,19 @@ serve(async (req) => {
 
     logStep("Active subscription found", { plan, productId, priceId, subscriptionEnd });
 
+    // Sync plan to user_plans table so admin panel shows correct info
+    const { error: upsertError } = await supabaseClient
+      .from("user_plans")
+      .upsert(
+        {
+          user_id: user.id,
+          plan,
+          started_at: new Date(sub.created * 1000).toISOString(),
+          expires_at: subscriptionEnd || null,
+        },
+        { onConflict: "user_id" }
+      );
+    if (upsertError) logStep("Failed to sync user_plans", { error: upsertError.message });
     return new Response(
       JSON.stringify({
         subscribed: true,
