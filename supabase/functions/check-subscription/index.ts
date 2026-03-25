@@ -79,9 +79,20 @@ serve(async (req) => {
       );
     }
 
-    const productId = sub.items.data[0].price.product as string;
-    const subscriptionEnd = new Date(sub.current_period_end * 1000).toISOString();
-    const priceId = sub.items.data[0].price.id;
+    const item = sub.items.data[0];
+    const productId = item.price.product as string;
+    const priceId = item.price.id;
+
+    // In Stripe API 2025-03-31+, current_period_end moved to items.data[]
+    const rawEnd = (item as any).current_period_end ?? (sub as any).current_period_end;
+    let subscriptionEnd: string;
+    if (typeof rawEnd === "number") {
+      subscriptionEnd = new Date(rawEnd * 1000).toISOString();
+    } else if (typeof rawEnd === "string") {
+      subscriptionEnd = rawEnd;
+    } else {
+      subscriptionEnd = "";
+    }
 
     // Map product to plan name
     let plan = "free";
