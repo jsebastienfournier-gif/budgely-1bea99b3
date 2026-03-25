@@ -384,22 +384,35 @@ Deno.serve(async (req) => {
           const subs = await stripe.subscriptions.list({
             customer: customerId,
             limit: 10,
-            expand: ["data.items.data.price.product"],
           });
 
           if (subs.data.length > 0) {
             const activeSub = subs.data[0];
             const item = activeSub.items.data[0];
             const price = item?.price;
-            const product = typeof price?.product === "object" ? price.product : null;
+
+            // Fetch product name separately to avoid deep expansion
+            let productName = "Inconnu";
+            const productId = typeof price?.product === "string" ? price.product : (price?.product as any)?.id;
+            if (productId) {
+              try {
+                const product = await stripe.products.retrieve(productId);
+                productName = product.name || "Inconnu";
+              } catch {}
+            }
+
+            // current_period_end moved to item level in newer Stripe API
+            const rawStart = (item as any).current_period_start ?? (activeSub as any).current_period_start;
+            const rawEnd = (item as any).current_period_end ?? (activeSub as any).current_period_end;
+            const toISO = (v: any) => typeof v === "number" ? new Date(v * 1000).toISOString() : typeof v === "string" ? v : null;
 
             subscriptionInfo = {
               id: activeSub.id,
               status: activeSub.status,
-              plan_name: product?.name || "Inconnu",
+              plan_name: productName,
               interval: price?.recurring?.interval === "year" ? "annuel" : "mensuel",
-              current_period_start: new Date(activeSub.current_period_start * 1000).toISOString(),
-              current_period_end: new Date(activeSub.current_period_end * 1000).toISOString(),
+              current_period_start: toISO(rawStart),
+              current_period_end: toISO(rawEnd),
               created: new Date(activeSub.created * 1000).toISOString(),
             };
           }
