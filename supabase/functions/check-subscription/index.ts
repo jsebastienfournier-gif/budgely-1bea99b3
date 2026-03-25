@@ -79,27 +79,18 @@ serve(async (req) => {
       );
     }
 
-    const productId = sub.items.data[0].price.product as string;
-    const priceId = sub.items.data[0].price.id;
+    const item = sub.items.data[0];
+    const productId = item.price.product as string;
+    const priceId = item.price.id;
 
-    // Debug: log raw subscription fields for date
-    logStep("Raw sub fields", {
-      current_period_end: sub.current_period_end,
-      current_period_start: sub.current_period_start,
-      ended_at: (sub as any).ended_at,
-      cancel_at: (sub as any).cancel_at,
-      keys: Object.keys(sub).filter(k => k.includes("period") || k.includes("end") || k.includes("cancel")),
-    });
-
-    // Handle current_period_end - may be unix timestamp (number), ISO string, or undefined
+    // In Stripe API 2025-03-31+, current_period_end moved to items.data[]
+    const rawEnd = (item as any).current_period_end ?? (sub as any).current_period_end;
     let subscriptionEnd: string;
-    const rawEnd = sub.current_period_end ?? (sub as any).currentPeriodEnd;
     if (typeof rawEnd === "number") {
       subscriptionEnd = new Date(rawEnd * 1000).toISOString();
     } else if (typeof rawEnd === "string") {
       subscriptionEnd = rawEnd;
     } else {
-      // Fallback: calculate from billing interval
       subscriptionEnd = "";
     }
 
