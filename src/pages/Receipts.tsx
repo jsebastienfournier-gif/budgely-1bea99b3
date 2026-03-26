@@ -632,21 +632,6 @@ const Receipts = () => {
           </motion.div>
         </div>
 
-        {/* AI Extraction Steps */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="mb-8">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Processus d'extraction IA</p>
-          <div className="flex items-center gap-2 flex-wrap">
-            {["Lecture OCR", "Extraction IA", "Catégorisation", "Stockage"].map((step, i) => (
-              <div key={step} className="flex items-center gap-2">
-                <div className="flex items-center gap-2 bg-card rounded-lg px-3 py-2 border border-border">
-                  <div className="h-5 w-5 rounded-full bg-savings/20 text-savings text-[10px] font-bold flex items-center justify-center">{i + 1}</div>
-                  <span className="text-xs font-medium text-foreground">{step}</span>
-                </div>
-                {i < 3 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
-              </div>
-            ))}
-          </div>
-        </motion.div>
 
         {/* Receipt List */}
         <div className="bg-card rounded-2xl border border-border overflow-hidden">
