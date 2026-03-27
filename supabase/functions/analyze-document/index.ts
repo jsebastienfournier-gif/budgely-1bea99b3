@@ -240,6 +240,17 @@ serve(async (req) => {
       });
     }
 
+    // Check if email was rejected (promotional/non-transactional)
+    if (parsed.rejected === true) {
+      if (document_id) {
+        await supabaseAdmin.from("documents").update({ status: "completed", error_message: `Rejeté: ${parsed.reason || "email non transactionnel"}` }).eq("id", document_id);
+      }
+      return new Response(JSON.stringify({ success: true, rejected: true, reason: parsed.reason || "Email non transactionnel" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Store expense
     const expenseData: any = {
       user_id: user.id,
