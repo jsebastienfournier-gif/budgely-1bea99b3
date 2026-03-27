@@ -61,15 +61,21 @@ Renvoie UNIQUEMENT un JSON strict avec ces champs :
   "abonnement_detecte": false
 }
 Règles IMPORTANTES :
-- montant_total est LE CHAMP LE PLUS IMPORTANT. Tu DOIS absolument trouver le montant dans le texte. Cherche partout : dans les tableaux, les récapitulatifs, les lignes de total. Cherche des patterns comme "Total", "Montant", "Amount", "Prix", "€", "$", "TTC", "HT", tout nombre suivi ou précédé d'un symbole de devise, même dans du texte HTML converti.
+- montant_total est LE CHAMP LE PLUS IMPORTANT. Tu DOIS absolument trouver le montant dans le texte.
+- Cherche partout : sujet de l'email, tableaux, récapitulatifs, lignes de total, pied de page.
+- Cherche des patterns comme "Total", "Montant", "Amount", "Prix", "€", "$", "TTC", "HT", tout nombre suivi ou précédé d'un symbole de devise.
+- Exemples de patterns à détecter : "5,99 €", "€5.99", "Total : 12,50€", "montant de 3,00 EUR", "29.99 EUR/mois".
 - Si tu vois "5,99" ou "3,00" ou "12.50" ce sont des montants. Utilise le point comme séparateur décimal dans ta réponse (ex: 5.99 et non 5,99).
-- Ne JAMAIS laisser montant_total à 0 si un montant est visible quelque part dans le texte. Si plusieurs montants existent, prends le total TTC.
+- ATTENTION aux emails de notification (ex: "Votre facture est disponible") : même si l'email dit de consulter la facture en ligne, cherche quand même un montant dans le corps ou le sujet. Si le sujet contient un montant (ex: "Facture Bouygues 15,99€"), extrais-le.
+- Pour les opérateurs télécom (Bouygues, Orange, SFR, Free), le montant est souvent dans le sujet ou dans une phrase comme "montant de X€" ou "d'un montant de X,XX €".
+- Ne JAMAIS laisser montant_total à 0 si un montant est visible quelque part dans le texte, le sujet ou les en-têtes.
+- Si plusieurs montants existent, prends le total TTC.
 - type_document peut être : facture, reçu, abonnement, renouvellement, confirmation_commande, notification_paiement.
 - fournisseur : nom de l'entreprise/service qui envoie l'email.
 - date : date du paiement ou de la facture au format YYYY-MM-DD.
 - abonnement_detecte : true si c'est un paiement récurrent (abonnement, renouvellement).
 - recurrence : mensuel, annuel, trimestriel, ou vide si pas récurrent.
-- Champs manquants = chaînes vides, sauf montant_total qui doit être 0 uniquement si AUCUN montant n'est trouvé nulle part dans le texte.`,
+- Champs manquants = chaînes vides, sauf montant_total qui doit être 0 uniquement si AUCUN montant n'est trouvé NULLE PART dans le texte (sujet inclus).`,
 
   bank: `Tu es un assistant spécialisé dans l'analyse de transactions bancaires.
 Analyse les transactions suivantes et renvoie UNIQUEMENT un JSON strict avec ces champs pour CHAQUE transaction :

@@ -51,9 +51,9 @@ function flattenParts(payload: any): any[] {
 }
 
 // Search Gmail for financial emails
-async function searchFinancialEmails(accessToken: string, maxResults = 10): Promise<any[]> {
+async function searchFinancialEmails(accessToken: string, maxResults = 30): Promise<any[]> {
   const query = encodeURIComponent(
-    "subject:(facture OR invoice OR reçu OR receipt OR confirmation OR commande OR order OR paiement OR payment) newer_than:90d"
+    "subject:(facture OR invoice OR reçu OR receipt OR confirmation OR commande OR order OR paiement OR payment OR achat OR purchase OR livraison OR delivery OR expédition OR prélèvement OR abonnement OR subscription OR montant OR amount) newer_than:90d"
   );
 
   const listRes = await fetch(
@@ -204,7 +204,7 @@ serve(async (req) => {
     }
 
     // Search financial emails
-    const messages = await searchFinancialEmails(accessToken, 10);
+    const messages = await searchFinancialEmails(accessToken, 30);
 
     if (messages.length === 0) {
       // Update last_sync_at
