@@ -45,9 +45,22 @@ Analyse le texte suivant et renvoie UNIQUEMENT un JSON strict avec ces champs :
 Règles : remplis tous les champs. Les champs manquants = chaînes vides. Aucune interprétation non justifiée.`,
 
   email: `Tu es un assistant spécialisé dans l'extraction de données financières à partir d'emails.
-Analyse attentivement le texte suivant et extrais les informations de paiement/dépense.
-Renvoie UNIQUEMENT un JSON strict avec ces champs :
+
+ÉTAPE 1 - FILTRAGE : Détermine d'abord si cet email correspond à une VRAIE dépense/transaction financière.
+REJETTE l'email (renvoie {"rejected": true, "reason": "..."}) si c'est :
+- Une newsletter, offre promotionnelle, publicité, "bon plan", "vente flash", "code promo"
+- Un email marketing sans transaction réelle (ex: "Découvrez nos offres", "Profitez de -30%")
+- Une simple notification sans montant payé (ex: "Votre colis est en chemin" SANS montant)
+- Un email de fidélité/points de récompense sans achat
+
+ACCEPTE l'email si c'est :
+- Une facture, un reçu, une confirmation de commande AVEC un montant payé
+- Un prélèvement bancaire, un abonnement facturé
+- Une confirmation de paiement
+
+ÉTAPE 2 - Si l'email est une vraie transaction, renvoie UNIQUEMENT un JSON strict :
 {
+  "rejected": false,
   "type_document": "",
   "fournisseur": "",
   "montant_total": 0,
@@ -60,22 +73,18 @@ Renvoie UNIQUEMENT un JSON strict avec ces champs :
   "moyen_paiement": "",
   "abonnement_detecte": false
 }
-Règles IMPORTANTES :
-- montant_total est LE CHAMP LE PLUS IMPORTANT. Tu DOIS absolument trouver le montant dans le texte.
-- Cherche partout : sujet de l'email, tableaux, récapitulatifs, lignes de total, pied de page.
-- Cherche des patterns comme "Total", "Montant", "Amount", "Prix", "€", "$", "TTC", "HT", tout nombre suivi ou précédé d'un symbole de devise.
-- Exemples de patterns à détecter : "5,99 €", "€5.99", "Total : 12,50€", "montant de 3,00 EUR", "29.99 EUR/mois".
-- Si tu vois "5,99" ou "3,00" ou "12.50" ce sont des montants. Utilise le point comme séparateur décimal dans ta réponse (ex: 5.99 et non 5,99).
-- ATTENTION aux emails de notification (ex: "Votre facture est disponible") : même si l'email dit de consulter la facture en ligne, cherche quand même un montant dans le corps ou le sujet. Si le sujet contient un montant (ex: "Facture Bouygues 15,99€"), extrais-le.
-- Pour les opérateurs télécom (Bouygues, Orange, SFR, Free), le montant est souvent dans le sujet ou dans une phrase comme "montant de X€" ou "d'un montant de X,XX €".
-- Ne JAMAIS laisser montant_total à 0 si un montant est visible quelque part dans le texte, le sujet ou les en-têtes.
-- Si plusieurs montants existent, prends le total TTC.
-- type_document peut être : facture, reçu, abonnement, renouvellement, confirmation_commande, notification_paiement.
-- fournisseur : nom de l'entreprise/service qui envoie l'email.
-- date : date du paiement ou de la facture au format YYYY-MM-DD.
-- abonnement_detecte : true si c'est un paiement récurrent (abonnement, renouvellement).
-- recurrence : mensuel, annuel, trimestriel, ou vide si pas récurrent.
-- Champs manquants = chaînes vides, sauf montant_total qui doit être 0 uniquement si AUCUN montant n'est trouvé NULLE PART dans le texte (sujet inclus).`,
+
+Règles IMPORTANTES pour l'extraction :
+- Le SUJET de l'email est fourni en première ligne après "Sujet:". C'est souvent LA source principale du montant.
+- montant_total est LE CHAMP LE PLUS IMPORTANT. Tu DOIS absolument trouver le montant.
+- Cherche des patterns : "5,99 €", "€5.99", "Total : 12,50€", "montant de 3,00 EUR", "d'un montant de X,XX €".
+- Utilise le POINT comme séparateur décimal (5.99 pas 5,99).
+- Pour les télécom (Bouygues, Orange, SFR, Free), le montant est souvent dans le sujet : "montant de X,XX €" ou "Facture de X€".
+- Ne JAMAIS laisser montant_total à 0 si un montant est visible QUELQUE PART (sujet, corps, HTML).
+- Si plusieurs montants, prends le total TTC.
+- fournisseur : nom de l'entreprise/service.
+- date : format YYYY-MM-DD.
+- abonnement_detecte : true si paiement récurrent.`,
 
   bank: `Tu es un assistant spécialisé dans l'analyse de transactions bancaires.
 Analyse les transactions suivantes et renvoie UNIQUEMENT un JSON strict avec ces champs pour CHAQUE transaction :
