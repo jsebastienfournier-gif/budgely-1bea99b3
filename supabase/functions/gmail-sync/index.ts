@@ -53,7 +53,7 @@ function flattenParts(payload: any): any[] {
 // Search Gmail for financial emails
 async function searchFinancialEmails(accessToken: string, maxResults = 30): Promise<any[]> {
   const query = encodeURIComponent(
-    "subject:(facture OR invoice OR reçu OR receipt OR confirmation OR commande OR order OR paiement OR payment OR achat OR purchase OR livraison OR delivery OR expédition OR prélèvement OR abonnement OR subscription OR montant OR amount) newer_than:90d"
+    "subject:(facture OR invoice OR reçu OR receipt OR confirmation OR commande OR order OR paiement OR payment OR achat OR purchase OR livraison OR delivery OR expédition OR prélèvement OR abonnement OR subscription OR montant OR amount) newer_than:90d -subject:(offre OR promo OR promotion OR soldes OR newsletter OR \"code promo\" OR réduction OR \"vente flash\" OR \"bon plan\")"
   );
 
   const listRes = await fetch(
