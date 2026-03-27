@@ -30,6 +30,26 @@ async function refreshAccessToken(refreshToken: string): Promise<{ access_token:
   return { access_token: data.access_token, expires_in: data.expires_in || 3600 };
 }
 
+// Decode base64url-encoded string
+function decodeBase64Url(data: string): string {
+  return atob(data.replace(/-/g, "+").replace(/_/g, "/"));
+}
+
+// Recursively flatten MIME parts (handles nested multipart messages)
+function flattenParts(payload: any): any[] {
+  const parts: any[] = [];
+  if (payload?.parts) {
+    for (const part of payload.parts) {
+      if (part.parts) {
+        parts.push(...flattenParts(part));
+      } else {
+        parts.push(part);
+      }
+    }
+  }
+  return parts;
+}
+
 // Search Gmail for financial emails
 async function searchFinancialEmails(accessToken: string, maxResults = 10): Promise<any[]> {
   const query = encodeURIComponent(
@@ -61,17 +81,43 @@ async function searchFinancialEmails(accessToken: string, maxResults = 10): Prom
     const from = headers.find((h: any) => h.name === "From")?.value || "";
     const date = headers.find((h: any) => h.name === "Date")?.value || "";
 
-    // Extract body text
+    // Extract body text - try plain text first, fall back to HTML
     let body = "";
-    if (msgData.payload?.body?.data) {
-      body = atob(msgData.payload.body.data.replace(/-/g, "+").replace(/_/g, "/"));
-    } else if (msgData.payload?.parts) {
-      const textPart = msgData.payload.parts.find(
-        (p: any) => p.mimeType === "text/plain" && p.body?.data
-      );
-      if (textPart) {
-        body = atob(textPart.body.data.replace(/-/g, "+").replace(/_/g, "/"));
-      }
+    const allParts = flattenParts(msgData.payload);
+    
+    // Try text/plain first
+    const textPart = allParts.find((p: any) => p.mimeType === "text/plain" && p.body?.data);
+    if (textPart) {
+      body = decodeBase64Url(textPart.body.data);
+    }
+    
+    // Also get HTML and strip tags - often contains amounts not in plain text
+    const htmlPart = allParts.find((p: any) => p.mimeType === "text/html" && p.body?.data);
+    let htmlBody = "";
+    if (htmlPart) {
+      const rawHtml = decodeBase64Url(htmlPart.body.data);
+      htmlBody = rawHtml.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+        .replace(/<[^>]*>/g, " ")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&euro;/g, "€")
+        .replace(/&amp;/g, "&")
+        .replace(/&#\d+;/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    // If plain text is empty or very short, use HTML-derived text
+    if (!body || body.trim().length < 50) {
+      body = htmlBody;
+    } else if (htmlBody && htmlBody.length > body.length) {
+      // Append HTML content as it may contain amounts missing from plain text
+      body = body + "\n\n--- Contenu HTML ---\n" + htmlBody;
+    }
+    
+    // Also check top-level body
+    if (!body && msgData.payload?.body?.data) {
+      body = decodeBase64Url(msgData.payload.body.data);
     }
 
     // Truncate body to avoid oversized AI prompts
