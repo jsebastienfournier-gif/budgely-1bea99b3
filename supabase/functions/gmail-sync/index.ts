@@ -30,6 +30,26 @@ async function refreshAccessToken(refreshToken: string): Promise<{ access_token:
   return { access_token: data.access_token, expires_in: data.expires_in || 3600 };
 }
 
+// Decode base64url-encoded string
+function decodeBase64Url(data: string): string {
+  return atob(data.replace(/-/g, "+").replace(/_/g, "/"));
+}
+
+// Recursively flatten MIME parts (handles nested multipart messages)
+function flattenParts(payload: any): any[] {
+  const parts: any[] = [];
+  if (payload?.parts) {
+    for (const part of payload.parts) {
+      if (part.parts) {
+        parts.push(...flattenParts(part));
+      } else {
+        parts.push(part);
+      }
+    }
+  }
+  return parts;
+}
+
 // Search Gmail for financial emails
 async function searchFinancialEmails(accessToken: string, maxResults = 10): Promise<any[]> {
   const query = encodeURIComponent(
