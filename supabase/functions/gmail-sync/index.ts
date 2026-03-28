@@ -32,7 +32,13 @@ async function refreshAccessToken(refreshToken: string): Promise<{ access_token:
 
 // Decode base64url-encoded string
 function decodeBase64Url(data: string): string {
-  return atob(data.replace(/-/g, "+").replace(/_/g, "/"));
+  const normalized = data.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+  try {
+    return atob(padded);
+  } catch {
+    return "";
+  }
 }
 
 // Recursively flatten MIME parts (handles nested multipart messages)
@@ -50,26 +56,28 @@ function flattenParts(payload: any): any[] {
   return parts;
 }
 
-// Search Gmail for financial emails
-async function searchFinancialEmails(accessToken: string, maxResults = 80): Promise<any[]> {
-  const includeTerms = [
-    "facture", "invoice", "reçu", "receipt", "confirmation", "commande", "order",
-    "paiement", "payment", "achat", "purchase", "livraison", "delivery", "expédition",
-    "expedition", "prélèvement", "prelevement", "abonnement", "subscription", "montant", "amount",
-    "amazon", "bouygues", "ionos", "orange", "sfr", "fnac"
-  ];
+const PROMO_KEYWORDS = /(offre|promo|promotion|soldes|newsletter|code promo|vente flash|bon plan|r[ée]duction|publicit[ée]|deals?)/i;
+const HARD_TRANSACTION_PROOF = /(n[°º]\s*de\s*commande|num[eé]ro\s*de\s*commande|order\s*#|num[eé]ro\s*de\s*facture|facture\s*n[°º]|confirmation\s*de\s*paiement|paiement\s*(confirm[ée]|effectu[ée])|re[çc]u\s*de\s*paiement|merci\s+pour\s+votre\s+achat|total(?:\s*ttc)?\s*[:=]|montant(?:\s+pay[ée]|\s+de)\s*[:=]?)/i;
+const SOFT_TRANSACTION_SIGNALS = /(facture|invoice|commande|order|paiement|payment|re[çc]u|receipt|total|ttc|montant|abonnement|pr[ée]l[eè]vement|d[ée]bit)/i;
+const TRUSTED_MERCHANTS = /(amazon|bouygues|bouygues telecom|orange|sfr|free|paypal|ionos|apple|google|uber|sncf|edf|engie)/i;
+const CURRENCY_PATTERN = /(\d+[.,]\d{1,2}\s*(€|eur)|€\s*\d+[.,]?\d*)/i;
 
-  const excludeSubjectTerms = [
-    "offre", "promo", "promotion", "soldes", "newsletter", '"code promo"',
-    "réduction", "reduction", '"vente flash"', '"bon plan"'
-  ];
+function isPromotionalWithoutTransactionProof(rawText: string, subject: string, from: string): boolean {
+  const text = `${subject}\n${from}\n${rawText}`.toLowerCase();
 
-  const query = encodeURIComponent(
-    `(${includeTerms.join(" OR ")}) newer_than:120d -category:promotions -category:social -subject:(${excludeSubjectTerms.join(" OR ")})`
-  );
+  if (!PROMO_KEYWORDS.test(text)) return false;
+  if (!CURRENCY_PATTERN.test(text)) return true;
+  if (HARD_TRANSACTION_PROOF.test(text)) return false;
 
+  const hasSoftTransactionSignal = SOFT_TRANSACTION_SIGNALS.test(text);
+  const hasTrustedMerchant = TRUSTED_MERCHANTS.test(text);
+
+  return !(hasSoftTransactionSignal && hasTrustedMerchant);
+}
+
+async function listMessageIdsByQuery(accessToken: string, query: string, maxResults: number): Promise<string[]> {
   const listRes = await fetch(
-    `https://www.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=${maxResults}`,
+    `https://www.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
   const listData = await listRes.json();
@@ -78,21 +86,49 @@ async function searchFinancialEmails(accessToken: string, maxResults = 80): Prom
     throw new Error(`Gmail list API error: ${JSON.stringify(listData)}`);
   }
 
-  if (!listData.messages || listData.messages.length === 0) {
+  return (listData.messages || []).map((m: { id: string }) => m.id);
+}
+
+// Search Gmail for financial emails
+async function searchFinancialEmails(accessToken: string, maxResults = 120): Promise<any[]> {
+  const includeTerms = [
+    "facture", "invoice", "reçu", "receipt", "confirmation", "commande", "order",
+    "paiement", "payment", "achat", "purchase", "livraison", "delivery", "expédition",
+    "expedition", "prélèvement", "prelevement", "abonnement", "subscription", "montant", "amount",
+    "amazon", "bouygues", "ionos", "orange", "sfr", "fnac"
+  ];
+
+  const queries = [
+    `(${includeTerms.join(" OR ")}) newer_than:180d -category:social`,
+    `(from:amazon OR from:amazon.fr OR from:bouygues OR from:bouyguestelecom OR from:paypal) newer_than:365d -category:social`,
+  ];
+
+  const uniqueIds = new Set<string>();
+  for (const query of queries) {
+    const ids = await listMessageIdsByQuery(accessToken, query, maxResults);
+    for (const id of ids) {
+      uniqueIds.add(id);
+      if (uniqueIds.size >= maxResults * 2) break;
+    }
+    if (uniqueIds.size >= maxResults * 2) break;
+  }
+
+  const messageIds = Array.from(uniqueIds).slice(0, maxResults);
+  if (messageIds.length === 0) {
     return [];
   }
 
   // Fetch each message content
   const messages = [];
-  for (const msg of listData.messages.slice(0, maxResults)) {
+  for (const messageId of messageIds) {
     const msgRes = await fetch(
-      `https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
+      `https://www.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     const msgData = await msgRes.json();
 
     if (!msgRes.ok) {
-      console.warn("Skipping Gmail message (fetch error):", msg.id, msgData);
+      console.warn("Skipping Gmail message (fetch error):", messageId, msgData);
       continue;
     }
 
@@ -143,14 +179,19 @@ async function searchFinancialEmails(accessToken: string, maxResults = 80): Prom
 
     // Truncate body to avoid oversized AI prompts
     const truncatedBody = body.substring(0, 4500);
+    const rawText = `De: ${from}\nSujet: ${subject}\nDate: ${date}\n\n${truncatedBody}`;
+
+    if (isPromotionalWithoutTransactionProof(rawText, subject, from)) {
+      continue;
+    }
 
     messages.push({
-      gmail_id: msg.id,
+      gmail_id: messageId,
       subject,
       from,
       date,
       body: truncatedBody,
-      raw_text: `De: ${from}\nSujet: ${subject}\nDate: ${date}\n\n${truncatedBody}`,
+      raw_text: rawText,
     });
   }
 
@@ -258,7 +299,7 @@ serve(async (req) => {
     }
 
     // Search financial emails
-    const messages = await searchFinancialEmails(accessToken, 80);
+    const messages = await searchFinancialEmails(accessToken, 120);
 
     if (messages.length === 0) {
       // Update last_sync_at
