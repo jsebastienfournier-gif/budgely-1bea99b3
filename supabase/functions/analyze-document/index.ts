@@ -197,7 +197,7 @@ serve(async (req) => {
     // Service role client for admin operations
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-    const { document_id, source, raw_text, source_id } = await req.json();
+    const { document_id, source, raw_text, source_id, skip_usage_check } = await req.json();
 
     if (!source || !raw_text) {
       return new Response(JSON.stringify({ error: "source et raw_text requis" }), {
@@ -224,17 +224,19 @@ serve(async (req) => {
       );
     }
 
-    // Check usage
-    const { data: usageCount } = await supabaseAdmin.rpc("increment_ai_usage", {
-      _user_id: user.id,
-      _source: source,
-    });
+    // Check usage (skip if called from sync functions that already counted)
+    if (!skip_usage_check) {
+      const { data: usageCount } = await supabaseAdmin.rpc("increment_ai_usage", {
+        _user_id: user.id,
+        _source: source,
+      });
 
-    if (usageCount > sourceLimit) {
-      return new Response(
-        JSON.stringify({ error: "limit_reached", message: `Limite mensuelle atteinte (${sourceLimit} analyses ${source}/mois).`, plan: userPlan, usage: usageCount }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (usageCount > sourceLimit) {
+        return new Response(
+          JSON.stringify({ error: "limit_reached", message: `Limite mensuelle atteinte (${sourceLimit} analyses ${source}/mois).`, plan: userPlan, usage: usageCount }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Update document status
