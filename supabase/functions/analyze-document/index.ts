@@ -57,6 +57,8 @@ ACCEPTE l'email si c'est :
 - Une facture, un reçu, une confirmation de commande AVEC un montant payé
 - Un prélèvement bancaire, un abonnement facturé
 - Une confirmation de paiement
+- IMPORTANT: si tu hésites entre rejet et acceptation, ACCEPTE.
+- IMPORTANT: si l'email contient un n° de commande, un numéro de facture, "Total", "TTC", "Montant", "Paiement", "Payé", ne rejette pas.
 
 ÉTAPE 2 - Si l'email est une vraie transaction, renvoie UNIQUEMENT un JSON strict :
 {
@@ -80,6 +82,7 @@ Règles IMPORTANTES pour l'extraction :
 - Cherche des patterns : "5,99 €", "€5.99", "Total : 12,50€", "montant de 3,00 EUR", "d'un montant de X,XX €".
 - Utilise le POINT comme séparateur décimal (5.99 pas 5,99).
 - Pour les télécom (Bouygues, Orange, SFR, Free), le montant est souvent dans le sujet : "montant de X,XX €" ou "Facture de X€".
+- Pour Amazon/e-commerce, cherche aussi "Total de la commande", "Montant payé", "Order total", "Merci pour votre achat".
 - Ne JAMAIS laisser montant_total à 0 si un montant est visible QUELQUE PART (sujet, corps, HTML).
 - Si plusieurs montants, prends le total TTC.
 - fournisseur : nom de l'entreprise/service.
@@ -99,6 +102,62 @@ Analyse les transactions suivantes et renvoie UNIQUEMENT un JSON strict avec ces
 }]
 Règles : catégorise intelligemment, détecte abonnements et récurrences. Champs manquants = chaînes vides.`,
 };
+
+function parseCurrencyAmount(raw: string): number | null {
+  const value = raw.trim().replace(/\s+/g, "");
+
+  let normalized = value;
+  if (value.includes(",") && value.includes(".")) {
+    // 1.234,56 => 1234.56 / 1,234.56 => 1234.56
+    if (value.indexOf(".") < value.indexOf(",")) {
+      normalized = value.replace(/\./g, "").replace(",", ".");
+    } else {
+      normalized = value.replace(/,/g, "");
+    }
+  } else if (value.includes(",")) {
+    normalized = value.replace(",", ".");
+  }
+
+  const parsed = Number.parseFloat(normalized);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.round(parsed * 100) / 100;
+}
+
+function extractAmountFromRawText(rawText: string): number | null {
+  const text = rawText.replace(/\u00a0/g, " ");
+
+  const keywordRegex =
+    /(?:montant|total(?:\s*ttc)?|facture(?:\s*de)?|pay(?:é|e)|paiement|pr[ée]lev(?:é|e)|d[ée]bit(?:é|e)?|commande(?:\s*de)?|amount)[^\d]{0,25}(\d{1,6}(?:[.,]\d{1,2})?)\s*(?:€|eur)/gi;
+  const keywordMatches: number[] = [];
+  for (const match of text.matchAll(keywordRegex)) {
+    const amount = parseCurrencyAmount(match[1] ?? "");
+    if (amount) keywordMatches.push(amount);
+  }
+  if (keywordMatches.length > 0) {
+    return keywordMatches[keywordMatches.length - 1];
+  }
+
+  const genericRegex = /(\d{1,6}(?:[.,]\d{1,2})?)\s*(?:€|eur)/gi;
+  const genericMatches: number[] = [];
+  for (const match of text.matchAll(genericRegex)) {
+    const amount = parseCurrencyAmount(match[1] ?? "");
+    if (amount) genericMatches.push(amount);
+  }
+  if (genericMatches.length === 0) return null;
+
+  // Usually the total is the highest currency amount shown in transactional emails.
+  return Math.max(...genericMatches);
+}
+
+function shouldOverrideRejectedEmail(rawText: string): boolean {
+  const text = rawText.toLowerCase();
+  const promoOnly = /(offre|promo|promotion|soldes|code promo|vente flash|bon plan|newsletter)/.test(text);
+  const transactionSignal = /(commande|order|facture|invoice|reçu|receipt|total|ttc|montant|paiement|payé|amazon|bouygues|ionos|n°\s*de\s*commande|num[eé]ro\s*de\s*commande)/.test(text);
+  const hasCurrency = /(\d+[,.]\d{1,2}\s*(€|eur)|€\s*\d+[,.]?\d*)/.test(text);
+
+  if (promoOnly && !transactionSignal) return false;
+  return transactionSignal && hasCurrency;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -241,7 +300,8 @@ serve(async (req) => {
     }
 
     // Check if email was rejected (promotional/non-transactional)
-    if (parsed.rejected === true) {
+    const rejectionOverridden = parsed.rejected === true && shouldOverrideRejectedEmail(raw_text);
+    if (parsed.rejected === true && !rejectionOverridden) {
       if (document_id) {
         await supabaseAdmin.from("documents").update({ status: "completed", error_message: `Rejeté: ${parsed.reason || "email non transactionnel"}` }).eq("id", document_id);
       }
@@ -250,6 +310,14 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    if (rejectionOverridden) {
+      parsed.rejected = false;
+      parsed.reason = "Rejet IA annulé: signaux transactionnels détectés";
+    }
+
+    const aiAmount = parseCurrencyAmount(String(parsed.montant_total ?? parsed.montant ?? "")) ?? 0;
+    const fallbackAmount = aiAmount > 0 ? aiAmount : extractAmountFromRawText(raw_text);
 
     // Store expense
     const expenseData: any = {
@@ -260,7 +328,7 @@ serve(async (req) => {
       type_document: parsed.type_document || "",
       fournisseur: parsed.fournisseur || parsed.magasin || "",
       magasin: parsed.magasin || "",
-      montant_total: parseFloat(parsed.montant_total || parsed.montant || 0),
+      montant_total: fallbackAmount ?? 0,
       devise: parsed.devise || "EUR",
       date_expense: parsed.date || parsed.date_facture || null,
       categorie: parsed.categorie || "",
@@ -272,7 +340,10 @@ serve(async (req) => {
       abonnement_detecte: parsed.abonnement_detecte || false,
       commentaire: parsed.commentaire || "",
       articles: parsed.articles || [],
-      raw_ai_response: parsed,
+      raw_ai_response: {
+        ...parsed,
+        amount_fallback_used: aiAmount <= 0 && fallbackAmount !== null,
+      },
     };
 
     const { data: expense, error: insertError } = await supabaseAdmin
@@ -291,7 +362,7 @@ serve(async (req) => {
       await supabaseAdmin.from("subscriptions").insert({
         user_id: user.id,
         fournisseur: parsed.fournisseur || parsed.magasin || "Inconnu",
-        montant: parseFloat(parsed.montant_total || parsed.montant || 0),
+        montant: fallbackAmount ?? 0,
         devise: parsed.devise || "EUR",
         categorie: parsed.categorie || "",
         recurrence: parsed.recurrence || "mensuel",

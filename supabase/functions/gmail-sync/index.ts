@@ -51,9 +51,21 @@ function flattenParts(payload: any): any[] {
 }
 
 // Search Gmail for financial emails
-async function searchFinancialEmails(accessToken: string, maxResults = 30): Promise<any[]> {
+async function searchFinancialEmails(accessToken: string, maxResults = 80): Promise<any[]> {
+  const includeTerms = [
+    "facture", "invoice", "reçu", "receipt", "confirmation", "commande", "order",
+    "paiement", "payment", "achat", "purchase", "livraison", "delivery", "expédition",
+    "expedition", "prélèvement", "prelevement", "abonnement", "subscription", "montant", "amount",
+    "amazon", "bouygues", "ionos", "orange", "sfr", "fnac"
+  ];
+
+  const excludeSubjectTerms = [
+    "offre", "promo", "promotion", "soldes", "newsletter", '"code promo"',
+    "réduction", "reduction", '"vente flash"', '"bon plan"'
+  ];
+
   const query = encodeURIComponent(
-    "subject:(facture OR invoice OR reçu OR receipt OR confirmation OR commande OR order OR paiement OR payment OR achat OR purchase OR livraison OR delivery OR expédition OR prélèvement OR abonnement OR subscription OR montant OR amount) newer_than:90d -subject:(offre OR promo OR promotion OR soldes OR newsletter OR \"code promo\" OR réduction OR \"vente flash\" OR \"bon plan\")"
+    `(${includeTerms.join(" OR ")}) newer_than:120d -category:promotions -category:social -subject:(${excludeSubjectTerms.join(" OR ")})`
   );
 
   const listRes = await fetch(
@@ -61,6 +73,10 @@ async function searchFinancialEmails(accessToken: string, maxResults = 30): Prom
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
   const listData = await listRes.json();
+
+  if (!listRes.ok) {
+    throw new Error(`Gmail list API error: ${JSON.stringify(listData)}`);
+  }
 
   if (!listData.messages || listData.messages.length === 0) {
     return [];
@@ -74,6 +90,11 @@ async function searchFinancialEmails(accessToken: string, maxResults = 30): Prom
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     const msgData = await msgRes.json();
+
+    if (!msgRes.ok) {
+      console.warn("Skipping Gmail message (fetch error):", msg.id, msgData);
+      continue;
+    }
 
     // Extract subject, from, date
     const headers = msgData.payload?.headers || [];
@@ -121,7 +142,7 @@ async function searchFinancialEmails(accessToken: string, maxResults = 30): Prom
     }
 
     // Truncate body to avoid oversized AI prompts
-    const truncatedBody = body.substring(0, 3000);
+    const truncatedBody = body.substring(0, 4500);
 
     messages.push({
       gmail_id: msg.id,
@@ -204,7 +225,7 @@ serve(async (req) => {
     }
 
     // Search financial emails
-    const messages = await searchFinancialEmails(accessToken, 30);
+    const messages = await searchFinancialEmails(accessToken, 80);
 
     if (messages.length === 0) {
       // Update last_sync_at
