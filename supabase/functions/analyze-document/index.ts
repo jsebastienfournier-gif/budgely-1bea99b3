@@ -151,12 +151,15 @@ function extractAmountFromRawText(rawText: string): number | null {
 
 function shouldOverrideRejectedEmail(rawText: string): boolean {
   const text = rawText.toLowerCase();
-  const promoOnly = /(offre|promo|promotion|soldes|code promo|vente flash|bon plan|newsletter)/.test(text);
-  const transactionSignal = /(commande|order|facture|invoice|reçu|receipt|total|ttc|montant|paiement|payé|amazon|bouygues|ionos|n°\s*de\s*commande|num[eé]ro\s*de\s*commande)/.test(text);
+  const promoOnly = /(offre|promo|promotion|soldes|code promo|vente flash|bon plan|newsletter|publicit[ée]|r[ée]duction|deals?)/.test(text);
+  const hardTransactionSignal = /(n°\s*de\s*commande|num[eé]ro\s*de\s*commande|order\s*#|num[eé]ro\s*de\s*facture|facture\s*n°|confirmation\s*de\s*paiement|paiement\s*confirm[ée]|re[çc]u\s*de\s*paiement|merci\s+pour\s+votre\s+achat|total\s*ttc\s*[:=]|montant\s+pay[ée]\s*[:=]?)/.test(text);
+  const transactionSignal = /(commande|order|facture|invoice|reçu|receipt|total|ttc|montant|paiement|payé|abonnement|amazon|bouygues|ionos|paypal|orange|sfr|free|n°\s*de\s*commande|num[eé]ro\s*de\s*commande)/.test(text);
   const hasCurrency = /(\d+[,.]\d{1,2}\s*(€|eur)|€\s*\d+[,.]?\d*)/.test(text);
 
-  if (promoOnly && !transactionSignal) return false;
-  return transactionSignal && hasCurrency;
+  if (!hasCurrency) return false;
+  if (hardTransactionSignal) return true;
+  if (promoOnly) return false;
+  return transactionSignal;
 }
 
 serve(async (req) => {
