@@ -196,6 +196,39 @@ serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
+    // --- Check sync limit (1 sync = 1 usage, regardless of email count) ---
+    const { data: planData } = await supabaseAdmin
+      .from("user_plans")
+      .select("plan")
+      .eq("user_id", user.id)
+      .single();
+
+    const userPlan = planData?.plan || "free";
+    const SYNC_LIMITS: Record<string, number> = {
+      free: 5,
+      essential: 30,
+      premium: 999,
+    };
+    const syncLimit = SYNC_LIMITS[userPlan] ?? SYNC_LIMITS.free;
+
+    // Increment usage ONCE for this sync call
+    const { data: usageCount } = await supabaseAdmin.rpc("increment_ai_usage", {
+      _user_id: user.id,
+      _source: "email",
+    });
+
+    if ((usageCount as number) > syncLimit) {
+      return new Response(
+        JSON.stringify({
+          error: "limit_reached",
+          message: `Limite mensuelle atteinte (${syncLimit} synchronisations email/mois pour le plan ${userPlan}).`,
+          plan: userPlan,
+          usage: usageCount,
+        }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Get tokens
     const { data: tokenData, error: tokenError } = await supabaseAdmin
       .from("gmail_tokens")
@@ -279,6 +312,7 @@ serve(async (req) => {
             source: "email",
             raw_text: msg.raw_text,
             source_id: `gmail_${msg.gmail_id}`,
+            skip_usage_check: true,
           }),
         });
 
