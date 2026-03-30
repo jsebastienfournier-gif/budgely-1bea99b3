@@ -709,7 +709,7 @@ const Receipts = () => {
                   </div>
                   <div onClick={() => setSelectedReceipt(r)} className="cursor-pointer">
                     <p className="text-sm font-medium text-foreground">{r.store}</p>
-                    <p className="text-[10px] text-muted-foreground">{r.date} · {r.items} articles</p>
+                    <p className="text-[10px] text-muted-foreground">{r.date} · {r.items > 0 ? `${r.items} article${r.items > 1 ? "s" : ""}` : (r.description || "Aucun article")}</p>
                   </div>
                   <span className="text-sm font-semibold tabular-nums text-foreground">{r.total}</span>
                   <button
