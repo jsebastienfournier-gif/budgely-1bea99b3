@@ -31,6 +31,7 @@ type Receipt = {
   status: string;
   products: ReceiptProduct[];
   source?: string;
+  description?: string;
 };
 
 const emailProviders = [
