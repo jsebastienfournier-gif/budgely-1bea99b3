@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Upload, Camera, FileText, ChevronRight, Mail, Landmark, RefreshCw, Plus, Check, Loader2, X, ShoppingCart, Sparkles, Coins } from "lucide-react";
+import { Upload, Camera, FileText, ChevronRight, Mail, Landmark, RefreshCw, Plus, Check, Loader2, X, ShoppingCart, Sparkles, Coins, Pencil, Trash2 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import AppLayout from "@/components/AppLayout";
 import PremiumCTA from "@/components/PremiumCTA";
@@ -12,6 +12,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import CashExpenseDialog from "@/components/CashExpenseDialog";
+import EditExpenseDialog from "@/components/EditExpenseDialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type ConnectedEmail = { id: string; email: string; provider: string; label: string | null; status: string; last_sync_at: string | null };
 type ConnectedBank = { id: string; bank_name: string; account_label: string | null; account_type: string | null; status: string; last_sync_at: string | null };
@@ -64,6 +69,11 @@ const Receipts = () => {
   const [saving, setSaving] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
   const [showCashDialog, setShowCashDialog] = useState(false);
+  const [rawExpenses, setRawExpenses] = useState<any[]>([]);
+  const [editingExpense, setEditingExpense] = useState<any | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Handle Gmail/Microsoft OAuth callback params
   useEffect(() => {
@@ -97,6 +107,42 @@ const Receipts = () => {
     }
   }, [searchParams]);
 
+  const mapExpenses = (data: any[]) => {
+    return data.map((e: any) => {
+      const articles = (e.articles || []).map((a: any) => ({
+        name: a.nom || a.name || "",
+        qty: a.quantite || a.qty || 1,
+        unit: a.unite || a.unit || "pce",
+        unitPrice: a.prix_unitaire || a.unitPrice || 0,
+        total: a.prix_total || a.total || 0,
+        pricePerUnit: a.prix_unitaire ? `${a.prix_unitaire.toFixed(2)} €` : undefined,
+      }));
+      return {
+        id: e.id,
+        store: e.magasin || e.fournisseur || "Inconnu",
+        date: e.date_expense ? new Date(e.date_expense).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "Date inconnue",
+        total: `€${(e.montant_total || 0).toFixed(2)}`,
+        items: articles.length,
+        status: "Analysé",
+        products: articles,
+        source: e.source,
+      };
+    });
+  };
+
+  const reloadExpenses = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("expenses")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    const raw = data || [];
+    setRawExpenses(raw);
+    setExpenses(mapExpenses(raw));
+  };
+
   useEffect(() => {
     if (!user) return;
     const load = async () => {
@@ -108,33 +154,35 @@ const Receipts = () => {
       ]);
       setEmails((emailRes.data as ConnectedEmail[]) || []);
       setBanks((bankRes.data as ConnectedBank[]) || []);
-
-      // Map expenses to Receipt format
-      const mapped = (expenseRes.data || []).map((e: any) => {
-        const articles = (e.articles || []).map((a: any) => ({
-          name: a.nom || a.name || "",
-          qty: a.quantite || a.qty || 1,
-          unit: a.unite || a.unit || "pce",
-          unitPrice: a.prix_unitaire || a.unitPrice || 0,
-          total: a.prix_total || a.total || 0,
-          pricePerUnit: a.prix_unitaire ? `${a.prix_unitaire.toFixed(2)} €` : undefined,
-        }));
-        return {
-          id: e.id,
-          store: e.magasin || e.fournisseur || "Inconnu",
-          date: e.date_expense ? new Date(e.date_expense).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "Date inconnue",
-          total: `€${(e.montant_total || 0).toFixed(2)}`,
-          items: articles.length,
-          status: "Analysé",
-          products: articles,
-          source: e.source,
-        };
-      });
-      setExpenses(mapped);
+      const raw = expenseRes.data || [];
+      setRawExpenses(raw);
+      setExpenses(mapExpenses(raw));
       setLoading(false);
     };
     load();
   }, [user]);
+
+  const handleDeleteExpense = async () => {
+    if (!deletingExpenseId) return;
+    setDeleting(true);
+    const { error } = await supabase.from("expenses").delete().eq("id", deletingExpenseId);
+    setDeleting(false);
+    setDeletingExpenseId(null);
+    if (error) {
+      toast.error("Erreur lors de la suppression");
+      return;
+    }
+    toast.success("Dépense supprimée");
+    reloadExpenses();
+  };
+
+  const handleEditExpense = (id: string) => {
+    const raw = rawExpenses.find((e) => e.id === id);
+    if (raw) {
+      setEditingExpense(raw);
+      setShowEditDialog(true);
+    }
+  };
 
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0 || !user) return;
@@ -655,17 +703,30 @@ const Receipts = () => {
           ) : (
             <div className="divide-y divide-border">
               {expenses.map((r) => (
-                <div key={r.id} onClick={() => setSelectedReceipt(r)} className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-4 p-4 items-center hover:bg-secondary/50 transition-colors cursor-pointer">
-                  <div className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center text-lg">
+                <div key={r.id} className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-3 p-4 items-center hover:bg-secondary/50 transition-colors">
+                  <div onClick={() => setSelectedReceipt(r)} className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center text-lg cursor-pointer">
                     {sourceIcon(r.source)}
                   </div>
-                  <div>
+                  <div onClick={() => setSelectedReceipt(r)} className="cursor-pointer">
                     <p className="text-sm font-medium text-foreground">{r.store}</p>
                     <p className="text-[10px] text-muted-foreground">{r.date} · {r.items} articles</p>
                   </div>
-                  <Badge variant="outline" className="text-[10px] text-savings border-savings/30">{r.status}</Badge>
                   <span className="text-sm font-semibold tabular-nums text-foreground">{r.total}</span>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleEditExpense(r.id); }}
+                    className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                    title="Modifier"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setDeletingExpenseId(r.id); }}
+                    className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                    title="Supprimer"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                  <ChevronRight onClick={() => setSelectedReceipt(r)} className="h-4 w-4 text-muted-foreground cursor-pointer" />
                 </div>
               ))}
             </div>
@@ -944,6 +1005,33 @@ const Receipts = () => {
           setExpenses(prev => [newReceipt, ...prev]);
         }}
       />
+
+      {/* Edit expense dialog */}
+      <EditExpenseDialog
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+        expense={editingExpense}
+        onSaved={reloadExpenses}
+      />
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deletingExpenseId} onOpenChange={(open) => !open && setDeletingExpenseId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cette dépense ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Es-tu sûr de vouloir supprimer cette dépense ? Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteExpense} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 };
