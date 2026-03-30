@@ -183,13 +183,6 @@ const Receipts = () => {
       setShowEditDialog(true);
     }
   };
-        };
-      });
-      setExpenses(mapped);
-      setLoading(false);
-    };
-    load();
-  }, [user]);
 
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0 || !user) return;
