@@ -53,7 +53,7 @@ serve(async (req) => {
 
     if (customers.data.length === 0) {
       logStep("No customer found");
-      await supabaseClient.from("user_plans").upsert({ user_id: user.id, plan: "free", expires_at: null }, { onConflict: "user_id" });
+      await supabaseAdmin.from("user_plans").upsert({ user_id: user.id, plan: "free", expires_at: null }, { onConflict: "user_id" });
       return new Response(
         JSON.stringify({ subscribed: false, plan: "free", product_id: null, subscription_end: null }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
@@ -82,7 +82,7 @@ serve(async (req) => {
 
     if (!sub) {
       logStep("No active subscription");
-      await supabaseClient.from("user_plans").upsert({ user_id: user.id, plan: "free", expires_at: null }, { onConflict: "user_id" });
+      await supabaseAdmin.from("user_plans").upsert({ user_id: user.id, plan: "free", expires_at: null }, { onConflict: "user_id" });
       return new Response(
         JSON.stringify({ subscribed: false, plan: "free", product_id: null, subscription_end: null }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
