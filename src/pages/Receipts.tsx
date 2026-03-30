@@ -703,17 +703,30 @@ const Receipts = () => {
           ) : (
             <div className="divide-y divide-border">
               {expenses.map((r) => (
-                <div key={r.id} onClick={() => setSelectedReceipt(r)} className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-4 p-4 items-center hover:bg-secondary/50 transition-colors cursor-pointer">
-                  <div className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center text-lg">
+                <div key={r.id} className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-3 p-4 items-center hover:bg-secondary/50 transition-colors">
+                  <div onClick={() => setSelectedReceipt(r)} className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center text-lg cursor-pointer">
                     {sourceIcon(r.source)}
                   </div>
-                  <div>
+                  <div onClick={() => setSelectedReceipt(r)} className="cursor-pointer">
                     <p className="text-sm font-medium text-foreground">{r.store}</p>
                     <p className="text-[10px] text-muted-foreground">{r.date} · {r.items} articles</p>
                   </div>
-                  <Badge variant="outline" className="text-[10px] text-savings border-savings/30">{r.status}</Badge>
                   <span className="text-sm font-semibold tabular-nums text-foreground">{r.total}</span>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleEditExpense(r.id); }}
+                    className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                    title="Modifier"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setDeletingExpenseId(r.id); }}
+                    className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                    title="Supprimer"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                  <ChevronRight onClick={() => setSelectedReceipt(r)} className="h-4 w-4 text-muted-foreground cursor-pointer" />
                 </div>
               ))}
             </div>
