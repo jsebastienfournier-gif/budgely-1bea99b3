@@ -127,6 +127,7 @@ const Receipts = () => {
         status: "Analysé",
         products: articles,
         source: e.source,
+        description: e.description || "",
       };
     });
   };
