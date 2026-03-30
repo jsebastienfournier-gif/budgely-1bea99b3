@@ -28,6 +28,11 @@ const AdminEmailTemplates = () => {
     setLoading(true);
     setError(null);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setLoading(false);
+        return;
+      }
       const { data, error: fnError } = await supabase.functions.invoke(
         "preview-transactional-email"
       );
