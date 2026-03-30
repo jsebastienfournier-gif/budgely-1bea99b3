@@ -107,6 +107,42 @@ const Receipts = () => {
     }
   }, [searchParams]);
 
+  const mapExpenses = (data: any[]) => {
+    return data.map((e: any) => {
+      const articles = (e.articles || []).map((a: any) => ({
+        name: a.nom || a.name || "",
+        qty: a.quantite || a.qty || 1,
+        unit: a.unite || a.unit || "pce",
+        unitPrice: a.prix_unitaire || a.unitPrice || 0,
+        total: a.prix_total || a.total || 0,
+        pricePerUnit: a.prix_unitaire ? `${a.prix_unitaire.toFixed(2)} €` : undefined,
+      }));
+      return {
+        id: e.id,
+        store: e.magasin || e.fournisseur || "Inconnu",
+        date: e.date_expense ? new Date(e.date_expense).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "Date inconnue",
+        total: `€${(e.montant_total || 0).toFixed(2)}`,
+        items: articles.length,
+        status: "Analysé",
+        products: articles,
+        source: e.source,
+      };
+    });
+  };
+
+  const reloadExpenses = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("expenses")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    const raw = data || [];
+    setRawExpenses(raw);
+    setExpenses(mapExpenses(raw));
+  };
+
   useEffect(() => {
     if (!user) return;
     const load = async () => {
@@ -118,26 +154,35 @@ const Receipts = () => {
       ]);
       setEmails((emailRes.data as ConnectedEmail[]) || []);
       setBanks((bankRes.data as ConnectedBank[]) || []);
+      const raw = expenseRes.data || [];
+      setRawExpenses(raw);
+      setExpenses(mapExpenses(raw));
+      setLoading(false);
+    };
+    load();
+  }, [user]);
 
-      // Map expenses to Receipt format
-      const mapped = (expenseRes.data || []).map((e: any) => {
-        const articles = (e.articles || []).map((a: any) => ({
-          name: a.nom || a.name || "",
-          qty: a.quantite || a.qty || 1,
-          unit: a.unite || a.unit || "pce",
-          unitPrice: a.prix_unitaire || a.unitPrice || 0,
-          total: a.prix_total || a.total || 0,
-          pricePerUnit: a.prix_unitaire ? `${a.prix_unitaire.toFixed(2)} €` : undefined,
-        }));
-        return {
-          id: e.id,
-          store: e.magasin || e.fournisseur || "Inconnu",
-          date: e.date_expense ? new Date(e.date_expense).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "Date inconnue",
-          total: `€${(e.montant_total || 0).toFixed(2)}`,
-          items: articles.length,
-          status: "Analysé",
-          products: articles,
-          source: e.source,
+  const handleDeleteExpense = async () => {
+    if (!deletingExpenseId) return;
+    setDeleting(true);
+    const { error } = await supabase.from("expenses").delete().eq("id", deletingExpenseId);
+    setDeleting(false);
+    setDeletingExpenseId(null);
+    if (error) {
+      toast.error("Erreur lors de la suppression");
+      return;
+    }
+    toast.success("Dépense supprimée");
+    reloadExpenses();
+  };
+
+  const handleEditExpense = (id: string) => {
+    const raw = rawExpenses.find((e) => e.id === id);
+    if (raw) {
+      setEditingExpense(raw);
+      setShowEditDialog(true);
+    }
+  };
         };
       });
       setExpenses(mapped);
