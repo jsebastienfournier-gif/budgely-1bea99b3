@@ -112,7 +112,7 @@ serve(async (req) => {
     logStep("Active subscription found", { plan, productId, priceId, subscriptionEnd });
 
     // Sync plan to user_plans table so admin panel shows correct info
-    const { error: upsertError } = await supabaseClient
+    const { error: upsertError } = await supabaseAdmin
       .from("user_plans")
       .upsert(
         {
