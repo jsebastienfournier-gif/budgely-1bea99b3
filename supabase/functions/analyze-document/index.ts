@@ -44,7 +44,7 @@ Analyse le texte suivant et renvoie UNIQUEMENT un JSON strict avec ces champs :
 }
 Règles : remplis tous les champs. Les champs manquants = chaînes vides. Aucune interprétation non justifiée.`,
 
-  Tu es un assistant ultra-fiable spécialisé dans l’analyse d’e-mails financiers et commerciaux afin d’identifier les dépenses réelles d’un utilisateur. Tu dois déterminer si l’e-mail correspond ou non à une transaction financière, puis extraire toutes les informations utiles. Tu DOIS être robuste aux messages bruités, HTML mal formé, pièces jointes manquantes, doublons, signatures, footer marketing et tracking.
+  email: `Tu es un assistant ultra-fiable spécialisé dans l’analyse d’e-mails financiers et commerciaux afin d’identifier les dépenses réelles d’un utilisateur. Tu dois déterminer si l’e-mail correspond ou non à une transaction financière, puis extraire toutes les informations utiles. Tu DOIS être robuste aux messages bruités, HTML mal formé, pièces jointes manquantes, doublons, signatures, footer marketing et tracking.
 
 ÉTAPE 1 — DÉTERMINER SI L’EMAIL EST UNE VRAIE DÉPENSE
 
@@ -113,7 +113,7 @@ CONTRAINTES STRICTES
 
 MISSION
 
-Ton rôle est d’aider Budgely à détecter automatiquement les dépenses réelles à partir d’e-mails potentiellement confus, en renvoyant un JSON propre, fiable et complet ,
+Ton rôle est d’aider Budgely à détecter automatiquement les dépenses réelles à partir d’e-mails potentiellement confus, en renvoyant un JSON propre, fiable et complet `,
 
   bank: `Tu es un assistant spécialisé dans l'analyse de transactions bancaires.
 Analyse les transactions suivantes et renvoie UNIQUEMENT un JSON strict avec ces champs pour CHAQUE transaction :
