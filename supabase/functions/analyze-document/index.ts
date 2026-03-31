@@ -43,7 +43,8 @@ Analyse le texte suivant et renvoie UNIQUEMENT un JSON strict avec ces champs :
   "periode_couverte": "",
   "details": ""
 }
-Règles : remplis tous les champs. Les champs manquants = chaînes vides. Aucune interprétation non justifiée.`,
+Règles : remplis tous les champs. Les champs manquants = chaînes vides. Aucune interprétation non justifiée.
+Catégories possibles : Alimentation, Transport, Logement, Santé, Loisirs, Shopping, Restauration, Éducation, Abonnements, Épargne, Investissement, Autre.`,
 
   email: `Tu es un assistant ultra-fiable spécialisé dans l’analyse d’e-mails financiers et commerciaux afin d’identifier les dépenses réelles d’un utilisateur. Tu dois déterminer si l’e-mail correspond ou non à une transaction financière, puis extraire toutes les informations utiles. Tu DOIS être robuste aux messages bruités, HTML mal formé, pièces jointes manquantes, doublons, signatures, footer marketing et tracking.
 
