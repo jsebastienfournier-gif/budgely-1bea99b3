@@ -10,7 +10,8 @@ import { Loader2 } from "lucide-react";
 
 const categories = [
   "Alimentation", "Transport", "Logement", "Santé", "Loisirs",
-  "Shopping", "Restauration", "Éducation", "Abonnements", "Autre",
+  "Shopping", "Restauration", "Éducation", "Abonnements",
+  "Épargne", "Investissement", "Autre",
 ];
 
 type RawExpense = {
