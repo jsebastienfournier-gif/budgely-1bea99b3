@@ -96,7 +96,7 @@ RÈGLES D’EXTRACTION (IMPORTANT)
 - fournisseur : toujours extraire le marchand réel (amazon, sncf, orange, etc.).
 - numero_facture / numero_commande : détecter si présents.
 - description : résumé clair de la transaction.
-- categorie : déduire si possible (courses, restaurant, transport, télécom, services, santé, digital, abonnement, etc.)
+- categorie : déduire si possible (courses, restaurant, transport, télécom, services, santé, digital, abonnement, épargne, investissement, etc.)
 - récurrence :
   - "mensuel" / "annuel" / "hebdomadaire" si un abonnement est détecté.
   - Sinon : "".
