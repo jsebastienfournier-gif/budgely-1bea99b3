@@ -1,83 +1,160 @@
-import { useState } from "react";
+import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, Copy, TrendingUp, CreditCard, ArrowRight, Inbox } from "lucide-react";
+import { ArrowRight, Inbox, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import PremiumCTA from "@/components/PremiumCTA";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useExpenses, Expense } from "@/hooks/useExpenses";
+import { startOfMonth, endOfMonth, subMonths, parseISO } from "date-fns";
 
-const categories = [
-  { name: "Alimentation", emoji: "🛒", percent: 35, color: "hsl(var(--savings))" },
-  { name: "Transport", emoji: "🚗", percent: 18, color: "hsl(221, 83%, 53%)" },
-  { name: "Logement", emoji: "🏠", percent: 15, color: "hsl(262, 60%, 55%)" },
-  { name: "Restaurants", emoji: "🍽️", percent: 13, color: "hsl(25, 90%, 55%)" },
-  { name: "Santé", emoji: "💊", percent: 8, color: "hsl(340, 70%, 55%)" },
-  { name: "Abonnements", emoji: "📦", percent: 7, color: "hsl(250, 60%, 55%)" },
-  { name: "Autres", emoji: "📌", percent: 4, color: "hsl(var(--muted-foreground))" },
-];
+const CATEGORY_COLORS: Record<string, string> = {
+  Alimentation: "hsl(142, 71%, 45%)",
+  Transport: "hsl(221, 83%, 53%)",
+  Logement: "hsl(262, 60%, 55%)",
+  Loisirs: "hsl(25, 90%, 55%)",
+  Santé: "hsl(340, 70%, 55%)",
+  Abonnements: "hsl(250, 60%, 55%)",
+  Restaurants: "hsl(30, 80%, 55%)",
+  Épargne: "hsl(170, 60%, 45%)",
+  Investissement: "hsl(200, 70%, 50%)",
+  Autres: "hsl(215, 16%, 47%)",
+};
 
-const detections = [
-  {
-    icon: AlertTriangle,
-    title: "Frais bancaires anormaux",
-    desc: "Des frais inhabituels de 12,50 € ont été détectés le 8 mars sur votre compte courant.",
-  },
-  {
-    icon: Copy,
-    title: "Doublons potentiels",
-    desc: "2 transactions similaires de 29,99 € chez Netflix repérées à 3 jours d'intervalle.",
-  },
-  {
-    icon: TrendingUp,
-    title: "Catégorie en hausse",
-    desc: "Vos dépenses Restaurants ont augmenté de 22 % par rapport au mois dernier.",
-  },
-  {
-    icon: CreditCard,
-    title: "Abonnements repérés",
-    desc: "4 abonnements récurrents détectés pour un total de 52 €/mois.",
-  },
-];
+type CategoryStat = { name: string; emoji: string; percent: number; color: string; amount: number };
+type Detection = { title: string; desc: string };
 
-const SkeletonCard = () => (
-  <div className="bg-card rounded-2xl border border-border p-5">
-    <div className="flex items-center justify-between mb-2.5">
-      <div className="flex items-center gap-2.5">
-        <Skeleton className="h-5 w-5 rounded" />
-        <Skeleton className="h-4 w-24" />
-      </div>
-      <Skeleton className="h-4 w-8" />
-    </div>
-    <Skeleton className="h-2 w-full rounded-full" />
-  </div>
-);
+const EMOJI_MAP: Record<string, string> = {
+  Alimentation: "🛒", Transport: "🚗", Logement: "🏠", Restaurants: "🍽️",
+  Santé: "💊", Abonnements: "📦", Loisirs: "🎭", Épargne: "💰",
+  Investissement: "📈", Autres: "📌",
+};
 
-const SkeletonDetection = () => (
-  <div className="bg-card rounded-2xl border border-border p-4 flex gap-3 items-start">
-    <Skeleton className="h-9 w-9 rounded-xl shrink-0" />
-    <div className="flex-1 space-y-2">
-      <Skeleton className="h-4 w-32" />
-      <Skeleton className="h-3 w-full" />
-      <Skeleton className="h-5 w-28 rounded-full" />
-    </div>
-  </div>
-);
+function buildCategories(expenses: Expense[]): CategoryStat[] {
+  const map: Record<string, number> = {};
+  let total = 0;
+  expenses.forEach((e) => {
+    const cat = e.categorie || "Autres";
+    const amt = e.montant_total || 0;
+    map[cat] = (map[cat] || 0) + amt;
+    total += amt;
+  });
+  if (total === 0) return [];
+  return Object.entries(map)
+    .map(([name, amount]) => ({
+      name,
+      emoji: EMOJI_MAP[name] || "📌",
+      percent: Math.round((amount / total) * 100),
+      color: CATEGORY_COLORS[name] || CATEGORY_COLORS.Autres,
+      amount,
+    }))
+    .sort((a, b) => b.percent - a.percent);
+}
 
-const EmptyState = ({ message }: { message: string }) => (
+function buildDetections(thisMonth: Expense[], lastMonth: Expense[]): Detection[] {
+  const detections: Detection[] = [];
+
+  // Subscription duplicates
+  const subs = thisMonth.filter((e) => e.abonnement_detecte);
+  const subMap: Record<string, number> = {};
+  subs.forEach((e) => {
+    const key = (e.fournisseur || e.magasin || "").toLowerCase();
+    if (key) subMap[key] = (subMap[key] || 0) + 1;
+  });
+  Object.entries(subMap).forEach(([name, count]) => {
+    if (count > 1) {
+      detections.push({
+        title: "Doublons potentiels",
+        desc: `${count} prélèvements pour "${name}" détectés ce mois.`,
+      });
+    }
+  });
+
+  // Category increase
+  const thisMap: Record<string, number> = {};
+  const lastMap: Record<string, number> = {};
+  thisMonth.forEach((e) => { thisMap[e.categorie || "Autres"] = (thisMap[e.categorie || "Autres"] || 0) + (e.montant_total || 0); });
+  lastMonth.forEach((e) => { lastMap[e.categorie || "Autres"] = (lastMap[e.categorie || "Autres"] || 0) + (e.montant_total || 0); });
+  Object.entries(thisMap).forEach(([cat, amt]) => {
+    const prev = lastMap[cat] || 0;
+    if (prev > 0) {
+      const pct = Math.round(((amt - prev) / prev) * 100);
+      if (pct > 20) {
+        detections.push({
+          title: "Catégorie en hausse",
+          desc: `Vos dépenses ${cat} ont augmenté de ${pct}% par rapport au mois dernier.`,
+        });
+      }
+    }
+  });
+
+  // Subscriptions total
+  const totalSubs = subs.reduce((s, e) => s + (e.montant_total || 0), 0);
+  if (subs.length >= 2) {
+    detections.push({
+      title: "Abonnements repérés",
+      desc: `${subs.length} abonnements récurrents détectés pour un total de ${totalSubs.toFixed(0)} €/mois.`,
+    });
+  }
+
+  return detections;
+}
+
+const EmptyState = () => (
   <div className="flex flex-col items-center justify-center py-12 text-center">
     <div className="h-12 w-12 rounded-2xl bg-muted flex items-center justify-center mb-3">
       <Inbox className="h-6 w-6 text-muted-foreground" />
     </div>
-    <p className="text-sm text-muted-foreground">{message}</p>
+    <p className="text-sm text-muted-foreground">
+      Pas encore de données. Importez vos dépenses depuis la page Capture.
+    </p>
   </div>
 );
 
 const Transactions = () => {
-  // Simulate loading — replace with real data fetching
-  const [isLoading] = useState(false);
+  const { expenses, loading } = useExpenses();
+
+  const now = new Date();
+  const thisMonthStart = startOfMonth(now);
+  const thisMonthEnd = endOfMonth(now);
+  const lastMonthStart = startOfMonth(subMonths(now, 1));
+  const lastMonthEnd = endOfMonth(subMonths(now, 1));
+
+  const thisMonth = useMemo(
+    () => expenses.filter((e) => {
+      if (!e.date_expense) return false;
+      const d = parseISO(e.date_expense);
+      return d >= thisMonthStart && d <= thisMonthEnd;
+    }),
+    [expenses, thisMonthStart, thisMonthEnd]
+  );
+
+  const lastMonth = useMemo(
+    () => expenses.filter((e) => {
+      if (!e.date_expense) return false;
+      const d = parseISO(e.date_expense);
+      return d >= lastMonthStart && d <= lastMonthEnd;
+    }),
+    [expenses, lastMonthStart, lastMonthEnd]
+  );
+
+  const thisTotal = useMemo(() => thisMonth.reduce((s, e) => s + (e.montant_total || 0), 0), [thisMonth]);
+  const lastTotal = useMemo(() => lastMonth.reduce((s, e) => s + (e.montant_total || 0), 0), [lastMonth]);
+  const changePct = lastTotal > 0 ? ((thisTotal - lastTotal) / lastTotal) * 100 : 0;
+
+  const categories = useMemo(() => buildCategories(thisMonth), [thisMonth]);
+  const detections = useMemo(() => buildDetections(thisMonth, lastMonth), [thisMonth, lastMonth]);
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </AppLayout>
+    );
+  }
+
   const hasData = categories.length > 0;
-  const hasDetections = detections.length > 0;
 
   return (
     <AppLayout>
@@ -88,53 +165,28 @@ const Transactions = () => {
         </div>
 
         {/* KPIs */}
-        {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
-            {[1, 2, 3].map((k) => (
-              <Skeleton key={k} className="h-20 rounded-2xl" />
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05 }}
-              className="bg-card rounded-2xl border border-border p-4 text-center"
-            >
-              <p className="text-xs text-muted-foreground mb-1">Dépenses du mois</p>
-              <p className="text-lg font-bold text-foreground">2 340 €</p>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="bg-card rounded-2xl border border-border p-4 text-center"
-            >
-              <p className="text-xs text-muted-foreground mb-1">Évolution vs mois dernier</p>
-              <p className="text-lg font-bold text-destructive">+8,2 %</p>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
-              className="bg-card rounded-2xl border border-border p-4 text-center"
-            >
-              <p className="text-xs text-muted-foreground mb-1">Catégorie principale</p>
-              <p className="text-lg font-bold text-foreground">🛒 Alimentation</p>
-            </motion.div>
-          </div>
-        )}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="bg-card rounded-2xl border border-border p-4 text-center">
+            <p className="text-xs text-muted-foreground mb-1">Dépenses du mois</p>
+            <p className="text-lg font-bold text-foreground">{thisTotal.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €</p>
+          </motion.div>
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-card rounded-2xl border border-border p-4 text-center">
+            <p className="text-xs text-muted-foreground mb-1">Évolution vs mois dernier</p>
+            <p className={`text-lg font-bold ${changePct > 0 ? "text-destructive" : "text-savings"}`}>
+              {lastTotal > 0 ? `${changePct > 0 ? "+" : ""}${changePct.toFixed(1)} %` : "—"}
+            </p>
+          </motion.div>
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-card rounded-2xl border border-border p-4 text-center">
+            <p className="text-xs text-muted-foreground mb-1">Catégorie principale</p>
+            <p className="text-lg font-bold text-foreground">
+              {categories[0] ? `${categories[0].emoji} ${categories[0].name}` : "—"}
+            </p>
+          </motion.div>
+        </div>
 
         {/* Catégories */}
-        {isLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3, 4].map((k) => (
-              <SkeletonCard key={k} />
-            ))}
-          </div>
-        ) : !hasData ? (
-          <EmptyState message="Pas encore assez de données pour afficher vos catégories." />
+        {!hasData ? (
+          <EmptyState />
         ) : (
           <div className="space-y-3">
             {categories.map((cat, i) => (
@@ -166,58 +218,35 @@ const Transactions = () => {
           </div>
         )}
 
-        {/* Détections automatiques */}
-        <div className="mt-8 sm:mt-10">
-          <h2 className="text-lg font-bold text-foreground mb-1">Détections automatiques</h2>
-          <p className="text-xs text-muted-foreground mb-4">Anomalies et tendances repérées dans vos dépenses</p>
-
-          {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {[1, 2, 3, 4].map((k) => (
-                <SkeletonDetection key={k} />
-              ))}
-            </div>
-          ) : !hasDetections ? (
-            <EmptyState message="Aucune détection pour le moment. Revenez quand plus de données seront disponibles." />
-          ) : (
+        {/* Détections */}
+        {detections.length > 0 && (
+          <div className="mt-8 sm:mt-10">
+            <h2 className="text-lg font-bold text-foreground mb-1">Détections automatiques</h2>
+            <p className="text-xs text-muted-foreground mb-4">Anomalies et tendances repérées dans vos dépenses</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {detections.map((item, i) => (
                 <motion.div
-                  key={item.title}
+                  key={i}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
-                  className="bg-card rounded-2xl border border-border p-4 flex gap-3 items-start"
+                  className="bg-card rounded-2xl border border-border p-4"
                 >
-                  <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                    <item.icon className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-foreground leading-tight">{item.title}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{item.desc}</p>
-                    <Link to="/insights">
-                      <Badge variant="secondary" className="mt-2 text-[10px] font-medium cursor-pointer hover:bg-secondary/80">
-                        Voir dans Optimisation
-                      </Badge>
-                    </Link>
-                  </div>
+                  <p className="text-sm font-semibold text-foreground leading-tight">{item.title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{item.desc}</p>
                 </motion.div>
               ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Premium CTA */}
         <div className="mt-8">
           <PremiumCTA message="Analyse illimitée disponible avec Premium" />
         </div>
 
-        {/* Footer */}
         <div className="mt-8 sm:mt-10 pt-6 border-t border-border text-center">
-          <Link
-            to="/insights"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
-          >
+          <Link to="/insights" className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
             Voir toutes les optimisations
             <ArrowRight className="h-4 w-4" />
           </Link>

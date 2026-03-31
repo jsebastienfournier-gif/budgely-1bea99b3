@@ -1,7 +1,27 @@
+import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { TrendingDown, TrendingUp, Wallet, Users, Sparkles } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from "recharts";
+import { TrendingDown, TrendingUp, Wallet, Sparkles, Inbox, Loader2 } from "lucide-react";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, LineChart, Line, CartesianGrid,
+} from "recharts";
 import AppLayout from "@/components/AppLayout";
+import { useExpenses, Expense } from "@/hooks/useExpenses";
+import { format, subMonths, startOfMonth, endOfMonth, parseISO } from "date-fns";
+import { fr } from "date-fns/locale";
+
+const CATEGORY_COLORS: Record<string, string> = {
+  Alimentation: "hsl(142, 71%, 45%)",
+  Transport: "hsl(221, 83%, 53%)",
+  Logement: "hsl(262, 60%, 55%)",
+  Loisirs: "hsl(25, 90%, 55%)",
+  Santé: "hsl(340, 70%, 55%)",
+  Abonnements: "hsl(250, 60%, 55%)",
+  Restaurants: "hsl(30, 80%, 55%)",
+  Épargne: "hsl(170, 60%, 45%)",
+  Investissement: "hsl(200, 70%, 50%)",
+  Autres: "hsl(215, 16%, 47%)",
+};
 
 const fadeUp = {
   initial: { opacity: 0, y: 8 },
@@ -9,252 +29,281 @@ const fadeUp = {
   transition: { duration: 0.3 },
 };
 
-const summaryCards = [
-  { label: "Dépenses du mois", value: "€3,240", change: "-8%", trend: "down", icon: Wallet },
-  { label: "Dépenses foyer", value: "€5,120", change: "-5%", trend: "down", icon: Users },
-  { label: "Économies détectées", value: "€186", change: "+24%", trend: "up", icon: Sparkles },
-];
-
-const categoryData = [
-  { name: "Alimentation", value: 890, color: "hsl(var(--savings))" },
-  { name: "Transport", value: 420, color: "hsl(221, 83%, 53%)" },
-  { name: "Loisirs", value: 310, color: "hsl(25, 90%, 55%)" },
-  { name: "Logement", value: 1200, color: "hsl(262, 60%, 55%)" },
-  { name: "Santé", value: 180, color: "hsl(340, 70%, 55%)" },
-  { name: "Abonnements", value: 240, color: "hsl(250, 60%, 55%)" },
-];
-
-const monthlyData = [
-  { month: "Oct", amount: 3800 },
-  { month: "Nov", amount: 3600 },
-  { month: "Déc", amount: 4100 },
-  { month: "Jan", amount: 3900 },
-  { month: "Fév", amount: 3500 },
-  { month: "Mar", amount: 3240 },
-];
-
-const topMerchants = [
-  { name: "Carrefour", amount: "€420", visits: 12 },
-  { name: "Leclerc", amount: "€380", visits: 8 },
-  { name: "Amazon", amount: "€290", visits: 15 },
-  { name: "SNCF", amount: "€180", visits: 6 },
-  { name: "Spotify", amount: "€10", visits: 1 },
-];
-
-const insights = [
-  {
-    type: "brand_swap",
-    title: "Changement de marque recommandé",
-    desc: "Vous achetez régulièrement le yaourt Danone à 3.20€. Le yaourt Carrefour Bio coûte 2.40€ pour une qualité similaire.",
-    savings: "€9.60/mois",
-  },
-  {
-    type: "subscription",
-    title: "Abonnement à optimiser",
-    desc: "Vous avez 4 services de streaming. Réduire un abonnement pourrait économiser 15€/mois.",
-    savings: "€15/mois",
-  },
-  {
-    type: "category",
-    title: "Dépenses restaurants en hausse",
-    desc: "Vous avez dépensé 22% de plus en restaurants ce mois-ci par rapport à la moyenne des 3 derniers mois.",
-    savings: "€45/mois",
-  },
-];
-
-const recentActivity = [
-  { source: "receipt", merchant: "Carrefour", date: "16 mars", amount: "€67.40" },
-  { source: "bank", merchant: "SNCF", date: "15 mars", amount: "€32.00" },
-  { source: "email", merchant: "Amazon", date: "14 mars", amount: "€24.99" },
-  { source: "receipt", merchant: "Leclerc", date: "13 mars", amount: "€89.20" },
-  { source: "bank", merchant: "Spotify", date: "12 mars", amount: "€9.99" },
-  { source: "bank", merchant: "EDF", date: "10 mars", amount: "€85.00" },
-];
-
 const sourceLabels: Record<string, string> = {
   receipt: "Ticket",
   bank: "Banque",
   email: "Email",
+  invoice: "Facture",
 };
 
+function getColor(cat: string) {
+  return CATEGORY_COLORS[cat] || CATEGORY_COLORS.Autres;
+}
+
+function buildCategoryData(expenses: Expense[]) {
+  const map: Record<string, number> = {};
+  expenses.forEach((e) => {
+    const cat = e.categorie || "Autres";
+    map[cat] = (map[cat] || 0) + (e.montant_total || 0);
+  });
+  return Object.entries(map)
+    .map(([name, value]) => ({ name, value: Math.round(value * 100) / 100, color: getColor(name) }))
+    .sort((a, b) => b.value - a.value);
+}
+
+function buildMonthlyData(expenses: Expense[]) {
+  const now = new Date();
+  const months: { month: string; amount: number }[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = subMonths(now, i);
+    const start = startOfMonth(d);
+    const end = endOfMonth(d);
+    const total = expenses
+      .filter((e) => {
+        if (!e.date_expense) return false;
+        const ed = parseISO(e.date_expense);
+        return ed >= start && ed <= end;
+      })
+      .reduce((s, e) => s + (e.montant_total || 0), 0);
+    months.push({ month: format(d, "MMM", { locale: fr }), amount: Math.round(total) });
+  }
+  return months;
+}
+
+function buildTopMerchants(expenses: Expense[]) {
+  const map: Record<string, { amount: number; visits: number }> = {};
+  expenses.forEach((e) => {
+    const name = e.fournisseur || e.magasin || "Inconnu";
+    if (!map[name]) map[name] = { amount: 0, visits: 0 };
+    map[name].amount += e.montant_total || 0;
+    map[name].visits += 1;
+  });
+  return Object.entries(map)
+    .map(([name, v]) => ({ name, amount: Math.round(v.amount * 100) / 100, visits: v.visits }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 5);
+}
+
+const EmptyState = () => (
+  <div className="flex flex-col items-center justify-center py-20 text-center">
+    <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
+      <Inbox className="h-7 w-7 text-muted-foreground" />
+    </div>
+    <h2 className="text-lg font-semibold text-foreground mb-1">Aucune dépense enregistrée</h2>
+    <p className="text-sm text-muted-foreground max-w-sm">
+      Importez vos tickets, emails ou relevés bancaires depuis la page Capture pour alimenter votre tableau de bord.
+    </p>
+  </div>
+);
+
 const Dashboard = () => {
+  const { expenses, loading } = useExpenses();
+
+  const now = new Date();
+  const thisMonthStart = startOfMonth(now);
+  const thisMonthEnd = endOfMonth(now);
+  const lastMonthStart = startOfMonth(subMonths(now, 1));
+  const lastMonthEnd = endOfMonth(subMonths(now, 1));
+
+  const thisMonthExpenses = useMemo(
+    () => expenses.filter((e) => {
+      if (!e.date_expense) return false;
+      const d = parseISO(e.date_expense);
+      return d >= thisMonthStart && d <= thisMonthEnd;
+    }),
+    [expenses, thisMonthStart, thisMonthEnd]
+  );
+
+  const lastMonthExpenses = useMemo(
+    () => expenses.filter((e) => {
+      if (!e.date_expense) return false;
+      const d = parseISO(e.date_expense);
+      return d >= lastMonthStart && d <= lastMonthEnd;
+    }),
+    [expenses, lastMonthStart, lastMonthEnd]
+  );
+
+  const thisTotal = useMemo(() => thisMonthExpenses.reduce((s, e) => s + (e.montant_total || 0), 0), [thisMonthExpenses]);
+  const lastTotal = useMemo(() => lastMonthExpenses.reduce((s, e) => s + (e.montant_total || 0), 0), [lastMonthExpenses]);
+  const changePct = lastTotal > 0 ? Math.round(((thisTotal - lastTotal) / lastTotal) * 100) : 0;
+
+  const categoryData = useMemo(() => buildCategoryData(thisMonthExpenses), [thisMonthExpenses]);
+  const monthlyData = useMemo(() => buildMonthlyData(expenses), [expenses]);
+  const topMerchants = useMemo(() => buildTopMerchants(thisMonthExpenses), [thisMonthExpenses]);
+  const recentActivity = useMemo(() => expenses.slice(0, 6), [expenses]);
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (expenses.length === 0) {
+    return <AppLayout><EmptyState /></AppLayout>;
+  }
+
   return (
     <AppLayout>
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-foreground">Tableau de bord</h1>
-          <p className="text-sm text-muted-foreground mt-1">Mars 2026 — Vue d'ensemble de vos dépenses</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {format(now, "MMMM yyyy", { locale: fr })} — Vue d'ensemble de vos dépenses
+          </p>
         </div>
 
-        {/* Summary Cards + Score */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {summaryCards.map((card, i) => (
-            <motion.div
-              key={card.label}
-              {...fadeUp}
-              transition={{ delay: i * 0.1 }}
-              className="bg-card rounded-2xl p-6 shadow-sm border border-border"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{card.label}</p>
-                <card.icon className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold tracking-tight tabular-nums text-foreground">{card.value}</span>
-                <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${card.trend === "down" ? "text-savings" : "text-primary"}`}>
-                  {card.trend === "down" ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
-                  {card.change}
-                </span>
-              </div>
-            </motion.div>
-          ))}
-
-          {/* Score Card */}
-          <motion.div {...fadeUp} transition={{ delay: 0.3 }} className="bg-foreground rounded-2xl p-6">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Score d'optimisation</p>
-            <div className="mt-3 flex items-center justify-between">
-              <span className="text-5xl font-bold tracking-tighter text-background tabular-nums">82</span>
-              <svg className="h-14 w-14" viewBox="0 0 48 48">
-                <circle cx="24" cy="24" r="20" fill="none" stroke="hsl(142, 71%, 45%, 0.2)" strokeWidth="4" />
-                <circle
-                  cx="24" cy="24" r="20" fill="none" stroke="hsl(142, 71%, 45%)" strokeWidth="4"
-                  strokeDasharray={`${82 * 1.256} 125.6`}
-                  strokeLinecap="round"
-                  transform="rotate(-90 24 24)"
-                />
-              </svg>
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <motion.div {...fadeUp} className="bg-card rounded-2xl p-6 shadow-sm border border-border">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Dépenses du mois</p>
+              <Wallet className="h-4 w-4 text-muted-foreground" />
             </div>
-            <p className="text-xs text-background/50 mt-2">+4 pts ce mois</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-bold tracking-tight tabular-nums text-foreground">
+                €{thisTotal.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+              {lastTotal > 0 && (
+                <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${changePct <= 0 ? "text-savings" : "text-destructive"}`}>
+                  {changePct <= 0 ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
+                  {changePct > 0 ? "+" : ""}{changePct}%
+                </span>
+              )}
+            </div>
+          </motion.div>
+
+          <motion.div {...fadeUp} transition={{ delay: 0.1 }} className="bg-card rounded-2xl p-6 shadow-sm border border-border">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Transactions ce mois</p>
+            </div>
+            <span className="text-3xl font-bold tracking-tight tabular-nums text-foreground">{thisMonthExpenses.length}</span>
+          </motion.div>
+
+          <motion.div {...fadeUp} transition={{ delay: 0.2 }} className="bg-card rounded-2xl p-6 shadow-sm border border-border">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Catégorie principale</p>
+              <Sparkles className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <span className="text-xl font-bold text-foreground">{categoryData[0]?.name || "—"}</span>
           </motion.div>
         </div>
 
         {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-          {/* Category Chart */}
-          <motion.div {...fadeUp} className="bg-card rounded-2xl p-6 border border-border">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-6">Dépenses par catégorie</p>
-            <div className="flex items-center gap-6">
-              <div className="w-40 h-40">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={categoryData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" stroke="none">
-                      {categoryData.map((entry, i) => (
-                        <Cell key={i} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="flex-1 space-y-2">
-                {categoryData.map((cat) => (
-                  <div key={cat.name} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full" style={{ backgroundColor: cat.color }} />
-                      <span className="text-foreground">{cat.name}</span>
+        {categoryData.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+            <motion.div {...fadeUp} className="bg-card rounded-2xl p-6 border border-border">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-6">Dépenses par catégorie</p>
+              <div className="flex items-center gap-6">
+                <div className="w-40 h-40">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={categoryData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" stroke="none">
+                        {categoryData.map((entry, i) => (
+                          <Cell key={i} fill={entry.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex-1 space-y-2">
+                  {categoryData.map((cat) => (
+                    <div key={cat.name} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: cat.color }} />
+                        <span className="text-foreground">{cat.name}</span>
+                      </div>
+                      <span className="tabular-nums text-muted-foreground">€{cat.value.toLocaleString("fr-FR")}</span>
                     </div>
-                    <span className="tabular-nums text-muted-foreground">€{cat.value}</span>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.div {...fadeUp} className="bg-card rounded-2xl p-6 border border-border">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-6">Tendance mensuelle</p>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={monthlyData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", fontSize: "12px" }}
+                    formatter={(value: number) => [`€${value}`, "Dépenses"]}
+                  />
+                  <Line type="monotone" dataKey="amount" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4, fill: "hsl(var(--primary))" }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Merchants + Bar */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+          {topMerchants.length > 0 && (
+            <motion.div {...fadeUp} className="bg-card rounded-2xl p-6 border border-border">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Top commerçants</p>
+              <div className="space-y-3">
+                {topMerchants.map((m) => (
+                  <div key={m.name} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-lg bg-secondary flex items-center justify-center text-xs font-bold text-foreground">
+                        {m.name[0]}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{m.name}</p>
+                        <p className="text-[10px] text-muted-foreground">{m.visits} transaction{m.visits > 1 ? "s" : ""}</p>
+                      </div>
+                    </div>
+                    <span className="text-sm font-semibold tabular-nums text-foreground">€{m.amount.toLocaleString("fr-FR")}</span>
                   </div>
                 ))}
               </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          )}
 
-          {/* Trend Chart */}
-          <motion.div {...fadeUp} className="bg-card rounded-2xl p-6 border border-border">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-6">Tendance mensuelle</p>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 91%)" />
-                <XAxis dataKey="month" tick={{ fontSize: 12, fill: "hsl(215, 16%, 47%)" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 12, fill: "hsl(215, 16%, 47%)" }} axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{ borderRadius: "8px", border: "1px solid hsl(220, 13%, 91%)", fontSize: "12px" }}
-                  formatter={(value: number) => [`€${value}`, "Dépenses"]}
-                />
-                <Line type="monotone" dataKey="amount" stroke="hsl(221, 83%, 53%)" strokeWidth={2} dot={{ r: 4, fill: "hsl(221, 83%, 53%)" }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </motion.div>
+          {categoryData.length > 0 && (
+            <motion.div {...fadeUp} className="bg-card rounded-2xl p-6 border border-border">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-6">Par catégorie (barres)</p>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={categoryData} layout="vertical">
+                  <XAxis type="number" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={100} />
+                  <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", fontSize: "12px" }} formatter={(value: number) => [`€${value}`, ""]} />
+                  <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} barSize={20} />
+                </BarChart>
+              </ResponsiveContainer>
+            </motion.div>
+          )}
         </div>
 
-        {/* Merchants + Products */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-          {/* Top Merchants */}
+        {/* Recent Activity */}
+        {recentActivity.length > 0 && (
           <motion.div {...fadeUp} className="bg-card rounded-2xl p-6 border border-border">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Top commerçants</p>
-            <div className="space-y-3">
-              {topMerchants.map((m, i) => (
-                <div key={m.name} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-lg bg-secondary flex items-center justify-center text-xs font-bold text-foreground">
-                      {m.name[0]}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{m.name}</p>
-                      <p className="text-[10px] text-muted-foreground">{m.visits} visites</p>
-                    </div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Activité récente</p>
+            <div className="divide-y divide-border">
+              {recentActivity.map((a) => (
+                <div key={a.id} className="grid grid-cols-[auto_1fr_auto] gap-4 py-3 items-center">
+                  <div className="h-8 w-8 rounded-lg bg-secondary flex items-center justify-center text-xs font-bold text-foreground">
+                    {(a.fournisseur || a.magasin || "?")[0]}
                   </div>
-                  <span className="text-sm font-semibold tabular-nums text-foreground">{m.amount}</span>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{a.fournisseur || a.magasin || "Inconnu"}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {a.date_expense ? format(parseISO(a.date_expense), "d MMM yyyy", { locale: fr }) : "—"} · {sourceLabels[a.source] || a.source}
+                    </p>
+                  </div>
+                  <span className="text-sm font-semibold tabular-nums text-foreground">
+                    €{(a.montant_total || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+                  </span>
                 </div>
               ))}
             </div>
           </motion.div>
-
-          {/* Spending bar */}
-          <motion.div {...fadeUp} className="bg-card rounded-2xl p-6 border border-border">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-6">Par catégorie (barres)</p>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={categoryData} layout="vertical">
-                <XAxis type="number" tick={{ fontSize: 12, fill: "hsl(215, 16%, 47%)" }} axisLine={false} tickLine={false} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "hsl(215, 16%, 47%)" }} axisLine={false} tickLine={false} width={90} />
-                <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid hsl(220, 13%, 91%)", fontSize: "12px" }} formatter={(value: number) => [`€${value}`, ""]} />
-                <Bar dataKey="value" fill="hsl(221, 83%, 53%)" radius={[0, 4, 4, 0]} barSize={20} />
-              </BarChart>
-            </ResponsiveContainer>
-          </motion.div>
-        </div>
-
-        {/* Insights */}
-        <motion.div {...fadeUp} className="mb-8">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Opportunités d'optimisation</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {insights.map((insight, i) => (
-              <div key={i} className="bg-card rounded-2xl p-5 border-l-4 border-l-savings border border-border">
-                <div className="flex items-start justify-between mb-2">
-                  <span className="bg-savings/10 text-savings px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tight">
-                    {insight.type === "brand_swap" ? "Marque" : insight.type === "subscription" ? "Abonnement" : "Catégorie"}
-                  </span>
-                  <span className="text-sm font-bold tabular-nums text-savings">{insight.savings}</span>
-                </div>
-                <h3 className="text-sm font-semibold text-foreground mt-3">{insight.title}</h3>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{insight.desc}</p>
-                <button className="mt-4 text-xs font-medium bg-foreground text-background px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity">
-                  Appliquer ce changement
-                </button>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Recent Activity */}
-        <motion.div {...fadeUp} className="bg-card rounded-2xl p-6 border border-border">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Activité récente</p>
-          <div className="divide-y divide-border">
-            {recentActivity.map((a, i) => (
-              <div key={i} className="grid grid-cols-[auto_1fr_auto] gap-4 py-3 items-center">
-                <div className="h-8 w-8 rounded-lg bg-secondary flex items-center justify-center text-xs font-bold text-foreground">
-                  {a.merchant[0]}
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">{a.merchant}</p>
-                  <p className="text-[10px] text-muted-foreground">{a.date} · {sourceLabels[a.source]}</p>
-                </div>
-                <span className="text-sm font-semibold tabular-nums text-foreground">{a.amount}</span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
+        )}
       </div>
     </AppLayout>
   );
