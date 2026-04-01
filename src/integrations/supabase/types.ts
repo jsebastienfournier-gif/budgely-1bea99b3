@@ -465,6 +465,45 @@ export type Database = {
         }
         Relationships: []
       }
+      merchant_profiles: {
+        Row: {
+          category: string | null
+          confidence: number
+          created_at: string
+          id: string
+          merchant: string
+          normalized_name: string
+          patterns: Json | null
+          subcategory: string | null
+          updated_at: string
+          usage_count: number
+        }
+        Insert: {
+          category?: string | null
+          confidence?: number
+          created_at?: string
+          id?: string
+          merchant: string
+          normalized_name: string
+          patterns?: Json | null
+          subcategory?: string | null
+          updated_at?: string
+          usage_count?: number
+        }
+        Update: {
+          category?: string | null
+          confidence?: number
+          created_at?: string
+          id?: string
+          merchant?: string
+          normalized_name?: string
+          patterns?: Json | null
+          subcategory?: string | null
+          updated_at?: string
+          usage_count?: number
+        }
+        Relationships: []
+      }
       microsoft_tokens: {
         Row: {
           access_token: string
