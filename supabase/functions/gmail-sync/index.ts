@@ -7,6 +7,115 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const POSITIVE_TRANSACTION_PATTERN = /(facture|invoice|re[çc]u|receipt|commande|order|paiement|payment|pr[ée]l[èe]vement|prelevement|d[ée]bit|debit|abonnement|subscription|[ée]ch[ée]ance|echeance|montant|total|ttc|achat|purchase|renewal|renouvellement)/i;
+const MARKETING_OR_PROMO_PATTERN = /(tirage au sort|gagnez|remportez|offre|promo(?:tion)?|newsletter|parrainage|campagne|marketing|vente flash|code promo|bon plan|r[ée]duction|reduction)/i;
+const NON_EXPENSE_FINANCIAL_PATTERN = /(souscription au projet|investissement|investir|rendement|porte[- ]?monnaie|wallet|avis d['’]ex[ée]cution|dividende|crowdfunding|p2p|remboursement mensuel|alimentation de votre porte[- ]?monnaie|gain|cashback)/i;
+const REFUND_ONLY_PATTERN = /(remboursement|refund|cr[ée]dit[ée]?|credited)/i;
+const POSITIVE_EXPENSE_PROOF = /(facture|invoice|re[çc]u|receipt|commande|order|paiement|payment|pr[ée]l[èe]vement|prelevement|d[ée]bit|debit|total(?:\s*ttc)?|montant(?:\s+d[ûu]|\s+pay[ée]|\s+de)?|[ée]ch[ée]ance|echeance|achat|purchase)/i;
+const HARD_TRANSACTION_PROOF = /(n[°º]\s*de\s*commande|num[eé]ro\s*de\s*commande|order\s*#|num[eé]ro\s*de\s*facture|facture\s*n[°º]|confirmation\s*de\s*paiement|paiement\s*(confirm[ée]|effectu[ée])|re[çc]u\s*de\s*paiement|merci\s+pour\s+votre\s+achat|total(?:\s*ttc)?\s*[:=]|montant(?:\s+pay[ée]|\s+d[ûu]|\s+de)\s*[:=]?|pr[ée]l[èe]vement\s*[:=]?|d[ée]bit(?:[ée])?\s*[:=]?)/i;
+const SHIPPING_ONLY_PATTERN = /(exp[ée]di[ée]|shipped|livraison|delivery|suivi|tracking)/i;
+const AMAZON_PATTERN = /(amazon(?:\.fr)?)/i;
+const BOUYGUES_PATTERN = /(bouygues telecom|bouygues t[ée]l[ée]com|bouyguestelecom|b&you|bouygues)/i;
+const UNKNOWN_RESULT_PATTERN = /\b(inconnu|unknown|aucun article|no item|n\/a)\b/i;
+
+function normalizeText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/\u00a0/g, " ")
+    .replace(/\u202f/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseCurrencyAmount(raw: string): number | null {
+  let normalized = raw.trim().replace(/[\s\u00a0\u202f]/g, "");
+  if (!normalized) return null;
+
+  if (normalized.includes(",") && normalized.includes(".")) {
+    if (normalized.lastIndexOf(",") > normalized.lastIndexOf(".")) {
+      normalized = normalized.replace(/\./g, "").replace(",", ".");
+    } else {
+      normalized = normalized.replace(/,/g, "");
+    }
+  } else if (normalized.includes(",")) {
+    normalized = normalized.replace(",", ".");
+  }
+
+  normalized = normalized.replace(/[^\d.]/g, "");
+  const parsed = Number.parseFloat(normalized);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.round(parsed * 100) / 100;
+}
+
+function extractAmount(text: string, patterns: RegExp[] = []): number | null {
+  const normalized = text.replace(/\u00a0/g, " ").replace(/\u202f/g, " ");
+
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    const amount = parseCurrencyAmount(match?.[1] ?? "");
+    if (amount !== null) return amount;
+  }
+
+  const suffixMatches = Array.from(
+    normalized.matchAll(/(\d{1,3}(?:[ .\u00a0\u202f]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(?:€|eur)/gi),
+  );
+  const prefixMatches = Array.from(
+    normalized.matchAll(/(?:€)\s*(\d{1,3}(?:[ .\u00a0\u202f]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)/gi),
+  );
+
+  const amounts = [...suffixMatches, ...prefixMatches]
+    .map((match) => parseCurrencyAmount(match[1] ?? ""))
+    .filter((value): value is number => value !== null);
+
+  if (amounts.length === 0) return null;
+  return Math.max(...amounts);
+}
+
+function extractEmailDate(rawText: string): string | null {
+  const dateMatch = rawText.match(/Date:\s*(.+)/);
+  if (!dateMatch) return null;
+
+  try {
+    const date = new Date(dateMatch[1].trim());
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toISOString().split("T")[0];
+  } catch {
+    return null;
+  }
+}
+
+function hasExpenseIntent(text: string): boolean {
+  return POSITIVE_TRANSACTION_PATTERN.test(text) || HARD_TRANSACTION_PROOF.test(text);
+}
+
+function isBlockedFinancialNoise(text: string): boolean {
+  if (MARKETING_OR_PROMO_PATTERN.test(text)) return true;
+  if (NON_EXPENSE_FINANCIAL_PATTERN.test(text) && !POSITIVE_EXPENSE_PROOF.test(text)) return true;
+  if (REFUND_ONLY_PATTERN.test(text) && !/(carte|d[ée]bit|debit|paiement|payment|facture|invoice|commande|order|achat|purchase|pr[ée]l[èe]vement|prelevement)/i.test(text)) {
+    return true;
+  }
+  return false;
+}
+
+function isBlockedLearnedProfile(learned: any, text: string): boolean {
+  const learnedText = normalizeText(`${learned?.merchant ?? ""} ${learned?.normalized_name ?? ""} ${learned?.category ?? ""}`);
+  if (/investissement|épargne/.test(learnedText) && !POSITIVE_EXPENSE_PROOF.test(text)) return true;
+  return isBlockedFinancialNoise(`${learnedText} ${text}`);
+}
+
+function isUsableExpenseResult(
+  merchant: string | null | undefined,
+  description: string | null | undefined,
+  amount: number | null,
+): boolean {
+  if (!amount || amount <= 0) return false;
+
+  const combined = `${merchant ?? ""} ${description ?? ""}`.trim();
+  if (!combined) return false;
+
+  return !UNKNOWN_RESULT_PATTERN.test(combined);
+}
+
 // ===================== TOKEN REFRESH =====================
 
 async function refreshAccessToken(refreshToken: string): Promise<{ access_token: string; expires_in: number }> {
@@ -57,27 +166,14 @@ function flattenParts(payload: any): any[] {
   return parts;
 }
 
-// ===================== PRE-FILTER (BLACKLIST) =====================
-
-const BLACKLIST_KEYWORDS = [
-  "promo", "offre", "soldes", "deal", "discount", "save",
-  "newsletter", "prix suggéré", "négociation", "vinted",
-  "déstockage", "vente flash", "bon plan", "code promo",
-  "publicité", "unsubscribe from marketing",
-];
-
-const HARD_TRANSACTION_PROOF = /(n[°º]\s*de\s*commande|num[eé]ro\s*de\s*commande|order\s*#|num[eé]ro\s*de\s*facture|facture\s*n[°º]|confirmation\s*de\s*paiement|paiement\s*(confirm[ée]|effectu[ée])|re[çc]u\s*de\s*paiement|merci\s+pour\s+votre\s+achat|total(?:\s*ttc)?\s*[:=]|montant(?:\s+pay[ée]|\s+de)\s*[:=]?)/i;
-
 function preFilter(subject: string, from: string, body: string): "reject" | "candidate" {
-  const text = `${subject} ${from} ${body}`.toLowerCase();
+  const text = normalizeText(`${subject} ${from} ${body}`);
 
-  // If we have hard transaction proof, always keep it
   if (HARD_TRANSACTION_PROOF.test(text)) return "candidate";
 
-  // Check blacklist
-  if (BLACKLIST_KEYWORDS.some(word => text.includes(word))) {
-    return "reject";
-  }
+  if (isBlockedFinancialNoise(text)) return "reject";
+  if (!hasExpenseIntent(text)) return "reject";
+  if (SHIPPING_ONLY_PATTERN.test(text) && !POSITIVE_EXPENSE_PROOF.test(text)) return "reject";
 
   return "candidate";
 }
@@ -103,14 +199,17 @@ interface EmailData {
 const MERCHANT_RULES = [
   {
     name: "Amazon",
-    detect: (e: EmailData) => /amazon/i.test(e.from + e.body),
-    allow: (t: string) => /commande|order|total|facture|invoice/i.test(t),
-    block: (t: string) => /expédié|shipped|suivi|tracking/i.test(t) && !/total|montant/i.test(t),
+    detect: (e: EmailData) => AMAZON_PATTERN.test(`${e.subject} ${e.from} ${e.body}`),
+    allow: (t: string) => /commande|order|total|montant|tva|facture|invoice|re[çc]u|receipt/i.test(t),
+    block: (t: string) => SHIPPING_ONLY_PATTERN.test(t) && !/total|montant|facture|invoice|re[çc]u|receipt|tva/i.test(t),
     extract: (t: string): Partial<RuleResult> => {
-      const m = t.match(/total.*?(\d+[.,]\d{2})\s*€/i) || t.match(/(\d+[.,]\d{2})\s*€/i);
+      const amount = extractAmount(t, [
+        /(?:total(?:\s*(?:de la commande|commande|ttc))?|montant(?:\s+pay[ée]|\s+d[ûu])?|payment total|total amount)[^\d]{0,20}(\d{1,3}(?:[ .\u00a0\u202f]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(?:€|eur)/i,
+        /(?:tva(?:\s+incluse)?|prix total)[^\d]{0,20}(\d{1,3}(?:[ .\u00a0\u202f]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(?:€|eur)/i,
+      ]);
       return {
         merchant: "Amazon",
-        amount: m ? parseFloat(m[1].replace(",", ".")) : null,
+        amount,
         category: "Shopping",
         subcategory: "E-commerce",
       };
@@ -149,14 +248,16 @@ const MERCHANT_RULES = [
   },
   {
     name: "Bouygues",
-    detect: (e: EmailData) => /bouygues/i.test(e.from),
-    allow: (t: string) => /facture|montant|prélèvement/i.test(t),
-    block: () => false,
+    detect: (e: EmailData) => BOUYGUES_PATTERN.test(`${e.subject} ${e.from} ${e.body}`),
+    allow: (t: string) => /facture|montant|prélèvement|prelevement|abonnement|[ée]ch[ée]ance|echeance|montant d[ûu]|total à payer|total a payer|paiement|payment/i.test(t),
+    block: (t: string) => /offre|promo|nouveaut[ée]/i.test(t) && !/facture|prélèvement|prelevement|montant d[ûu]|total à payer|total a payer/i.test(t),
     extract: (t: string): Partial<RuleResult> => {
-      const m = t.match(/(\d+[.,]\d{2})\s*€/);
+      const amount = extractAmount(t, [
+        /(?:montant d[ûu]|total à payer|total a payer|prélèvement|prelevement|montant de votre facture|montant ttc|facture)[^\d]{0,25}(\d{1,3}(?:[ .\u00a0\u202f]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(?:€|eur)/i,
+      ]);
       return {
         merchant: "Bouygues Telecom",
-        amount: m ? parseFloat(m[1].replace(",", ".")) : null,
+        amount,
         category: "Abonnements",
         subcategory: "Télécom",
       };
@@ -385,6 +486,8 @@ async function learnFromResult(
   if (!merchant) return;
 
   const key = merchant.toLowerCase().trim();
+  if (!key || UNKNOWN_RESULT_PATTERN.test(key)) return;
+  if (category && /investissement|épargne/i.test(category)) return;
 
   const { data } = await supabaseAdmin
     .from("merchant_profiles")
@@ -432,15 +535,15 @@ async function listMessageIdsByQuery(accessToken: string, query: string, maxResu
 
 async function searchFinancialEmails(accessToken: string, maxResults = 120): Promise<any[]> {
   const includeTerms = [
-    "facture", "invoice", "reçu", "receipt", "confirmation", "commande", "order",
-    "paiement", "payment", "achat", "purchase", "livraison", "delivery", "expédition",
-    "expedition", "prélèvement", "prelevement", "abonnement", "subscription", "montant", "amount",
+    "facture", "invoice", "reçu", "receipt", "commande", "order",
+    "paiement", "payment", "achat", "purchase", "prélèvement", "prelevement",
+    "abonnement", "subscription", "montant", "amount", "total", "ttc", "échéance", "echeance",
     "amazon", "bouygues", "ionos", "orange", "sfr", "fnac",
   ];
 
   const queries = [
-    `(${includeTerms.join(" OR ")}) newer_than:180d -category:social`,
-    `(from:amazon OR from:amazon.fr OR from:bouygues OR from:bouyguestelecom OR from:paypal) newer_than:365d -category:social`,
+    `(${includeTerms.join(" OR ")}) newer_than:180d -category:social -category:promotions`,
+    `(from:amazon OR from:amazon.fr OR from:bouygues OR from:bouyguestelecom OR from:paypal OR from:orange OR from:ionos) newer_than:365d -category:social -category:promotions`,
   ];
 
   const uniqueIds = new Set<string>();
@@ -665,6 +768,8 @@ serve(async (req) => {
 
     for (const msg of newMessages) {
       try {
+        const normalizedText = normalizeText(`${msg.subject} ${msg.from} ${msg.body}`);
+
         // 1. PRE-FILTER
         const filterResult = preFilter(msg.subject, msg.from, msg.body);
         if (filterResult === "reject") {
@@ -675,50 +780,37 @@ serve(async (req) => {
         // 2. LEARNED MERCHANT
         const learned = await findLearnedMerchant(supabaseAdmin, msg.subject, msg.from, msg.body);
         if (learned && learned.confidence >= 0.85) {
-          // Direct insert from learned data
-          const dateMatch = msg.raw_text.match(/Date:\s*(.+)/);
-          let dateExpense: string | null = null;
-          if (dateMatch) {
-            try {
-              const d = new Date(dateMatch[1].trim());
-              if (!isNaN(d.getTime())) dateExpense = d.toISOString().split("T")[0];
-            } catch { /* ignore */ }
+          if (isBlockedLearnedProfile(learned, normalizedText)) {
+            results.push({ gmail_id: msg.gmail_id, subject: msg.subject, success: false, skipped: true, reason: "learned-filter" });
+            continue;
           }
 
-          const amountMatch = msg.body.match(/(\d+[.,]\d{2})\s*€/);
-          const amount = amountMatch ? parseFloat(amountMatch[1].replace(",", ".")) : null;
+          const amount = extractAmount(msg.body, [
+            /(?:total|montant|paiement|payment|pr[ée]l[èe]vement|prelevement|facture|invoice)[^\d]{0,25}(\d{1,3}(?:[ .\u00a0\u202f]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(?:€|eur)/i,
+          ]);
 
-          await supabaseAdmin.from("expenses").insert({
-            user_id: user.id,
-            source: "email",
-            source_id: `gmail_${msg.gmail_id}`,
-            fournisseur: learned.normalized_name,
-            categorie: learned.category,
-            montant_total: amount,
-            date_expense: dateExpense,
-            description: msg.subject,
-            devise: "EUR",
-          });
+          if (isUsableExpenseResult(learned.normalized_name, msg.subject, amount)) {
+            await supabaseAdmin.from("expenses").insert({
+              user_id: user.id,
+              source: "email",
+              source_id: `gmail_${msg.gmail_id}`,
+              fournisseur: learned.normalized_name,
+              categorie: learned.category,
+              montant_total: amount,
+              date_expense: extractEmailDate(msg.raw_text),
+              description: msg.subject,
+              devise: "EUR",
+            });
 
-          // Update learning
-          await learnFromResult(supabaseAdmin, learned.normalized_name, learned.category, learned.subcategory);
-
-          results.push({ gmail_id: msg.gmail_id, subject: msg.subject, success: true, source: "learned" });
-          continue;
+            await learnFromResult(supabaseAdmin, learned.normalized_name, learned.category, learned.subcategory);
+            results.push({ gmail_id: msg.gmail_id, subject: msg.subject, success: true, source: "learned" });
+            continue;
+          }
         }
 
         // 3. RULES ENGINE
         const ruleResult = applyRules({ subject: msg.subject, from: msg.from, body: msg.body });
-        if (ruleResult && ruleResult.amount !== null) {
-          const dateMatch = msg.raw_text.match(/Date:\s*(.+)/);
-          let dateExpense: string | null = null;
-          if (dateMatch) {
-            try {
-              const d = new Date(dateMatch[1].trim());
-              if (!isNaN(d.getTime())) dateExpense = d.toISOString().split("T")[0];
-            } catch { /* ignore */ }
-          }
-
+        if (ruleResult && isUsableExpenseResult(ruleResult.merchant, msg.subject, ruleResult.amount)) {
           await supabaseAdmin.from("expenses").insert({
             user_id: user.id,
             source: "email",
@@ -726,7 +818,7 @@ serve(async (req) => {
             fournisseur: ruleResult.merchant,
             categorie: ruleResult.category,
             montant_total: ruleResult.amount,
-            date_expense: dateExpense,
+            date_expense: extractEmailDate(msg.raw_text),
             description: msg.subject,
             devise: "EUR",
           });
@@ -735,6 +827,11 @@ serve(async (req) => {
           await learnFromResult(supabaseAdmin, ruleResult.merchant, ruleResult.category, ruleResult.subcategory);
 
           results.push({ gmail_id: msg.gmail_id, subject: msg.subject, success: true, source: "rules" });
+          continue;
+        }
+
+        if (!hasExpenseIntent(normalizedText) || isBlockedFinancialNoise(normalizedText)) {
+          results.push({ gmail_id: msg.gmail_id, subject: msg.subject, success: false, skipped: true, reason: "low-signal" });
           continue;
         }
 
@@ -755,7 +852,32 @@ serve(async (req) => {
 
         const analyzeData = await analyzeRes.json();
         if (analyzeRes.ok) {
-          // Learn from AI result
+          if (analyzeData.rejected) {
+            results.push({ gmail_id: msg.gmail_id, subject: msg.subject, success: false, skipped: true, reason: analyzeData.reason || "rejected", source: "ai" });
+            continue;
+          }
+
+          const aiAmountRaw = analyzeData.expense?.montant_total;
+          const aiAmount = typeof aiAmountRaw === "number" ? aiAmountRaw : parseCurrencyAmount(String(aiAmountRaw ?? ""));
+          const aiMerchant = analyzeData.expense?.fournisseur;
+          const aiDescription = analyzeData.expense?.description ?? msg.subject;
+          const aiCategory = String(analyzeData.expense?.categorie ?? "");
+          const shouldDiscardAiResult =
+            !isUsableExpenseResult(aiMerchant, aiDescription, aiAmount) ||
+            isBlockedFinancialNoise(normalizeText(`${msg.raw_text} ${aiMerchant ?? ""} ${aiDescription ?? ""}`)) ||
+            (/investissement|épargne/i.test(aiCategory) && !POSITIVE_EXPENSE_PROOF.test(normalizedText));
+
+          if (shouldDiscardAiResult) {
+            await supabaseAdmin
+              .from("expenses")
+              .delete()
+              .eq("user_id", user.id)
+              .eq("source_id", `gmail_${msg.gmail_id}`);
+
+            results.push({ gmail_id: msg.gmail_id, subject: msg.subject, success: false, skipped: true, reason: "ai-validation", source: "ai" });
+            continue;
+          }
+
           if (analyzeData.expense?.fournisseur) {
             await learnFromResult(
               supabaseAdmin,
