@@ -1,114 +1,292 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-serve(async (req) => {
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+// --- CONFIGURATION DES FILTRES ---
+const JUNK_KEYWORDS =
+  /(newsletter|offre|profitez|cadeau|parrainage|avis|votre panier|expédition|suivi|tracking|votre avis|bon plan|réduction|promo)/i;
+const EXPENSE_SIGNALS =
+  /(facture|reçu|receipt|invoice|commande|order|paiement|payment|prélèvement|débit|confirmation|échéance|abonnement)/i;
+
+// --- UTILITAIRES DE NETTOYAGE ---
+
+function normalizeText(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Nettoie le HTML pour garder la proximité entre les mots et les prix
+ */
+function cleanEmailBody(html: string): string {
+  if (!html) return "";
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<\/p>|<\/div>|<\/tr>|<td>|<\/td>/gi, " ") // Remplace les balises de bloc par des espaces
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&euro;/g, "€")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseCurrencyAmount(raw: string): number | null {
+  if (!raw) return null;
+  let normalized = raw.replace(/[\s\u00a0\u202f]/g, "");
+  if (normalized.includes(",") && normalized.includes(".")) {
+    if (normalized.lastIndexOf(",") > normalized.lastIndexOf(".")) {
+      normalized = normalized.replace(/\./g, "").replace(",", ".");
+    } else {
+      normalized = normalized.replace(/,/g, "");
+    }
+  } else {
+    normalized = normalized.replace(",", ".");
+  }
+  const parsed = Number.parseFloat(normalized.replace(/[^\d.]/g, ""));
+  if (isNaN(parsed) || parsed <= 0) return null;
+  return Math.round(parsed * 100) / 100;
+}
+
+// --- LOGIQUE D'IDENTIFICATION ---
+
+/**
+ * Identifie le marchand de manière dynamique (Premium -> DB -> Email Display Name -> Domaine)
+ */
+async function identifyMerchant(from: string, supabaseAdmin: any): Promise<string | null> {
+  const fromLower = from.toLowerCase();
+
+  // 1. Marchands "Premium" (Précision 100%)
+  if (fromLower.includes("amazon")) return "Amazon";
+  if (fromLower.includes("uber")) return fromLower.includes("eats") ? "Uber Eats" : "Uber";
+  if (fromLower.includes("bouygues")) return "Bouygues Telecom";
+  if (fromLower.includes("netflix")) return "Netflix";
+  if (fromLower.includes("spotify")) return "Spotify";
+  if (fromLower.includes("apple")) return "Apple";
+  if (fromLower.includes("sncf")) return "SNCF";
+
+  // 2. Extraire le domaine pour chercher dans l'historique d'apprentissage
+  const domainMatch = fromLower.match(/@([\w.-]+)\./);
+  const domain = domainMatch ? domainMatch[1] : null;
+
+  if (domain && domain.length > 2) {
+    const { data: profile } = await supabaseAdmin
+      .from("merchant_profiles")
+      .select("normalized_name")
+      .contains("patterns", [domain])
+      .maybeSingle();
+    if (profile) return profile.normalized_name;
+  }
+
+  // 3. Extraire le nom d'affichage de l'email (ex: "Boulangerie Paul" <contact@paul.fr>)
+  const displayNameMatch = from.match(/^"?(.*?)"?\s*<.*>/);
+  if (displayNameMatch && displayNameMatch[1]) {
+    const name = displayNameMatch[1].trim();
+    const genericTerms = /^(service client|facture|noreply|no-reply|contact|support|info|votre facture)$/i;
+    if (!genericTerms.test(name) && name.length > 2) return name;
+  }
+
+  // 4. Fallback sur le domaine
+  if (domain && domain.length > 2) {
+    return domain
+      .split(/[-.]/)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  }
+
+  return null;
+}
+
+/**
+ * EXTRACTEUR UNIVERSEL : Cherche un montant à proximité d'une "Ancre"
+ */
+function universalAmountExtractor(text: string): number | null {
+  const normalized = text.toLowerCase();
+  const anchors = [
+    "total ttc",
+    "total",
+    "montant",
+    "net à payer",
+    "somme",
+    "combien",
+    "total à payer",
+    "total a payer",
+    "amount",
+    "total amount",
+    "due",
+    "payer",
+    "payé",
+  ];
+
+  for (const anchor of anchors) {
+    // Fenêtre de 60 caractères après l'ancre pour trouver un prix
+    const regex = new RegExp(`${anchor}[^0-9€]{0,60}(\\d{1,3}(?:[ .\\s]\\d{3})*[.,]\\d{2})\\s*(?:€|eur)`, "i");
+    const match = normalized.match(regex);
+    if (match) {
+      const val = parseCurrencyAmount(match[1]);
+      if (val && val < 5000) return val;
+    }
+  }
+
+  // Fallback : prendre le montant le plus élevé (souvent le TTC)
+  const allAmounts = Array.from(normalized.matchAll(/(\d{1,3}(?:[ .]\d{3})*[.,]\d{2})\s*(?:€|eur)/g))
+    .map((m) => parseCurrencyAmount(m[1]))
+    .filter((v): v is number => v !== null && v < 5000);
+
+  return allAmounts.length > 0 ? Math.max(...allAmounts) : null;
+}
+
+function getExpenseScore(subject: string, body: string): number {
+  let score = 0;
+  const text = (subject + " " + body).toLowerCase();
+  if (EXPENSE_SIGNALS.test(text)) score += 3;
+  if (/[0-9][.,][0-9]{2}\s*(€|eur)/i.test(text)) score += 2;
+  if (JUNK_KEYWORDS.test(text)) score -= 4;
+  return score;
+}
+
+// --- GMAIL HELPERS ---
+
+function decodeBase64Url(data: string): string {
+  const normalized = data.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
   try {
-    const url = new URL(req.url);
-    const code = url.searchParams.get("code");
-    const stateParam = url.searchParams.get("state");
-    const error = url.searchParams.get("error");
+    return atob(padded);
+  } catch {
+    return "";
+  }
+}
 
-    // Determine frontend origin for redirects
+function flattenParts(payload: any): any[] {
+  const parts: any[] = [];
+  if (payload?.parts) {
+    for (const part of payload.parts) {
+      if (part.parts) parts.push(...flattenParts(part));
+      else parts.push(part);
+    }
+  }
+  return parts;
+}
+
+// ===================== MAIN HANDLER =====================
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  try {
+    const authHeader = req.headers.get("Authorization");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    // Derive frontend URL from supabase URL (project-ref.supabase.co -> project-ref based app)
-    const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://budgely.lovable.app";
-
-    if (error) {
-      console.error("Google OAuth error:", error);
-      return Response.redirect(`${frontendUrl}/receipts?gmail_error=${error}`, 302);
-    }
-
-    if (!code || !stateParam) {
-      return Response.redirect(`${frontendUrl}/receipts?gmail_error=missing_params`, 302);
-    }
-
-    // Decode state to get user_id
-    let userId: string;
-    try {
-      const state = JSON.parse(atob(stateParam));
-      userId = state.user_id;
-    } catch {
-      return Response.redirect(`${frontendUrl}/receipts?gmail_error=invalid_state`, 302);
-    }
-
-    const clientId = Deno.env.get("GOOGLE_CLIENT_ID")!;
-    const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
-    const redirectUri = `${supabaseUrl}/functions/v1/gmail-callback`;
-
-    // Exchange code for tokens
-    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        code,
-        client_id: clientId,
-        client_secret: clientSecret,
-        redirect_uri: redirectUri,
-        grant_type: "authorization_code",
-      }),
-    });
-
-    const tokenData = await tokenResponse.json();
-    if (!tokenResponse.ok || !tokenData.access_token) {
-      console.error("Token exchange failed:", tokenData);
-      return Response.redirect(`${frontendUrl}/receipts?gmail_error=token_exchange_failed`, 302);
-    }
-
-    // Get user's Gmail address
-    const profileResponse = await fetch("https://www.googleapis.com/gmail/v1/users/me/profile", {
-      headers: { Authorization: `Bearer ${tokenData.access_token}` },
-    });
-    const profileData = await profileResponse.json();
-    const gmailAddress = profileData.emailAddress;
-
-    if (!gmailAddress) {
-      console.error("Could not get Gmail address:", profileData);
-      return Response.redirect(`${frontendUrl}/receipts?gmail_error=no_email`, 302);
-    }
-
-    // Store tokens using service role
+    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-    // Upsert connected_emails record
-    const { data: connectedEmail } = await supabaseAdmin
-      .from("connected_emails")
-      .upsert(
-        {
-          user_id: userId,
-          email: gmailAddress,
-          provider: "gmail",
-          status: "active",
-          label: "Gmail",
-          last_sync_at: null,
-        },
-        { onConflict: "user_id,email", ignoreDuplicates: false }
-      )
-      .select("id")
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+    const supabaseAuth = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader! } },
+    });
+
+    const {
+      data: { user },
+    } = await supabaseAuth.auth.getUser();
+    if (!user) throw new Error("Non autorisé");
+
+    const { email } = await req.json();
+
+    // 1. RÉCUPÉRATION TOKENS & GMAIL (Simplifié pour l'exemple)
+    const { data: tokenData } = await supabaseAdmin
+      .from("gmail_tokens")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("email", email)
       .single();
 
-    // Calculate token expiry
-    const expiresAt = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString();
+    if (!tokenData) throw new Error("Gmail non connecté");
 
-    // Upsert gmail_tokens
-    await supabaseAdmin
-      .from("gmail_tokens")
-      .upsert(
-        {
-          user_id: userId,
-          email: gmailAddress,
-          access_token: tokenData.access_token,
-          refresh_token: tokenData.refresh_token,
-          token_expires_at: expiresAt,
-          connected_email_id: connectedEmail?.id || null,
-        },
-        { onConflict: "user_id,email", ignoreDuplicates: false }
-      );
+    // Appel API Gmail (Note: Assure-toi que searchFinancialEmails est bien défini ou utilise cette logique)
+    const accessToken = tokenData.access_token;
+    const listRes = await fetch(
+      `https://www.googleapis.com/gmail/v1/users/me/messages?q="total" ("€" OR "eur") newer_than:30d -newsletter&maxResults=50`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    const listData = await listRes.json();
+    const messageIds = (listData.messages || []).map((m: any) => m.id);
 
-    return Response.redirect(`${frontendUrl}/receipts?gmail_connected=true&email=${encodeURIComponent(gmailAddress)}`, 302);
+    const results = [];
+
+    for (const messageId of messageIds) {
+      // Vérifier si déjà traité
+      const { data: existing } = await supabaseAdmin
+        .from("expenses")
+        .select("id")
+        .eq("source_id", `gmail_${messageId}`)
+        .maybeSingle();
+      if (existing) continue;
+
+      // Fetch message detail
+      const msgRes = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${messageId}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const msgData = await msgRes.json();
+
+      const headers = msgData.payload.headers;
+      const subject = headers.find((h: any) => h.name === "Subject")?.value || "";
+      const from = headers.find((h: any) => h.name === "From")?.value || "";
+      const dateRaw = headers.find((h: any) => h.name === "Date")?.value || "";
+
+      let body = "";
+      const parts = flattenParts(msgData.payload);
+      const htmlPart = parts.find((p) => p.mimeType === "text/html");
+      const textPart = parts.find((p) => p.mimeType === "text/plain");
+
+      if (htmlPart) body = cleanEmailBody(decodeBase64Url(htmlPart.body.data));
+      else if (textPart) body = normalizeText(decodeBase64Url(textPart.body.data));
+
+      // 2. LOGIQUE DE DÉCISION
+      const score = getExpenseScore(subject, body);
+      if (score < 3) continue;
+
+      const merchant = await identifyMerchant(from, supabaseAdmin);
+      const amount = universalAmountExtractor(body);
+
+      if (merchant && amount) {
+        // SUCCÈS SANS IA
+        await supabaseAdmin.from("expenses").insert({
+          user_id: user.id,
+          source: "email",
+          source_id: `gmail_${messageId}`,
+          fournisseur: merchant,
+          montant_total: amount,
+          date_expense: new Date(dateRaw).toISOString().split("T")[0],
+          devise: "EUR",
+          description: subject,
+        });
+        results.push({ id: messageId, merchant, amount, source: "rules" });
+      } else if (score >= 5) {
+        // FALLBACK IA (Seulement pour les cas complexes avec gros signal)
+        const analyzeRes = await fetch(`${supabaseUrl}/functions/v1/analyze-document`, {
+          method: "POST",
+          headers: { Authorization: authHeader!, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            source: "email",
+            raw_text: `De: ${from}\nSujet: ${subject}\n\n${body}`,
+            source_id: `gmail_${messageId}`,
+            skip_usage_check: true,
+          }),
+        });
+        if (analyzeRes.ok) results.push({ id: messageId, source: "ai" });
+      }
+    }
+
+    return new Response(JSON.stringify({ success: true, processed: results.length }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (e) {
-    console.error("gmail-callback error:", e);
-    const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://budgely.lovable.app";
-    return Response.redirect(`${frontendUrl}/receipts?gmail_error=server_error`, 302);
+    return new Response(JSON.stringify({ error: e.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
