@@ -35,13 +35,26 @@ serve(async (req) => {
       throw new Error("Invalid Gmail token exchange");
     }
 
+    const profileRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    const profile = await profileRes.json();
+    const gmailEmail = profile.email;
+
     const supabase = createClient(supabaseUrl, serviceKey);
 
     await supabase.from("gmail_tokens").upsert({
       user_id: userId,
+      email: gmailEmail,
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token,
-      token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+      expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+    });
+
+    await supabase.from("connected_emails").upsert({
+      user_id: userId,
+      email: gmailEmail,
+      provider: "gmail",
     });
 
     return new Response("Gmail connected successfully 🚀", { status: 200 });
