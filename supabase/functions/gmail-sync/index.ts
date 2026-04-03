@@ -14,7 +14,7 @@ const CORS_HEADERS = {
 const MAX_MESSAGES_PER_SYNC = 100;
 
 /* ============================================================
-   UTILITAIRES
+   UTILS
 ============================================================ */
 
 function normalize(text: string): string {
@@ -22,7 +22,7 @@ function normalize(text: string): string {
     .toLowerCase()
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
-    .replace(/[^a-z0-9@.\s]/g, " ")
+    .replace(/[^a-z0-9€@.\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -46,11 +46,11 @@ function flattenParts(payload: any): any[] {
 function extractAmount(text: string): number | null {
   const matches = [...text.matchAll(/(\d{1,3}(?:[ .]\d{3})*[.,]\d{2})\s*(€|eur)/gi)];
 
-  const amounts = matches
+  const values = matches
     .map((m) => Number.parseFloat(m[1].replace(/\s/g, "").replace(",", ".")))
-    .filter((n) => Number.isFinite(n) && n > 0);
+    .filter((v) => Number.isFinite(v) && v > 0);
 
-  return amounts.length ? Math.max(...amounts) : null;
+  return values.length ? Math.max(...values) : null;
 }
 
 function extractDate(raw: string): string | null {
@@ -83,9 +83,7 @@ serve(async (req) => {
     /* ---------------- AUTH ---------------- */
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response("Unauthorized", { status: 401 });
-    }
+    if (!authHeader) return new Response("Unauthorized", { status: 401 });
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -98,13 +96,9 @@ serve(async (req) => {
     const {
       data: { user },
     } = await supabaseAuth.auth.getUser();
-
-    if (!user) {
-      return new Response("Unauthorized", { status: 401 });
-    }
+    if (!user) return new Response("Unauthorized", { status: 401 });
 
     const { email } = await req.json();
-
     const supabaseAdmin = createClient<Database>(supabaseUrl, serviceKey);
 
     /* ---------------- CONNECTED EMAIL ---------------- */
@@ -120,7 +114,7 @@ serve(async (req) => {
       throw new Error("Connected email not found");
     }
 
-    /* ---------------- TOKENS GMAIL ---------------- */
+    /* ---------------- TOKENS ---------------- */
 
     const { data: token } = await supabaseAdmin
       .from("gmail_tokens")
@@ -129,9 +123,7 @@ serve(async (req) => {
       .eq("email", email)
       .single();
 
-    if (!token) {
-      throw new Error("Gmail not connected");
-    }
+    if (!token) throw new Error("Gmail not connected");
 
     const accessToken = token.access_token;
 
@@ -142,19 +134,15 @@ serve(async (req) => {
       : null;
 
     let gmailQuery = "newer_than:365d";
-    if (afterTimestamp) {
-      gmailQuery += ` after:${afterTimestamp}`;
-    }
+    if (afterTimestamp) gmailQuery += ` after:${afterTimestamp}`;
 
-    /* ---------------- LISTE DES MESSAGES ---------------- */
+    /* ---------------- LISTE SMTP ---------------- */
 
     const listRes = await fetch(
       `https://www.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(
         gmailQuery,
       )}&maxResults=${MAX_MESSAGES_PER_SYNC}`,
-      {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      },
+      { headers: { Authorization: `Bearer ${accessToken}` } },
     );
 
     const listData = await listRes.json();
@@ -162,10 +150,9 @@ serve(async (req) => {
 
     let processed = 0;
 
-    /* ---------------- TRAITEMENT ---------------- */
+    /* ---------------- PROCESS ---------------- */
 
     for (const messageId of messageIds) {
-      // Déduplication
       const { data: exists } = await supabaseAdmin
         .from("expenses")
         .select("id")
@@ -175,7 +162,6 @@ serve(async (req) => {
 
       if (exists) continue;
 
-      // Fetch message
       const msgRes = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
@@ -188,15 +174,39 @@ serve(async (req) => {
       const date = headers.find((h: any) => h.name === "Date")?.value || "";
 
       const parts = flattenParts(msg.payload);
-      const plain = parts.find((p) => p.mimeType === "text/plain")?.body?.data;
-      const html = parts.find((p) => p.mimeType === "text/html")?.body?.data;
-
-      const body = decodeBase64Url(plain) || decodeBase64Url(html);
+      const body =
+        decodeBase64Url(parts.find((p) => p.mimeType === "text/plain")?.body?.data) ||
+        decodeBase64Url(parts.find((p) => p.mimeType === "text/html")?.body?.data);
 
       if (!body) continue;
 
+      const bodyNorm = normalize(body);
+
+      /* ========= FILTRES MINIMAUX (CRITIQUES) ========= */
+
+      // 1. Bloquer crédits / gains / tirages
+      if (
+        bodyNorm.includes("credit") ||
+        bodyNorm.includes("gagne") ||
+        bodyNorm.includes("tirage") ||
+        bodyNorm.includes("recompense")
+      ) {
+        continue;
+      }
+
+      // 2. Exiger preuve explicite de paiement
+      const hasPaymentProof =
+        bodyNorm.includes("€") ||
+        bodyNorm.includes("eur") ||
+        bodyNorm.includes("facture") ||
+        bodyNorm.includes("recu") ||
+        bodyNorm.includes("paiement") ||
+        bodyNorm.includes("prelev");
+
+      if (!hasPaymentProof) continue;
+
       const amount = extractAmount(body);
-      if (!amount) continue; // filtre volontairement MINIMAL
+      if (amount === null || amount <= 0) continue;
 
       const sender = parseSender(from);
 
@@ -215,7 +225,7 @@ serve(async (req) => {
       processed++;
     }
 
-    /* ---------------- MAJ CURSEUR ---------------- */
+    /* ---------------- UPDATE CURSOR ---------------- */
 
     await supabaseAdmin
       .from("connected_emails")
@@ -226,12 +236,12 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         processed,
-        message_count: messageIds.length,
+        scanned: messageIds.length,
       }),
       { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } },
     );
-  } catch (error) {
-    console.error("gmail-sync error", error);
-    return new Response(JSON.stringify({ error: String(error) }), { status: 500, headers: CORS_HEADERS });
+  } catch (err) {
+    console.error("gmail-sync error", err);
+    return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: CORS_HEADERS });
   }
 });
