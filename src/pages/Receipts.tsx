@@ -466,10 +466,11 @@ const Receipts = () => {
     const providerLabel = provider === "microsoft" ? "Outlook" : "Gmail";
     toast.info(`Synchronisation ${providerLabel} en cours…`);
     try {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
       const { data, error } = await supabase.functions.invoke(funcName, {
         body: { email: emailAddr },
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${currentSession?.access_token}`,
         },
       });
       if (error) throw error;
