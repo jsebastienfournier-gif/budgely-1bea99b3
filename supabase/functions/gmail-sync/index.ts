@@ -1,5 +1,7 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://esm.sh/zod@3.25.76";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,28 +9,360 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const POSITIVE_TRANSACTION_PATTERN = /(facture|invoice|re[çc]u|receipt|commande|order|paiement|payment|pr[ée]l[èe]vement|prelevement|d[ée]bit|debit|abonnement|subscription|[ée]ch[ée]ance|echeance|montant|total|ttc|achat|purchase|renewal|renouvellement)/i;
-const MARKETING_OR_PROMO_PATTERN = /(tirage au sort|gagnez|remportez|offre|promo(?:tion)?|newsletter|parrainage|campagne|marketing|vente flash|code promo|bon plan|r[ée]duction|reduction)/i;
-const NON_EXPENSE_FINANCIAL_PATTERN = /(souscription au projet|investissement|investir|rendement|porte[- ]?monnaie|wallet|avis d['’]ex[ée]cution|dividende|crowdfunding|p2p|remboursement mensuel|alimentation de votre porte[- ]?monnaie|gain|cashback)/i;
-const REFUND_ONLY_PATTERN = /(remboursement|refund|cr[ée]dit[ée]?|credited)/i;
-const POSITIVE_EXPENSE_PROOF = /(facture|invoice|re[çc]u|receipt|commande|order|paiement|payment|pr[ée]l[èe]vement|prelevement|d[ée]bit|debit|total(?:\s*ttc)?|montant(?:\s+d[ûu]|\s+pay[ée]|\s+de)?|[ée]ch[ée]ance|echeance|achat|purchase)/i;
-const HARD_TRANSACTION_PROOF = /(n[°º]\s*de\s*commande|num[eé]ro\s*de\s*commande|order\s*#|num[eé]ro\s*de\s*facture|facture\s*n[°º]|confirmation\s*de\s*paiement|paiement\s*(confirm[ée]|effectu[ée])|re[çc]u\s*de\s*paiement|merci\s+pour\s+votre\s+achat|total(?:\s*ttc)?\s*[:=]|montant(?:\s+pay[ée]|\s+d[ûu]|\s+de)\s*[:=]?|pr[ée]l[èe]vement\s*[:=]?|d[ée]bit(?:[ée])?\s*[:=]?)/i;
-const SHIPPING_ONLY_PATTERN = /(exp[ée]di[ée]|shipped|livraison|delivery|suivi|tracking)/i;
-const AMAZON_PATTERN = /(amazon(?:\.fr)?)/i;
-const BOUYGUES_PATTERN = /(bouygues telecom|bouygues t[ée]l[ée]com|bouyguestelecom|b&you|bouygues)/i;
-const UNKNOWN_RESULT_PATTERN = /\b(inconnu|unknown|aucun article|no item|n\/a)\b/i;
+const RequestSchema = z.object({
+  email: z.string().email(),
+});
+
+type PipelineSource = "rules" | "learned" | "ai";
+
+type EmailMessage = {
+  gmail_id: string;
+  subject: string;
+  from: string;
+  date: string;
+  body: string;
+  raw_text: string;
+  sender_email: string;
+  sender_domain: string;
+  sender_name: string;
+  normalized_text: string;
+  normalized_sender: string;
+  normalized_subject: string;
+};
+
+type LearnedProfile = {
+  merchant: string;
+  normalized_name: string;
+  category: string | null;
+  subcategory: string | null;
+  confidence: number;
+  usage_count: number;
+  patterns: string[] | null;
+};
+
+type ExtractedExpense = {
+  merchant: string;
+  amount: number;
+  category: string;
+  subcategory: string;
+  description: string;
+  date: string | null;
+  source: PipelineSource;
+  recurrence?: string;
+};
+
+type CandidateDecision = {
+  isCandidate: boolean;
+  reason: string;
+  score: number;
+  amount: number | null;
+  hasHardProof: boolean;
+  hasTransactionKeyword: boolean;
+};
+
+type MerchantRule = {
+  merchant: string;
+  senderPatterns: RegExp[];
+  transactionPatterns: RegExp[];
+  blockedPatterns?: RegExp[];
+  amountKeywords?: string[];
+  category: string;
+  subcategory: string;
+  recurrence?: string;
+  resolveMetadata?: (message: EmailMessage) => {
+    merchant: string;
+    category: string;
+    subcategory: string;
+    recurrence?: string;
+  };
+};
+
+const EMAIL_SOURCE = "email";
+const MAX_SEARCH_RESULTS = 120;
+const FETCH_BATCH_SIZE = 12;
+const MIN_LEARNED_CONFIDENCE = 0.9;
+const MIN_LEARNED_USAGE = 2;
+
+const GENERIC_DOMAIN_LABELS = new Set([
+  "mail",
+  "mailer",
+  "email",
+  "service",
+  "services",
+  "notify",
+  "notification",
+  "notifications",
+  "news",
+  "noreply",
+  "no",
+  "reply",
+  "support",
+  "info",
+  "contact",
+  "hello",
+  "team",
+]);
+
+const HARD_PROOF_PATTERN =
+  /(confirmation de paiement|paiement confirme|paiement effectue|merci pour votre achat|facture|invoice|recu|receipt|prelevement|debit|payment due|amount due|montant paye|montant du|total ttc|numero de facture|numero de commande|commande n|order confirmed)/i;
+const TRANSACTION_KEYWORD_PATTERN =
+  /(facture|invoice|recu|receipt|commande|order|paiement|payment|achat|purchase|prelevement|debit|abonnement|subscription|echeance|montant|amount|total|ttc|a payer|paid|billing)/i;
+const ORDER_REFERENCE_PATTERN = /(commande n|order|numero de commande|numero de facture)/i;
+const PROMO_PATTERN =
+  /(tirage au sort|gagnez|remportez|offre|promotion|promo|newsletter|parrainage|code promo|bon plan|vente flash|reduction|soldes|jeu concours|black friday|cyber monday)/i;
+const INVESTMENT_PATTERN =
+  /(fortuneo|la premiere brique|premiere brique|crowdfunding|investissement|investir|souscription au projet|rendement|avis d execution|porte monnaie|portefeuille|wallet|robot investisseur|bourse|dividende|versement programme|p2p)/i;
+const NOTICE_ONLY_PATTERN =
+  /(nouvelle actualite|demande est bien recue|bienvenue a bord|vient de passer a l action|actualite du projet|votre compte joueur a bien ete credite|alimentation de votre porte monnaie)/i;
+const REFUND_NOISE_PATTERN = /(remboursement mensuel|cashback|gain|recompense|reward)/i;
+const ACCOUNT_UPDATE_PATTERN =
+  /(mot de passe|connexion|code de securite|verifiez|verify|bienvenue|welcome|adresse email|reinitialisation|password|double authentification|2fa|securite|suspicious login|new sign in)/i;
+const APPOINTMENT_PATTERN = /(rendez vous|rdv|appointment|reservation|booking|creneau|slot)/i;
+const LOGISTICS_PATTERN =
+  /(livraison|delivery|tracking|suivi|expedie|shipped|colis|point relais|dispatch|retour en cours|return in transit)/i;
+const DOMAIN_SETUP_PATTERN =
+  /(domaine .* enregistre|confirmation de contrat|hebergement active|dns|whois|site web cree|votre domaine .* bien ete enregistre|domaine .* registered)/i;
+const CONTENT_PATTERN = /(webinaire|webinar|blog|article|actualite|newsletter|evenement|event|livestream|podcast)/i;
+const UNKNOWN_PATTERN = /(inconnu|unknown|n a|aucun article|no item|sans objet)/i;
+const KNOWN_SENDER_PATTERN = /(amazon|bouygues|paypal|orange|sfr|free|fnac|uber|netflix|spotify|apple|google|ionos|sncf|ouigo|semerap)/i;
+const BLOCKED_CATEGORY_PATTERN = /(investissement|epargne|finance|wallet|bourse)/i;
+const LEARNING_BLOCKLIST_PATTERN = /(fortuneo|premiere brique|wallet|cashback|reward|fdj|parionssport|tirage au sort)/i;
+const RELEVANT_LINE_PATTERN =
+  /(€|eur|invoice|facture|receipt|recu|order|commande|payment|paiement|prelevement|debit|amount|montant|total|ttc|echeance|amazon|bouygues|orange|sfr|free|paypal|fnac|uber|netflix|spotify|apple|google|ionos|sncf|semerap)/i;
+
+const GENERIC_AMOUNT_KEYWORDS = [
+  "total",
+  "montant",
+  "a payer",
+  "facture",
+  "invoice",
+  "receipt",
+  "recu",
+  "paiement",
+  "payment",
+  "prelevement",
+  "debit",
+  "commande",
+  "order",
+  "echeance",
+  "billing",
+];
+
+const GMAIL_QUERIES = [
+  "category:purchases newer_than:365d -category:promotions -label:spam -label:trash",
+  '(facture OR invoice OR recu OR receipt OR paiement OR payment OR prelevement OR debit OR echeance OR total OR montant OR "a payer") newer_than:180d -category:social -category:promotions -label:spam -label:trash',
+  '(amazon OR bouygues OR orange OR sfr OR free OR fnac OR paypal OR uber OR netflix OR spotify OR apple OR google OR ionos OR sncf OR semerap) newer_than:365d -category:social -category:promotions -label:spam -label:trash',
+];
+
+const MERCHANT_METADATA = {
+  Amazon: { category: "Shopping", subcategory: "E-commerce" },
+  "Bouygues Telecom": { category: "Abonnements", subcategory: "Telecom" },
+  Orange: { category: "Abonnements", subcategory: "Telecom" },
+  SFR: { category: "Abonnements", subcategory: "Telecom" },
+  Free: { category: "Abonnements", subcategory: "Telecom" },
+  Fnac: { category: "Shopping", subcategory: "Culture" },
+  PayPal: { category: "Paiement", subcategory: "Portefeuille" },
+  Uber: { category: "Transport", subcategory: "VTC" },
+  "Uber Eats": { category: "Restauration", subcategory: "Livraison" },
+  Netflix: { category: "Abonnements", subcategory: "Streaming" },
+  Spotify: { category: "Abonnements", subcategory: "Streaming" },
+  Apple: { category: "Abonnements", subcategory: "Services numeriques" },
+  Google: { category: "Abonnements", subcategory: "Services numeriques" },
+  SNCF: { category: "Transport", subcategory: "Train" },
+  IONOS: { category: "Abonnements", subcategory: "Hebergement web" },
+  Semerap: { category: "Logement", subcategory: "Eau" },
+} as const;
+
+const MERCHANT_RULES: MerchantRule[] = [
+  {
+    merchant: "Amazon",
+    senderPatterns: [/amazon/i],
+    transactionPatterns: [/facture|invoice|recu|receipt|merci pour votre achat|payment|paiement|total|montant|commande confirmee|order confirmed/i],
+    blockedPatterns: [/livraison|delivery|tracking|expedie|shipped|retour|return|avis sur votre achat|review/i],
+    amountKeywords: ["total", "commande", "paiement", "payment", "montant", "facture"],
+    category: "Shopping",
+    subcategory: "E-commerce",
+  },
+  {
+    merchant: "Bouygues Telecom",
+    senderPatterns: [/bouygues/i, /bouyguestelecom/i, /b and you/i, /b you/i],
+    transactionPatterns: [/facture|prelevement|echeance|montant du|montant|total a payer|paiement|payment|commande/i],
+    blockedPatterns: [/offre|promo|nouveaute|bon plan|decouvrez/i],
+    amountKeywords: ["facture", "prelevement", "echeance", "montant", "total a payer", "paiement"],
+    category: "Abonnements",
+    subcategory: "Telecom",
+    recurrence: "mensuel",
+  },
+  {
+    merchant: "Orange",
+    senderPatterns: [/orange/i],
+    transactionPatterns: [/facture|prelevement|echeance|montant|total a payer|paiement/i],
+    blockedPatterns: [/offre|promo|boutique|decouvrez/i],
+    amountKeywords: ["facture", "prelevement", "echeance", "montant", "total a payer"],
+    category: "Abonnements",
+    subcategory: "Telecom",
+    recurrence: "mensuel",
+  },
+  {
+    merchant: "SFR",
+    senderPatterns: [/sfr/i],
+    transactionPatterns: [/facture|prelevement|echeance|montant|total a payer|paiement/i],
+    blockedPatterns: [/offre|promo|boutique|decouvrez/i],
+    amountKeywords: ["facture", "prelevement", "echeance", "montant", "total a payer"],
+    category: "Abonnements",
+    subcategory: "Telecom",
+    recurrence: "mensuel",
+  },
+  {
+    merchant: "Free",
+    senderPatterns: [/free/i],
+    transactionPatterns: [/facture|prelevement|echeance|montant|total a payer|paiement/i],
+    blockedPatterns: [/offre|promo|decouvrez/i],
+    amountKeywords: ["facture", "prelevement", "echeance", "montant", "total a payer"],
+    category: "Abonnements",
+    subcategory: "Telecom",
+    recurrence: "mensuel",
+  },
+  {
+    merchant: "Fnac",
+    senderPatterns: [/fnac/i],
+    transactionPatterns: [/commande|order|facture|invoice|paiement|payment|recu|receipt|total|montant/i],
+    blockedPatterns: [/promo|offre|newsletter|livraison|tracking/i],
+    amountKeywords: ["commande", "total", "montant", "paiement", "facture"],
+    category: "Shopping",
+    subcategory: "Culture",
+  },
+  {
+    merchant: "PayPal",
+    senderPatterns: [/paypal/i],
+    transactionPatterns: [/recu|receipt|paiement|payment|transaction|facture|invoice/i],
+    blockedPatterns: [/promo|offre|cashback|reward/i],
+    amountKeywords: ["paiement", "payment", "transaction", "montant", "total"],
+    category: "Paiement",
+    subcategory: "Portefeuille",
+  },
+  {
+    merchant: "Uber",
+    senderPatterns: [/uber/i],
+    transactionPatterns: [/recu|receipt|course|trip|facture|total|commande|order|paiement/i],
+    blockedPatterns: [/promo|parrainage|newsletter/i],
+    amountKeywords: ["total", "receipt", "recu", "paiement", "payment"],
+    category: "Transport",
+    subcategory: "VTC",
+    resolveMetadata: (message) => {
+      if (/uber eats/i.test(message.normalized_text)) {
+        return {
+          merchant: "Uber Eats",
+          category: "Restauration",
+          subcategory: "Livraison",
+        };
+      }
+
+      return {
+        merchant: "Uber",
+        category: "Transport",
+        subcategory: "VTC",
+      };
+    },
+  },
+  {
+    merchant: "Netflix",
+    senderPatterns: [/netflix/i],
+    transactionPatterns: [/facture|invoice|paiement|payment|prelevement|billing|receipt|recu/i],
+    amountKeywords: ["facture", "payment", "paiement", "total", "billing"],
+    category: "Abonnements",
+    subcategory: "Streaming",
+    recurrence: "mensuel",
+  },
+  {
+    merchant: "Spotify",
+    senderPatterns: [/spotify/i],
+    transactionPatterns: [/facture|invoice|paiement|payment|prelevement|billing|receipt|recu/i],
+    amountKeywords: ["facture", "payment", "paiement", "total", "billing"],
+    category: "Abonnements",
+    subcategory: "Streaming",
+    recurrence: "mensuel",
+  },
+  {
+    merchant: "Apple",
+    senderPatterns: [/apple/i, /itunes/i],
+    transactionPatterns: [/facture|invoice|receipt|recu|achat|purchase|paiement|payment/i],
+    blockedPatterns: [/newsletter|promo/i],
+    amountKeywords: ["receipt", "recu", "payment", "paiement", "total", "montant"],
+    category: "Abonnements",
+    subcategory: "Services numeriques",
+  },
+  {
+    merchant: "Google",
+    senderPatterns: [/google/i],
+    transactionPatterns: [/facture|invoice|receipt|recu|paiement|payment|achat|purchase|billing/i],
+    blockedPatterns: [/newsletter|promo/i],
+    amountKeywords: ["receipt", "recu", "payment", "paiement", "total", "montant", "billing"],
+    category: "Abonnements",
+    subcategory: "Services numeriques",
+  },
+  {
+    merchant: "SNCF",
+    senderPatterns: [/sncf/i, /ouigo/i],
+    transactionPatterns: [/billet|ticket|confirmation|reservation|booking|paiement|payment|facture|montant|total/i],
+    blockedPatterns: [/newsletter|promo/i],
+    amountKeywords: ["billet", "ticket", "paiement", "payment", "total", "montant"],
+    category: "Transport",
+    subcategory: "Train",
+  },
+  {
+    merchant: "IONOS",
+    senderPatterns: [/ionos/i],
+    transactionPatterns: [/facture|invoice|paiement|payment|prelevement|montant|total|commande payee/i],
+    blockedPatterns: [/domaine .* enregistre|confirmation de contrat|hebergement active|dns|whois|activation/i],
+    amountKeywords: ["facture", "payment", "paiement", "montant", "total", "prelevement"],
+    category: "Abonnements",
+    subcategory: "Hebergement web",
+  },
+  {
+    merchant: "Semerap",
+    senderPatterns: [/semerap/i],
+    transactionPatterns: [/confirmation de paiement|paiement|payment|facture|recu|receipt|montant|total|point de comptage/i],
+    blockedPatterns: [/newsletter|actualite|promo/i],
+    amountKeywords: ["paiement", "payment", "montant", "total", "facture"],
+    category: "Logement",
+    subcategory: "Eau",
+  },
+];
 
 function normalizeText(value: string): string {
   return value
     .toLowerCase()
-    .replace(/\u00a0/g, " ")
-    .replace(/\u202f/g, " ")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[  ]/g, " ")
+    .replace(/[^a-z0-9@.\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
+function compactToken(value: string): string {
+  return normalizeText(value).replace(/\s+/g, "");
+}
+
+function titleCase(value: string): string {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function matchesAny(text: string, patterns: RegExp[] = []): boolean {
+  return patterns.some((pattern) => pattern.test(text));
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\]/g, "\$&");
+}
+
 function parseCurrencyAmount(raw: string): number | null {
-  let normalized = raw.trim().replace(/[\s\u00a0\u202f]/g, "");
+  let normalized = raw.trim().replace(/[\s  ]/g, "");
   if (!normalized) return null;
 
   if (normalized.includes(",") && normalized.includes(".")) {
@@ -47,100 +381,67 @@ function parseCurrencyAmount(raw: string): number | null {
   return Math.round(parsed * 100) / 100;
 }
 
-function extractAmount(text: string, patterns: RegExp[] = []): number | null {
-  const normalized = text.replace(/\u00a0/g, " ").replace(/\u202f/g, " ");
+function extractCurrencyAmounts(text: string): number[] {
+  const normalized = text.replace(/[  ]/g, " ");
+  const matches = [
+    ...normalized.matchAll(/(?:€|eur)\s*(\d{1,3}(?:[ .]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)/gi),
+    ...normalized.matchAll(/(\d{1,3}(?:[ .]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(?:€|eur)/gi),
+  ];
 
-  for (const pattern of patterns) {
-    const match = normalized.match(pattern);
-    const amount = parseCurrencyAmount(match?.[1] ?? "");
-    if (amount !== null) return amount;
+  const unique = new Set<number>();
+  for (const match of matches) {
+    const amount = parseCurrencyAmount(match[1] ?? "");
+    if (amount !== null) unique.add(amount);
   }
 
-  const suffixMatches = Array.from(
-    normalized.matchAll(/(\d{1,3}(?:[ .\u00a0\u202f]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(?:€|eur)/gi),
-  );
-  const prefixMatches = Array.from(
-    normalized.matchAll(/(?:€)\s*(\d{1,3}(?:[ .\u00a0\u202f]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)/gi),
-  );
-
-  const amounts = [...suffixMatches, ...prefixMatches]
-    .map((match) => parseCurrencyAmount(match[1] ?? ""))
-    .filter((value): value is number => value !== null);
-
-  if (amounts.length === 0) return null;
-  return Math.max(...amounts);
+  return Array.from(unique).sort((a, b) => b - a);
 }
 
-function extractEmailDate(rawText: string): string | null {
-  const dateMatch = rawText.match(/Date:\s*(.+)/);
-  if (!dateMatch) return null;
+function extractAmount(text: string, preferredKeywords: string[] = []): number | null {
+  const normalized = text.replace(//g, "
+").replace(/[  ]/g, " ");
+  const lines = normalized
+    .split(/
++/)
+    .map((line) => line.trim())
+    .filter(Boolean);
 
-  try {
-    const date = new Date(dateMatch[1].trim());
-    if (Number.isNaN(date.getTime())) return null;
-    return date.toISOString().split("T")[0];
-  } catch {
-    return null;
+  const keywords = Array.from(new Set([...preferredKeywords, ...GENERIC_AMOUNT_KEYWORDS])).filter(Boolean);
+  const keywordRegex = new RegExp(keywords.map(escapeRegExp).join("|"), "i");
+
+  for (const line of lines) {
+    const normalizedLine = normalizeText(line);
+    if (!keywordRegex.test(normalizedLine) && !/(€|eur)/i.test(line)) continue;
+
+    const amounts = extractCurrencyAmounts(line);
+    if (amounts.length > 0) {
+      return Math.max(...amounts);
+    }
   }
+
+  const allAmounts = extractCurrencyAmounts(normalized);
+  return allAmounts.length > 0 ? Math.max(...allAmounts) : null;
 }
 
-function hasExpenseIntent(text: string): boolean {
-  return POSITIVE_TRANSACTION_PATTERN.test(text) || HARD_TRANSACTION_PROOF.test(text);
+function extractEmailDate(rawDate: string): string | null {
+  if (!rawDate) return null;
+  const parsedDate = new Date(rawDate);
+  if (Number.isNaN(parsedDate.getTime())) return null;
+  return parsedDate.toISOString().split("T")[0];
 }
 
-function isBlockedFinancialNoise(text: string): boolean {
-  if (MARKETING_OR_PROMO_PATTERN.test(text)) return true;
-  if (NON_EXPENSE_FINANCIAL_PATTERN.test(text) && !POSITIVE_EXPENSE_PROOF.test(text)) return true;
-  if (REFUND_ONLY_PATTERN.test(text) && !/(carte|d[ée]bit|debit|paiement|payment|facture|invoice|commande|order|achat|purchase|pr[ée]l[èe]vement|prelevement)/i.test(text)) {
-    return true;
-  }
-  return false;
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&euro;/gi, "€")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#\d+;/g, " ");
 }
-
-function isBlockedLearnedProfile(learned: any, text: string): boolean {
-  const learnedText = normalizeText(`${learned?.merchant ?? ""} ${learned?.normalized_name ?? ""} ${learned?.category ?? ""}`);
-  if (/investissement|épargne/.test(learnedText) && !POSITIVE_EXPENSE_PROOF.test(text)) return true;
-  return isBlockedFinancialNoise(`${learnedText} ${text}`);
-}
-
-function isUsableExpenseResult(
-  merchant: string | null | undefined,
-  description: string | null | undefined,
-  amount: number | null,
-): boolean {
-  if (!amount || amount <= 0) return false;
-
-  const combined = `${merchant ?? ""} ${description ?? ""}`.trim();
-  if (!combined) return false;
-
-  return !UNKNOWN_RESULT_PATTERN.test(combined);
-}
-
-// ===================== TOKEN REFRESH =====================
-
-async function refreshAccessToken(refreshToken: string): Promise<{ access_token: string; expires_in: number }> {
-  const clientId = Deno.env.get("GOOGLE_CLIENT_ID")!;
-  const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
-
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: refreshToken,
-      grant_type: "refresh_token",
-    }),
-  });
-
-  const data = await res.json();
-  if (!res.ok || !data.access_token) {
-    throw new Error(`Token refresh failed: ${JSON.stringify(data)}`);
-  }
-  return { access_token: data.access_token, expires_in: data.expires_in || 3600 };
-}
-
-// ===================== MIME HELPERS =====================
 
 function decodeBase64Url(data: string): string {
   const normalized = data.replace(/-/g, "+").replace(/_/g, "/");
@@ -166,388 +467,525 @@ function flattenParts(payload: any): any[] {
   return parts;
 }
 
-function preFilter(subject: string, from: string, body: string): "reject" | "candidate" {
-  const text = normalizeText(`${subject} ${from} ${body}`);
-
-  if (HARD_TRANSACTION_PROOF.test(text)) return "candidate";
-
-  if (isBlockedFinancialNoise(text)) return "reject";
-  if (!hasExpenseIntent(text)) return "reject";
-  if (SHIPPING_ONLY_PATTERN.test(text) && !POSITIVE_EXPENSE_PROOF.test(text)) return "reject";
-
-  return "candidate";
+function htmlToText(value: string): string {
+  return decodeHtmlEntities(value)
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-// ===================== RULES ENGINE =====================
-
-interface RuleResult {
-  source: "rules";
-  is_transaction: boolean;
-  confidence: number;
-  merchant: string;
-  amount: number | null;
-  category: string;
-  subcategory: string;
+function removeQuotedSections(body: string): string {
+  let cleaned = body;
+  cleaned = cleaned.replace(/
+>.*$/gm, "");
+  cleaned = cleaned.replace(/
+On .* wrote:[\s\S]*$/i, "");
+  cleaned = cleaned.replace(/
+Le .* a ecrit :[\s\S]*$/i, "");
+  cleaned = cleaned.replace(/
+-{2,}\s*Original Message\s*-{2,}[\s\S]*$/i, "");
+  cleaned = cleaned.replace(/
+From:\s.*[\s\S]*$/i, "");
+  cleaned = cleaned.replace(/
+De\s*:\s.*[\s\S]*$/i, "");
+  return cleaned;
 }
 
-interface EmailData {
-  subject: string;
-  from: string;
-  body: string;
+function sanitizeBody(body: string): string {
+  return removeQuotedSections(body)
+    .replace(//g, "
+")
+    .replace(/[ 	]+
+/g, "
+")
+    .replace(/[ 	]{2,}/g, " ")
+    .replace(/
+{3,}/g, "
+
+")
+    .trim();
 }
 
-const MERCHANT_RULES = [
-  {
-    name: "Amazon",
-    detect: (e: EmailData) => AMAZON_PATTERN.test(`${e.subject} ${e.from} ${e.body}`),
-    allow: (t: string) => /commande|order|total|montant|tva|facture|invoice|re[çc]u|receipt/i.test(t),
-    block: (t: string) => SHIPPING_ONLY_PATTERN.test(t) && !/total|montant|facture|invoice|re[çc]u|receipt|tva/i.test(t),
-    extract: (t: string): Partial<RuleResult> => {
-      const amount = extractAmount(t, [
-        /(?:total(?:\s*(?:de la commande|commande|ttc))?|montant(?:\s+pay[ée]|\s+d[ûu])?|payment total|total amount)[^\d]{0,20}(\d{1,3}(?:[ .\u00a0\u202f]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(?:€|eur)/i,
-        /(?:tva(?:\s+incluse)?|prix total)[^\d]{0,20}(\d{1,3}(?:[ .\u00a0\u202f]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(?:€|eur)/i,
-      ]);
-      return {
-        merchant: "Amazon",
-        amount,
-        category: "Shopping",
-        subcategory: "E-commerce",
-      };
-    },
-  },
-  {
-    name: "Uber",
-    detect: (e: EmailData) => /uber/i.test(e.from + e.body),
-    allow: (t: string) => /reçu|receipt|trip|course|facture|total/i.test(t),
-    block: (t: string) => /promo|parrainage|referral/i.test(t),
-    extract: (t: string): Partial<RuleResult> => {
-      const m = t.match(/(\d+[.,]\d{2})\s*€/);
-      const isFood = /uber eats/i.test(t);
-      return {
-        merchant: isFood ? "Uber Eats" : "Uber",
-        amount: m ? parseFloat(m[1].replace(",", ".")) : null,
-        category: isFood ? "Alimentation" : "Transport",
-        subcategory: isFood ? "Livraison" : "VTC",
-      };
-    },
-  },
-  {
-    name: "Netflix",
-    detect: (e: EmailData) => /netflix/i.test(e.from),
-    allow: (t: string) => /facture|payment|paiement|prélèvement|montant/i.test(t),
-    block: () => false,
-    extract: (t: string): Partial<RuleResult> => {
-      const m = t.match(/(\d+[.,]\d{2})\s*€/);
-      return {
-        merchant: "Netflix",
-        amount: m ? parseFloat(m[1].replace(",", ".")) : null,
-        category: "Abonnements",
-        subcategory: "Streaming",
-      };
-    },
-  },
-  {
-    name: "Bouygues",
-    detect: (e: EmailData) => BOUYGUES_PATTERN.test(`${e.subject} ${e.from} ${e.body}`),
-    allow: (t: string) => /facture|montant|prélèvement|prelevement|abonnement|[ée]ch[ée]ance|echeance|montant d[ûu]|total à payer|total a payer|paiement|payment/i.test(t),
-    block: (t: string) => /offre|promo|nouveaut[ée]/i.test(t) && !/facture|prélèvement|prelevement|montant d[ûu]|total à payer|total a payer/i.test(t),
-    extract: (t: string): Partial<RuleResult> => {
-      const amount = extractAmount(t, [
-        /(?:montant d[ûu]|total à payer|total a payer|prélèvement|prelevement|montant de votre facture|montant ttc|facture)[^\d]{0,25}(\d{1,3}(?:[ .\u00a0\u202f]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(?:€|eur)/i,
-      ]);
-      return {
-        merchant: "Bouygues Telecom",
-        amount,
-        category: "Abonnements",
-        subcategory: "Télécom",
-      };
-    },
-  },
-  {
-    name: "Orange",
-    detect: (e: EmailData) => /orange\.fr|orange\.com/i.test(e.from),
-    allow: (t: string) => /facture|montant|prélèvement/i.test(t),
-    block: (t: string) => /offre|boutique/i.test(t) && !/facture/i.test(t),
-    extract: (t: string): Partial<RuleResult> => {
-      const m = t.match(/(\d+[.,]\d{2})\s*€/);
-      return {
-        merchant: "Orange",
-        amount: m ? parseFloat(m[1].replace(",", ".")) : null,
-        category: "Abonnements",
-        subcategory: "Télécom",
-      };
-    },
-  },
-  {
-    name: "SFR",
-    detect: (e: EmailData) => /sfr/i.test(e.from),
-    allow: (t: string) => /facture|montant|prélèvement/i.test(t),
-    block: () => false,
-    extract: (t: string): Partial<RuleResult> => {
-      const m = t.match(/(\d+[.,]\d{2})\s*€/);
-      return {
-        merchant: "SFR",
-        amount: m ? parseFloat(m[1].replace(",", ".")) : null,
-        category: "Abonnements",
-        subcategory: "Télécom",
-      };
-    },
-  },
-  {
-    name: "Free",
-    detect: (e: EmailData) => /free\.fr|free mobile/i.test(e.from + e.body),
-    allow: (t: string) => /facture|montant|prélèvement/i.test(t),
-    block: () => false,
-    extract: (t: string): Partial<RuleResult> => {
-      const m = t.match(/(\d+[.,]\d{2})\s*€/);
-      return {
-        merchant: "Free",
-        amount: m ? parseFloat(m[1].replace(",", ".")) : null,
-        category: "Abonnements",
-        subcategory: "Télécom / Internet",
-      };
-    },
-  },
-  {
-    name: "PayPal",
-    detect: (e: EmailData) => /paypal/i.test(e.from),
-    allow: (t: string) => /reçu|receipt|paiement|payment|transaction/i.test(t),
-    block: (t: string) => /promo|offre/i.test(t),
-    extract: (t: string): Partial<RuleResult> => {
-      const m = t.match(/(\d+[.,]\d{2})\s*€/);
-      return {
-        merchant: "PayPal",
-        amount: m ? parseFloat(m[1].replace(",", ".")) : null,
-        category: "Paiement",
-        subcategory: "Service de paiement",
-      };
-    },
-  },
-  {
-    name: "Apple",
-    detect: (e: EmailData) => /apple\.com|itunes/i.test(e.from),
-    allow: (t: string) => /facture|receipt|reçu|achat|purchase/i.test(t),
-    block: () => false,
-    extract: (t: string): Partial<RuleResult> => {
-      const m = t.match(/(\d+[.,]\d{2})\s*€/);
-      return {
-        merchant: "Apple",
-        amount: m ? parseFloat(m[1].replace(",", ".")) : null,
-        category: "Abonnements",
-        subcategory: "Services numériques",
-      };
-    },
-  },
-  {
-    name: "Google",
-    detect: (e: EmailData) => /google/i.test(e.from) && /payment|facture|paiement/i.test(e.subject + e.body),
-    allow: (t: string) => /facture|receipt|paiement|payment/i.test(t),
-    block: () => false,
-    extract: (t: string): Partial<RuleResult> => {
-      const m = t.match(/(\d+[.,]\d{2})\s*€/);
-      return {
-        merchant: "Google",
-        amount: m ? parseFloat(m[1].replace(",", ".")) : null,
-        category: "Abonnements",
-        subcategory: "Services numériques",
-      };
-    },
-  },
-  {
-    name: "SNCF",
-    detect: (e: EmailData) => /sncf|oui\.sncf|ouigo/i.test(e.from + e.body),
-    allow: (t: string) => /billet|ticket|confirmation|réservation|booking/i.test(t),
-    block: () => false,
-    extract: (t: string): Partial<RuleResult> => {
-      const m = t.match(/(\d+[.,]\d{2})\s*€/);
-      return {
-        merchant: "SNCF",
-        amount: m ? parseFloat(m[1].replace(",", ".")) : null,
-        category: "Transport",
-        subcategory: "Train",
-      };
-    },
-  },
-  {
-    name: "EDF/Engie",
-    detect: (e: EmailData) => /edf|engie/i.test(e.from),
-    allow: (t: string) => /facture|montant|prélèvement|consommation/i.test(t),
-    block: () => false,
-    extract: (t: string): Partial<RuleResult> => {
-      const m = t.match(/(\d+[.,]\d{2})\s*€/);
-      const isEdf = /edf/i.test(t);
-      return {
-        merchant: isEdf ? "EDF" : "Engie",
-        amount: m ? parseFloat(m[1].replace(",", ".")) : null,
-        category: "Logement",
-        subcategory: "Énergie",
-      };
-    },
-  },
-  {
-    name: "IONOS",
-    detect: (e: EmailData) => /ionos/i.test(e.from),
-    allow: (t: string) => /facture|invoice|paiement|payment/i.test(t),
-    block: () => false,
-    extract: (t: string): Partial<RuleResult> => {
-      const m = t.match(/(\d+[.,]\d{2})\s*€/);
-      return {
-        merchant: "IONOS",
-        amount: m ? parseFloat(m[1].replace(",", ".")) : null,
-        category: "Abonnements",
-        subcategory: "Hébergement web",
-      };
-    },
-  },
-  {
-    name: "Spotify",
-    detect: (e: EmailData) => /spotify/i.test(e.from),
-    allow: (t: string) => /facture|receipt|paiement|payment/i.test(t),
-    block: () => false,
-    extract: (t: string): Partial<RuleResult> => {
-      const m = t.match(/(\d+[.,]\d{2})\s*€/);
-      return {
-        merchant: "Spotify",
-        amount: m ? parseFloat(m[1].replace(",", ".")) : null,
-        category: "Abonnements",
-        subcategory: "Streaming",
-      };
-    },
-  },
-  {
-    name: "Disney+",
-    detect: (e: EmailData) => /disney/i.test(e.from),
-    allow: (t: string) => /facture|paiement|payment|prélèvement/i.test(t),
-    block: () => false,
-    extract: (t: string): Partial<RuleResult> => {
-      const m = t.match(/(\d+[.,]\d{2})\s*€/);
-      return {
-        merchant: "Disney+",
-        amount: m ? parseFloat(m[1].replace(",", ".")) : null,
-        category: "Abonnements",
-        subcategory: "Streaming",
-      };
-    },
-  },
-];
+function focusEmailBody(body: string): string {
+  const lines = body
+    .split(/
++/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 220);
 
-function applyRules(email: EmailData): RuleResult | null {
-  const text = `${email.subject} ${email.from} ${email.body}`.toLowerCase();
+  if (lines.length === 0) return body.slice(0, 6000);
+
+  const pickedIndexes = new Set<number>();
+  for (let index = 0; index < lines.length; index += 1) {
+    if (RELEVANT_LINE_PATTERN.test(normalizeText(lines[index]))) {
+      for (let cursor = Math.max(0, index - 1); cursor <= Math.min(lines.length - 1, index + 1); cursor += 1) {
+        pickedIndexes.add(cursor);
+      }
+    }
+  }
+
+  const selectedIndexes = pickedIndexes.size > 0
+    ? Array.from(pickedIndexes).sort((a, b) => a - b)
+    : lines.slice(0, 40).map((_, index) => index);
+
+  const selectedLines: string[] = [];
+  const seen = new Set<string>();
+  for (const index of selectedIndexes) {
+    const line = lines[index];
+    const normalizedLine = normalizeText(line);
+    if (!normalizedLine || seen.has(normalizedLine)) continue;
+    seen.add(normalizedLine);
+    selectedLines.push(line);
+  }
+
+  return selectedLines.join("
+").slice(0, 6000);
+}
+
+function parseSender(from: string): { senderEmail: string; senderDomain: string; senderName: string } {
+  const emailMatch = from.match(/<([^>]+)>/);
+  const senderEmail = (emailMatch?.[1] ?? from).trim().toLowerCase();
+  const senderDomain = senderEmail.includes("@") ? senderEmail.split("@").pop() ?? "" : "";
+  const senderName = from.replace(/<[^>]+>/g, "").replace(/["']/g, "").trim() || senderDomain;
+
+  return {
+    senderEmail,
+    senderDomain,
+    senderName,
+  };
+}
+
+function getPrimaryDomainLabel(senderDomain: string): string {
+  const parts = senderDomain.split(".").filter(Boolean);
+  if (parts.length >= 3 && parts[parts.length - 1].length === 2 && parts[parts.length - 2].length <= 3) {
+    return parts[parts.length - 3];
+  }
+  if (parts.length >= 2) {
+    return parts[parts.length - 2];
+  }
+  return parts[0] ?? "";
+}
+
+function inferMerchantFromSender(senderDomain: string, senderName: string): string | null {
+  const normalized = normalizeText(`${senderDomain} ${senderName}`);
+  const exactMatches: Array<[RegExp, string]> = [
+    [/amazon/i, "Amazon"],
+    [/bouygues|bouyguestelecom/i, "Bouygues Telecom"],
+    [/orange/i, "Orange"],
+    [/sfr/i, "SFR"],
+    [/free/i, "Free"],
+    [/fnac/i, "Fnac"],
+    [/paypal/i, "PayPal"],
+    [/uber/i, "Uber"],
+    [/netflix/i, "Netflix"],
+    [/spotify/i, "Spotify"],
+    [/apple|itunes/i, "Apple"],
+    [/google/i, "Google"],
+    [/sncf|ouigo/i, "SNCF"],
+    [/ionos/i, "IONOS"],
+    [/semerap/i, "Semerap"],
+  ];
+
+  for (const [pattern, merchant] of exactMatches) {
+    if (pattern.test(normalized)) return merchant;
+  }
+
+  const label = normalizeText(getPrimaryDomainLabel(senderDomain));
+  if (!label || GENERIC_DOMAIN_LABELS.has(label) || label.length < 3) return null;
+
+  if (label === "bouyguestelecom") return "Bouygues Telecom";
+  return titleCase(label);
+}
+
+function inferMerchantMetadata(merchant: string | null | undefined): { category: string; subcategory: string } | null {
+  if (!merchant) return null;
+  const normalizedMerchant = normalizeText(merchant);
+
+  for (const [name, metadata] of Object.entries(MERCHANT_METADATA)) {
+    if (normalizeText(name) === normalizedMerchant) {
+      return metadata;
+    }
+  }
+
+  return null;
+}
+
+function evaluateCandidate(message: EmailMessage): CandidateDecision {
+  const text = message.normalized_text;
+  const amount = extractAmount(message.body);
+  const hasHardProof = HARD_PROOF_PATTERN.test(text);
+  const hasTransactionKeyword = TRANSACTION_KEYWORD_PATTERN.test(text);
+  const hasOrderReference = ORDER_REFERENCE_PATTERN.test(text);
+  const knownSender = KNOWN_SENDER_PATTERN.test(message.normalized_sender);
+
+  if (INVESTMENT_PATTERN.test(text) || NOTICE_ONLY_PATTERN.test(text)) {
+    return { isCandidate: false, reason: "non-expense-financial", score: 0, amount, hasHardProof, hasTransactionKeyword };
+  }
+
+  if (PROMO_PATTERN.test(text) && !hasHardProof) {
+    return { isCandidate: false, reason: "promotion", score: 0, amount, hasHardProof, hasTransactionKeyword };
+  }
+
+  if (REFUND_NOISE_PATTERN.test(text) && !hasHardProof) {
+    return { isCandidate: false, reason: "refund-noise", score: 0, amount, hasHardProof, hasTransactionKeyword };
+  }
+
+  if (ACCOUNT_UPDATE_PATTERN.test(text) && amount === null && !hasHardProof) {
+    return { isCandidate: false, reason: "account-update", score: 0, amount, hasHardProof, hasTransactionKeyword };
+  }
+
+  if (APPOINTMENT_PATTERN.test(text) && amount === null && !hasHardProof) {
+    return { isCandidate: false, reason: "appointment", score: 0, amount, hasHardProof, hasTransactionKeyword };
+  }
+
+  if (DOMAIN_SETUP_PATTERN.test(text) && amount === null && !hasHardProof) {
+    return { isCandidate: false, reason: "domain-setup", score: 0, amount, hasHardProof, hasTransactionKeyword };
+  }
+
+  if (LOGISTICS_PATTERN.test(text) && amount === null && !hasHardProof) {
+    return { isCandidate: false, reason: "logistics", score: 0, amount, hasHardProof, hasTransactionKeyword };
+  }
+
+  if (CONTENT_PATTERN.test(text) && amount === null && !hasHardProof) {
+    return { isCandidate: false, reason: "content", score: 0, amount, hasHardProof, hasTransactionKeyword };
+  }
+
+  let score = 0;
+  if (amount !== null) score += 3;
+  if (hasTransactionKeyword) score += 2;
+  if (hasHardProof) score += 3;
+  if (hasOrderReference) score += 1;
+  if (knownSender) score += 1;
+
+  const isCandidate =
+    score >= 5 ||
+    (amount !== null && (hasTransactionKeyword || hasHardProof)) ||
+    (hasHardProof && knownSender) ||
+    (hasOrderReference && amount !== null);
+
+  return {
+    isCandidate,
+    reason: isCandidate ? "candidate" : "low-signal",
+    score,
+    amount,
+    hasHardProof,
+    hasTransactionKeyword,
+  };
+}
+
+function applyMerchantRules(message: EmailMessage): ExtractedExpense | null {
+  const text = message.normalized_text;
+  const sender = message.normalized_sender;
 
   for (const rule of MERCHANT_RULES) {
-    if (!rule.detect(email)) continue;
-    if (!rule.allow(text)) continue;
-    if (rule.block(text)) continue;
+    if (!matchesAny(sender, rule.senderPatterns) && !matchesAny(text, rule.senderPatterns)) continue;
 
-    const extracted = rule.extract(text);
+    const hasBlockedSignal = matchesAny(text, rule.blockedPatterns ?? []);
+    const hasTransactionProof = matchesAny(text, rule.transactionPatterns) || HARD_PROOF_PATTERN.test(text);
+    if (hasBlockedSignal && !hasTransactionProof) continue;
+    if (!hasTransactionProof) continue;
+
+    const amount = extractAmount(message.body, rule.amountKeywords);
+    if (amount === null) continue;
+
+    const metadata = rule.resolveMetadata?.(message) ?? {
+      merchant: rule.merchant,
+      category: rule.category,
+      subcategory: rule.subcategory,
+      recurrence: rule.recurrence,
+    };
+
     return {
+      merchant: metadata.merchant,
+      amount,
+      category: metadata.category,
+      subcategory: metadata.subcategory,
+      description: message.subject.trim(),
+      date: extractEmailDate(message.date),
       source: "rules",
-      is_transaction: true,
-      confidence: 0.95,
-      merchant: extracted.merchant || rule.name,
-      amount: extracted.amount ?? null,
-      category: extracted.category || "Autre",
-      subcategory: extracted.subcategory || "",
+      recurrence: metadata.recurrence,
     };
   }
 
   return null;
 }
 
-// ===================== MERCHANT LEARNING =====================
+function isSafeLearnedProfile(profile: LearnedProfile): boolean {
+  const merchantText = normalizeText(`${profile.merchant} ${profile.normalized_name}`);
+  const categoryText = normalizeText(profile.category ?? "");
 
-async function findLearnedMerchant(
-  supabaseAdmin: any,
-  subject: string,
-  from: string,
-  body: string
-): Promise<any | null> {
-  const text = `${subject} ${from} ${body}`.toLowerCase();
+  if (Number(profile.confidence) < MIN_LEARNED_CONFIDENCE) return false;
+  if (Number(profile.usage_count ?? 0) < MIN_LEARNED_USAGE) return false;
+  if (!merchantText) return false;
+  if (LEARNING_BLOCKLIST_PATTERN.test(merchantText)) return false;
+  if (BLOCKED_CATEGORY_PATTERN.test(categoryText)) return false;
 
-  const { data } = await supabaseAdmin
+  return true;
+}
+
+function profileMatchesMessage(profile: LearnedProfile, message: EmailMessage): boolean {
+  const tokens = new Set<string>();
+  const rawTokens = [profile.merchant, profile.normalized_name, ...(profile.patterns ?? [])];
+  for (const token of rawTokens) {
+    const normalizedToken = normalizeText(token ?? "");
+    if (normalizedToken.length >= 3) tokens.add(normalizedToken);
+  }
+
+  if (tokens.size === 0) return false;
+
+  const normalizedText = message.normalized_text;
+  const compactSender = compactToken(`${message.sender_email} ${message.sender_domain} ${message.sender_name}`);
+
+  for (const token of tokens) {
+    if (normalizedText.includes(token)) return true;
+    if (compactSender.includes(token.replace(/\s+/g, ""))) return true;
+  }
+
+  return false;
+}
+
+async function loadLearnedProfiles(supabaseAdmin: any): Promise<LearnedProfile[]> {
+  const { data, error } = await supabaseAdmin
     .from("merchant_profiles")
-    .select("*")
-    .gte("confidence", 0.7);
+    .select("merchant, normalized_name, category, subcategory, confidence, usage_count, patterns")
+    .gte("confidence", MIN_LEARNED_CONFIDENCE)
+    .order("confidence", { ascending: false })
+    .order("usage_count", { ascending: false });
 
-  if (!data) return null;
+  if (error || !data) {
+    console.warn("Unable to load merchant_profiles", error);
+    return [];
+  }
 
-  return data.find((m: any) => {
-    const patterns = m.patterns as string[];
-    return patterns?.some((p: string) => text.includes(p.toLowerCase()));
-  }) || null;
+  return (data as LearnedProfile[]).filter(isSafeLearnedProfile);
+}
+
+function findMatchingLearnedProfile(profiles: LearnedProfile[], message: EmailMessage): LearnedProfile | null {
+  return profiles.find((profile) => profileMatchesMessage(profile, message)) ?? null;
+}
+
+function applyLearnedProfile(profile: LearnedProfile, message: EmailMessage): ExtractedExpense | null {
+  if (!profileMatchesMessage(profile, message)) return null;
+
+  const amount = extractAmount(message.body);
+  if (amount === null) return null;
+
+  const text = message.normalized_text;
+  if (!HARD_PROOF_PATTERN.test(text) && !TRANSACTION_KEYWORD_PATTERN.test(text)) return null;
+
+  const merchant = profile.normalized_name?.trim() || titleCase(profile.merchant);
+  const metadata = inferMerchantMetadata(merchant);
+
+  return {
+    merchant,
+    amount,
+    category: profile.category?.trim() || metadata?.category || "Autre",
+    subcategory: profile.subcategory?.trim() || metadata?.subcategory || "",
+    description: message.subject.trim(),
+    date: extractEmailDate(message.date),
+    source: "learned",
+  };
+}
+
+function shouldLearnMerchant(merchant: string, category: string | null | undefined): boolean {
+  const merchantText = normalizeText(merchant);
+  const categoryText = normalizeText(category ?? "");
+
+  if (!merchantText || UNKNOWN_PATTERN.test(merchantText)) return false;
+  if (LEARNING_BLOCKLIST_PATTERN.test(merchantText)) return false;
+  if (BLOCKED_CATEGORY_PATTERN.test(categoryText)) return false;
+
+  return true;
+}
+
+function buildLearningPatterns(merchant: string, message: EmailMessage): string[] {
+  const patterns = new Set<string>();
+  const merchantToken = normalizeText(merchant);
+  if (merchantToken.length >= 3) patterns.add(merchantToken);
+
+  const senderLabel = normalizeText(getPrimaryDomainLabel(message.sender_domain));
+  if (senderLabel.length >= 3 && !GENERIC_DOMAIN_LABELS.has(senderLabel)) {
+    patterns.add(senderLabel);
+  }
+
+  const senderNameToken = normalizeText(message.sender_name);
+  if (senderNameToken.length >= 3 && senderNameToken.length <= 40) {
+    patterns.add(senderNameToken);
+  }
+
+  return Array.from(patterns);
 }
 
 async function learnFromResult(
   supabaseAdmin: any,
-  merchant: string,
-  category: string | null,
-  subcategory: string | null
+  extracted: ExtractedExpense,
+  message: EmailMessage,
 ): Promise<void> {
-  if (!merchant) return;
+  if (!shouldLearnMerchant(extracted.merchant, extracted.category)) return;
 
-  const key = merchant.toLowerCase().trim();
-  if (!key || UNKNOWN_RESULT_PATTERN.test(key)) return;
-  if (category && /investissement|épargne/i.test(category)) return;
+  const merchantKey = normalizeText(extracted.merchant);
+  const nextPatterns = buildLearningPatterns(extracted.merchant, message);
+  const subcategory = extracted.subcategory || inferMerchantMetadata(extracted.merchant)?.subcategory || null;
 
-  const { data } = await supabaseAdmin
+  const { data: existingRows } = await supabaseAdmin
     .from("merchant_profiles")
-    .select("*")
-    .eq("merchant", key);
+    .select("id, usage_count, confidence, patterns")
+    .eq("merchant", merchantKey)
+    .limit(1);
 
-  if (data && data.length > 0) {
-    const m = data[0];
+  const existing = existingRows?.[0];
+  if (existing) {
+    const mergedPatterns = Array.from(new Set([...(existing.patterns ?? []), ...nextPatterns]));
     await supabaseAdmin
       .from("merchant_profiles")
       .update({
-        usage_count: m.usage_count + 1,
-        confidence: Math.min(Number(m.confidence) + 0.02, 0.99),
+        usage_count: Number(existing.usage_count ?? 0) + 1,
+        confidence: Math.min(Number(existing.confidence ?? 0.8) + 0.02, 0.99),
         updated_at: new Date().toISOString(),
+        patterns: mergedPatterns,
+        normalized_name: extracted.merchant,
+        category: extracted.category || null,
+        subcategory,
       })
-      .eq("id", m.id);
-  } else {
-    await supabaseAdmin
-      .from("merchant_profiles")
-      .insert({
-        merchant: key,
-        normalized_name: merchant,
-        category: category || null,
-        subcategory: subcategory || null,
-        patterns: [key],
-      });
+      .eq("id", existing.id);
+    return;
+  }
+
+  await supabaseAdmin.from("merchant_profiles").insert({
+    merchant: merchantKey,
+    normalized_name: extracted.merchant,
+    category: extracted.category || null,
+    subcategory,
+    patterns: nextPatterns,
+  });
+}
+
+async function readJson(response: Response): Promise<any> {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { raw: text };
   }
 }
 
-// ===================== GMAIL API =====================
+async function refreshAccessToken(refreshToken: string): Promise<{ access_token: string; expires_in: number }> {
+  const clientId = Deno.env.get("GOOGLE_CLIENT_ID")!;
+  const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
+
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: "refresh_token",
+    }),
+  });
+
+  const data = await readJson(res);
+  if (!res.ok || !data.access_token) {
+    if (data.error === "invalid_grant") {
+      throw new Error("Token Gmail expiré ou révoqué. Déconnectez puis reconnectez votre compte Gmail.");
+    }
+    throw new Error(`Token refresh failed: ${JSON.stringify(data)}`);
+  }
+
+  return { access_token: data.access_token, expires_in: data.expires_in || 3600 };
+}
 
 async function listMessageIdsByQuery(accessToken: string, query: string, maxResults: number): Promise<string[]> {
   const listRes = await fetch(
     `https://www.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
+    { headers: { Authorization: `Bearer ${accessToken}` } },
   );
-  const listData = await listRes.json();
 
+  const listData = await readJson(listRes);
   if (!listRes.ok) {
     throw new Error(`Gmail list API error: ${JSON.stringify(listData)}`);
   }
 
-  return (listData.messages || []).map((m: { id: string }) => m.id);
+  return (listData.messages || []).map((message: { id: string }) => message.id);
 }
 
-async function searchFinancialEmails(accessToken: string, maxResults = 120): Promise<any[]> {
-  const includeTerms = [
-    "facture", "invoice", "reçu", "receipt", "commande", "order",
-    "paiement", "payment", "achat", "purchase", "prélèvement", "prelevement",
-    "abonnement", "subscription", "montant", "amount", "total", "ttc", "échéance", "echeance",
-    "amazon", "bouygues", "ionos", "orange", "sfr", "fnac",
-  ];
+function chunkArray<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
 
-  const queries = [
-    `(${includeTerms.join(" OR ")}) newer_than:180d -category:social -category:promotions`,
-    `(from:amazon OR from:amazon.fr OR from:bouygues OR from:bouyguestelecom OR from:paypal OR from:orange OR from:ionos) newer_than:365d -category:social -category:promotions`,
-  ];
+async function fetchMessageDetails(accessToken: string, messageId: string): Promise<EmailMessage | null> {
+  const msgRes = await fetch(
+    `https://www.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
 
+  const msgData = await readJson(msgRes);
+  if (!msgRes.ok) {
+    console.warn("Skipping Gmail message (fetch error):", messageId, msgData);
+    return null;
+  }
+
+  const headers = msgData.payload?.headers || [];
+  const subject = headers.find((header: any) => header.name?.toLowerCase() === "subject")?.value || "";
+  const from = headers.find((header: any) => header.name?.toLowerCase() === "from")?.value || "";
+  const date = headers.find((header: any) => header.name?.toLowerCase() === "date")?.value || "";
+
+  const allParts = flattenParts(msgData.payload);
+  const plainTextParts = allParts
+    .filter((part: any) => part.mimeType === "text/plain" && part.body?.data)
+    .map((part: any) => decodeBase64Url(part.body.data));
+  const htmlTextParts = allParts
+    .filter((part: any) => part.mimeType === "text/html" && part.body?.data)
+    .map((part: any) => htmlToText(decodeBase64Url(part.body.data)));
+
+  const payloadBody = msgData.payload?.body?.data ? decodeBase64Url(msgData.payload.body.data) : "";
+  const mergedBody = [
+    ...plainTextParts,
+    ...htmlTextParts,
+    payloadBody,
+  ]
+    .filter(Boolean)
+    .join("
+");
+
+  const sanitizedBody = sanitizeBody(mergedBody);
+  const focusedBody = focusEmailBody(sanitizedBody);
+  const body = (focusedBody || sanitizedBody).slice(0, 6000);
+
+  const { senderEmail, senderDomain, senderName } = parseSender(from);
+
+  return {
+    gmail_id: messageId,
+    subject,
+    from,
+    date,
+    body,
+    raw_text: `De: ${from}
+Sujet: ${subject}
+Date: ${date}
+
+${body}`,
+    sender_email: senderEmail,
+    sender_domain: senderDomain,
+    sender_name: senderName,
+    normalized_text: normalizeText(`${subject} ${from} ${body}`),
+    normalized_sender: normalizeText(`${senderEmail} ${senderDomain} ${senderName}`),
+    normalized_subject: normalizeText(subject),
+  };
+}
+
+async function searchFinancialEmails(accessToken: string, maxResults = MAX_SEARCH_RESULTS): Promise<EmailMessage[]> {
   const uniqueIds = new Set<string>();
-  for (const query of queries) {
+
+  for (const query of GMAIL_QUERIES) {
     const ids = await listMessageIdsByQuery(accessToken, query, maxResults);
     for (const id of ids) {
       uniqueIds.add(id);
@@ -559,76 +997,147 @@ async function searchFinancialEmails(accessToken: string, maxResults = 120): Pro
   const messageIds = Array.from(uniqueIds).slice(0, maxResults);
   if (messageIds.length === 0) return [];
 
-  const messages = [];
-  for (const messageId of messageIds) {
-    const msgRes = await fetch(
-      `https://www.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    const msgData = await msgRes.json();
-
-    if (!msgRes.ok) {
-      console.warn("Skipping Gmail message (fetch error):", messageId, msgData);
-      continue;
+  const messages: EmailMessage[] = [];
+  for (const batch of chunkArray(messageIds, FETCH_BATCH_SIZE)) {
+    const results = await Promise.all(batch.map((messageId) => fetchMessageDetails(accessToken, messageId)));
+    for (const message of results) {
+      if (message) messages.push(message);
     }
-
-    const headers = msgData.payload?.headers || [];
-    const subject = headers.find((h: any) => h.name === "Subject")?.value || "";
-    const from = headers.find((h: any) => h.name === "From")?.value || "";
-    const date = headers.find((h: any) => h.name === "Date")?.value || "";
-
-    let body = "";
-    const allParts = flattenParts(msgData.payload);
-
-    const textPart = allParts.find((p: any) => p.mimeType === "text/plain" && p.body?.data);
-    if (textPart) {
-      body = decodeBase64Url(textPart.body.data);
-    }
-
-    const htmlPart = allParts.find((p: any) => p.mimeType === "text/html" && p.body?.data);
-    let htmlBody = "";
-    if (htmlPart) {
-      const rawHtml = decodeBase64Url(htmlPart.body.data);
-      htmlBody = rawHtml
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-        .replace(/<[^>]*>/g, " ")
-        .replace(/&nbsp;/g, " ")
-        .replace(/&euro;/g, "€")
-        .replace(/&amp;/g, "&")
-        .replace(/&#\d+;/g, "")
-        .replace(/\s+/g, " ")
-        .trim();
-    }
-
-    if (!body || body.trim().length < 50) {
-      body = htmlBody;
-    } else if (htmlBody && htmlBody.length > body.length) {
-      body = body + "\n\n--- Contenu HTML ---\n" + htmlBody;
-    }
-
-    if (!body && msgData.payload?.body?.data) {
-      body = decodeBase64Url(msgData.payload.body.data);
-    }
-
-    const truncatedBody = body.substring(0, 4500);
-
-    messages.push({
-      gmail_id: messageId,
-      subject,
-      from,
-      date,
-      body: truncatedBody,
-      raw_text: `De: ${from}\nSujet: ${subject}\nDate: ${date}\n\n${truncatedBody}`,
-    });
   }
 
   return messages;
 }
 
-// ===================== MAIN HANDLER =====================
+function buildExpensePayload(userId: string, sourceId: string, extracted: ExtractedExpense) {
+  return {
+    user_id: userId,
+    source: EMAIL_SOURCE,
+    source_id: sourceId,
+    type_document: "email_financier",
+    fournisseur: extracted.merchant,
+    categorie: extracted.category || "Autre",
+    montant_total: extracted.amount,
+    date_expense: extracted.date,
+    description: extracted.description,
+    devise: "EUR",
+    recurrence: extracted.recurrence ?? "",
+    abonnement_detecte: extracted.category === "Abonnements" || Boolean(extracted.recurrence),
+    raw_ai_response: { pipeline: `gmail-sync:${extracted.source}` },
+  };
+}
 
-serve(async (req) => {
+async function insertExpense(supabaseAdmin: any, userId: string, sourceId: string, extracted: ExtractedExpense): Promise<void> {
+  const { error } = await supabaseAdmin.from("expenses").insert(buildExpensePayload(userId, sourceId, extracted));
+  if (error) {
+    throw new Error(`Insert expense error: ${error.message}`);
+  }
+}
+
+async function upsertExpense(supabaseAdmin: any, userId: string, sourceId: string, extracted: ExtractedExpense): Promise<void> {
+  const { data: existingRows, error: selectError } = await supabaseAdmin
+    .from("expenses")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("source_id", sourceId)
+    .limit(1);
+
+  if (selectError) {
+    throw new Error(`Expense lookup failed: ${selectError.message}`);
+  }
+
+  const existing = existingRows?.[0];
+  if (existing) {
+    const { error } = await supabaseAdmin
+      .from("expenses")
+      .update(buildExpensePayload(userId, sourceId, extracted))
+      .eq("id", existing.id);
+    if (error) {
+      throw new Error(`Expense update failed: ${error.message}`);
+    }
+    return;
+  }
+
+  await insertExpense(supabaseAdmin, userId, sourceId, extracted);
+}
+
+async function deleteExpenseBySourceId(supabaseAdmin: any, userId: string, sourceId: string): Promise<void> {
+  await supabaseAdmin
+    .from("expenses")
+    .delete()
+    .eq("user_id", userId)
+    .eq("source_id", sourceId);
+}
+
+function sanitizeMerchant(value: unknown): string {
+  const merchant = String(value ?? "").replace(/\s+/g, " ").trim();
+  if (!merchant) return "";
+  if (UNKNOWN_PATTERN.test(normalizeText(merchant))) return "";
+  return merchant;
+}
+
+function sanitizeCategory(value: unknown): string {
+  const category = String(value ?? "").replace(/\s+/g, " ").trim();
+  if (!category) return "";
+  if (UNKNOWN_PATTERN.test(normalizeText(category))) return "";
+  return category;
+}
+
+function findAmountKeywordsForMerchant(merchant: string): string[] {
+  const normalizedMerchant = normalizeText(merchant);
+  const matchingRule = MERCHANT_RULES.find((rule) => normalizeText(rule.merchant) === normalizedMerchant);
+  return matchingRule?.amountKeywords ?? GENERIC_AMOUNT_KEYWORDS;
+}
+
+function buildValidatedAiExpense(message: EmailMessage, analyzeData: any): ExtractedExpense | null {
+  const aiExpense = analyzeData?.expense ?? {};
+  const merchant =
+    sanitizeMerchant(aiExpense.fournisseur) ||
+    sanitizeMerchant(aiExpense.magasin) ||
+    inferMerchantFromSender(message.sender_domain, message.sender_name) ||
+    "";
+
+  const inferredMetadata = inferMerchantMetadata(merchant);
+  const rawCategory = sanitizeCategory(aiExpense.categorie);
+  const category = rawCategory && !BLOCKED_CATEGORY_PATTERN.test(normalizeText(rawCategory))
+    ? rawCategory
+    : inferredMetadata?.category || "Autre";
+  const subcategory = inferredMetadata?.subcategory || "";
+
+  const aiAmount = typeof aiExpense.montant_total === "number"
+    ? aiExpense.montant_total
+    : parseCurrencyAmount(String(aiExpense.montant_total ?? ""));
+  const amount = aiAmount ?? extractAmount(message.body, findAmountKeywordsForMerchant(merchant));
+
+  const description = String(aiExpense.description ?? message.subject ?? "").replace(/\s+/g, " ").trim() || message.subject.trim();
+  const validationText = normalizeText(`${message.subject} ${message.sender_name} ${message.body} ${merchant} ${description} ${category}`);
+
+  if (!merchant || UNKNOWN_PATTERN.test(normalizeText(merchant))) return null;
+  if (amount === null || amount <= 0) return null;
+  if (INVESTMENT_PATTERN.test(validationText)) return null;
+  if (BLOCKED_CATEGORY_PATTERN.test(normalizeText(category))) return null;
+  if (PROMO_PATTERN.test(validationText) && !HARD_PROOF_PATTERN.test(message.normalized_text)) return null;
+
+  return {
+    merchant,
+    amount,
+    category,
+    subcategory,
+    description,
+    date: extractEmailDate(message.date),
+    source: "ai",
+    recurrence: String(aiExpense.recurrence ?? "").trim() || (category === "Abonnements" ? "mensuel" : undefined),
+  };
+}
+
+async function updateLastSync(supabaseAdmin: any, userId: string, email: string): Promise<void> {
+  await supabaseAdmin
+    .from("connected_emails")
+    .update({ last_sync_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .eq("email", email);
+}
+
+async function handleRequest(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -644,10 +1153,17 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
     const supabaseAuth = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabaseAuth.auth.getUser();
+
     if (userError || !user) {
       return new Response(JSON.stringify({ error: "Non autorisé" }), {
         status: 401,
@@ -655,18 +1171,27 @@ serve(async (req) => {
       });
     }
 
-    const { email } = await req.json();
-    if (!email) {
-      return new Response(JSON.stringify({ error: "Email requis" }), {
+    let requestBody: unknown;
+    try {
+      requestBody = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "Corps de requête invalide" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const parsedBody = RequestSchema.safeParse(requestBody);
+    if (!parsedBody.success) {
+      return new Response(JSON.stringify({ error: parsedBody.error.flatten().fieldErrors }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { email } = parsedBody.data;
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-    // --- Check sync limit ---
     const { data: planData } = await supabaseAdmin
       .from("user_plans")
       .select("plan")
@@ -674,12 +1199,12 @@ serve(async (req) => {
       .single();
 
     const userPlan = planData?.plan || "free";
-    const SYNC_LIMITS: Record<string, number> = { free: 5, essential: 30, premium: 999 };
-    const syncLimit = SYNC_LIMITS[userPlan] ?? SYNC_LIMITS.free;
+    const syncLimits: Record<string, number> = { free: 5, essential: 30, premium: 999 };
+    const syncLimit = syncLimits[userPlan] ?? syncLimits.free;
 
     const { data: usageCount } = await supabaseAdmin.rpc("increment_ai_usage", {
       _user_id: user.id,
-      _source: "email",
+      _source: EMAIL_SOURCE,
     });
 
     if ((usageCount as number) > syncLimit) {
@@ -690,11 +1215,10 @@ serve(async (req) => {
           plan: userPlan,
           usage: usageCount,
         }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // --- Get tokens ---
     const { data: tokenData, error: tokenError } = await supabaseAdmin
       .from("gmail_tokens")
       .select("*")
@@ -714,128 +1238,92 @@ serve(async (req) => {
       const refreshed = await refreshAccessToken(tokenData.refresh_token);
       accessToken = refreshed.access_token;
       const newExpiry = new Date(Date.now() + refreshed.expires_in * 1000).toISOString();
+
       await supabaseAdmin
         .from("gmail_tokens")
         .update({ access_token: accessToken, token_expires_at: newExpiry })
         .eq("id", tokenData.id);
     }
 
-    // --- Fetch emails ---
-    const messages = await searchFinancialEmails(accessToken, 120);
-
+    const messages = await searchFinancialEmails(accessToken, MAX_SEARCH_RESULTS);
     if (messages.length === 0) {
-      await supabaseAdmin
-        .from("connected_emails")
-        .update({ last_sync_at: new Date().toISOString() })
-        .eq("user_id", user.id)
-        .eq("email", email);
-
-      return new Response(JSON.stringify({ success: true, analyzed: 0, message: "Aucun email financier trouvé" }), {
+      await updateLastSync(supabaseAdmin, user.id, email);
+      return new Response(JSON.stringify({ success: true, analyzed: 0, message: "Aucun email de dépense trouvé" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // --- Deduplicate ---
-    const gmailIds = messages.map((m) => `gmail_${m.gmail_id}`);
+    const gmailIds = messages.map((message) => `gmail_${message.gmail_id}`);
     const { data: existingExpenses } = await supabaseAdmin
       .from("expenses")
       .select("source_id")
       .eq("user_id", user.id)
       .in("source_id", gmailIds);
 
-    const alreadyProcessed = new Set((existingExpenses || []).map((e: any) => e.source_id));
-    const newMessages = messages.filter((m) => !alreadyProcessed.has(`gmail_${m.gmail_id}`));
+    const alreadyProcessed = new Set((existingExpenses || []).map((expense: any) => expense.source_id));
+    const newMessages = messages.filter((message) => !alreadyProcessed.has(`gmail_${message.gmail_id}`));
 
     if (newMessages.length === 0) {
-      await supabaseAdmin
-        .from("connected_emails")
-        .update({ last_sync_at: new Date().toISOString() })
-        .eq("user_id", user.id)
-        .eq("email", email);
-
+      await updateLastSync(supabaseAdmin, user.id, email);
       return new Response(JSON.stringify({ success: true, analyzed: 0, message: "Tous les emails ont déjà été analysés" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // =====================================================
-    // HYBRID PROCESSING: pre-filter → learned → rules → AI
-    // =====================================================
-
+    const learnedProfiles = await loadLearnedProfiles(supabaseAdmin);
     const results: any[] = [];
 
-    for (const msg of newMessages) {
+    for (const message of newMessages) {
+      const sourceId = `gmail_${message.gmail_id}`;
+
       try {
-        const normalizedText = normalizeText(`${msg.subject} ${msg.from} ${msg.body}`);
-
-        // 1. PRE-FILTER
-        const filterResult = preFilter(msg.subject, msg.from, msg.body);
-        if (filterResult === "reject") {
-          results.push({ gmail_id: msg.gmail_id, subject: msg.subject, success: false, skipped: true, reason: "pre-filter" });
-          continue;
-        }
-
-        // 2. LEARNED MERCHANT
-        const learned = await findLearnedMerchant(supabaseAdmin, msg.subject, msg.from, msg.body);
-        if (learned && learned.confidence >= 0.85) {
-          if (isBlockedLearnedProfile(learned, normalizedText)) {
-            results.push({ gmail_id: msg.gmail_id, subject: msg.subject, success: false, skipped: true, reason: "learned-filter" });
-            continue;
-          }
-
-          const amount = extractAmount(msg.body, [
-            /(?:total|montant|paiement|payment|pr[ée]l[èe]vement|prelevement|facture|invoice)[^\d]{0,25}(\d{1,3}(?:[ .\u00a0\u202f]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(?:€|eur)/i,
-          ]);
-
-          if (isUsableExpenseResult(learned.normalized_name, msg.subject, amount)) {
-            await supabaseAdmin.from("expenses").insert({
-              user_id: user.id,
-              source: "email",
-              source_id: `gmail_${msg.gmail_id}`,
-              fournisseur: learned.normalized_name,
-              categorie: learned.category,
-              montant_total: amount,
-              date_expense: extractEmailDate(msg.raw_text),
-              description: msg.subject,
-              devise: "EUR",
-            });
-
-            await learnFromResult(supabaseAdmin, learned.normalized_name, learned.category, learned.subcategory);
-            results.push({ gmail_id: msg.gmail_id, subject: msg.subject, success: true, source: "learned" });
-            continue;
-          }
-        }
-
-        // 3. RULES ENGINE
-        const ruleResult = applyRules({ subject: msg.subject, from: msg.from, body: msg.body });
-        if (ruleResult && isUsableExpenseResult(ruleResult.merchant, msg.subject, ruleResult.amount)) {
-          await supabaseAdmin.from("expenses").insert({
-            user_id: user.id,
-            source: "email",
-            source_id: `gmail_${msg.gmail_id}`,
-            fournisseur: ruleResult.merchant,
-            categorie: ruleResult.category,
-            montant_total: ruleResult.amount,
-            date_expense: extractEmailDate(msg.raw_text),
-            description: msg.subject,
-            devise: "EUR",
+        const candidate = evaluateCandidate(message);
+        if (!candidate.isCandidate) {
+          results.push({
+            gmail_id: message.gmail_id,
+            subject: message.subject,
+            success: false,
+            skipped: true,
+            reason: candidate.reason,
           });
-
-          // Learn from this successful extraction
-          await learnFromResult(supabaseAdmin, ruleResult.merchant, ruleResult.category, ruleResult.subcategory);
-
-          results.push({ gmail_id: msg.gmail_id, subject: msg.subject, success: true, source: "rules" });
           continue;
         }
 
-        if (!hasExpenseIntent(normalizedText) || isBlockedFinancialNoise(normalizedText)) {
-          results.push({ gmail_id: msg.gmail_id, subject: msg.subject, success: false, skipped: true, reason: "low-signal" });
+        const ruleResult = applyMerchantRules(message);
+        if (ruleResult) {
+          await insertExpense(supabaseAdmin, user.id, sourceId, ruleResult);
+          await learnFromResult(supabaseAdmin, ruleResult, message);
+          results.push({
+            gmail_id: message.gmail_id,
+            subject: message.subject,
+            success: true,
+            source: "rules",
+            merchant: ruleResult.merchant,
+            amount: ruleResult.amount,
+          });
           continue;
         }
 
-        // 4. LOVABLE AI FALLBACK (via analyze-document)
+        const learnedProfile = findMatchingLearnedProfile(learnedProfiles, message);
+        if (learnedProfile) {
+          const learnedResult = applyLearnedProfile(learnedProfile, message);
+          if (learnedResult) {
+            await insertExpense(supabaseAdmin, user.id, sourceId, learnedResult);
+            await learnFromResult(supabaseAdmin, learnedResult, message);
+            results.push({
+              gmail_id: message.gmail_id,
+              subject: message.subject,
+              success: true,
+              source: "learned",
+              merchant: learnedResult.merchant,
+              amount: learnedResult.amount,
+            });
+            continue;
+          }
+        }
+
         const analyzeRes = await fetch(`${supabaseUrl}/functions/v1/analyze-document`, {
           method: "POST",
           headers: {
@@ -843,89 +1331,123 @@ serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            source: "email",
-            raw_text: msg.raw_text,
-            source_id: `gmail_${msg.gmail_id}`,
+            source: EMAIL_SOURCE,
+            raw_text: message.raw_text,
+            source_id: sourceId,
             skip_usage_check: true,
           }),
         });
 
-        const analyzeData = await analyzeRes.json();
-        if (analyzeRes.ok) {
-          if (analyzeData.rejected) {
-            results.push({ gmail_id: msg.gmail_id, subject: msg.subject, success: false, skipped: true, reason: analyzeData.reason || "rejected", source: "ai" });
-            continue;
-          }
-
-          const aiAmountRaw = analyzeData.expense?.montant_total;
-          const aiAmount = typeof aiAmountRaw === "number" ? aiAmountRaw : parseCurrencyAmount(String(aiAmountRaw ?? ""));
-          const aiMerchant = analyzeData.expense?.fournisseur;
-          const aiDescription = analyzeData.expense?.description ?? msg.subject;
-          const aiCategory = String(analyzeData.expense?.categorie ?? "");
-          const shouldDiscardAiResult =
-            !isUsableExpenseResult(aiMerchant, aiDescription, aiAmount) ||
-            isBlockedFinancialNoise(normalizeText(`${msg.raw_text} ${aiMerchant ?? ""} ${aiDescription ?? ""}`)) ||
-            (/investissement|épargne/i.test(aiCategory) && !POSITIVE_EXPENSE_PROOF.test(normalizedText));
-
-          if (shouldDiscardAiResult) {
-            await supabaseAdmin
-              .from("expenses")
-              .delete()
-              .eq("user_id", user.id)
-              .eq("source_id", `gmail_${msg.gmail_id}`);
-
-            results.push({ gmail_id: msg.gmail_id, subject: msg.subject, success: false, skipped: true, reason: "ai-validation", source: "ai" });
-            continue;
-          }
-
-          if (analyzeData.expense?.fournisseur) {
-            await learnFromResult(
-              supabaseAdmin,
-              analyzeData.expense.fournisseur,
-              analyzeData.expense.categorie,
-              null
-            );
-          }
-          results.push({ gmail_id: msg.gmail_id, subject: msg.subject, success: true, source: "ai" });
-        } else {
-          results.push({ gmail_id: msg.gmail_id, subject: msg.subject, success: false, error: analyzeData.error, source: "ai" });
+        const analyzeData = await readJson(analyzeRes);
+        if (!analyzeRes.ok) {
+          await deleteExpenseBySourceId(supabaseAdmin, user.id, sourceId);
+          results.push({
+            gmail_id: message.gmail_id,
+            subject: message.subject,
+            success: false,
+            source: "ai",
+            error: analyzeData.error || analyzeData.raw || `HTTP ${analyzeRes.status}`,
+          });
+          continue;
         }
-      } catch (err) {
-        results.push({ gmail_id: msg.gmail_id, subject: msg.subject, success: false, error: String(err) });
+
+        if (analyzeData.rejected) {
+          await deleteExpenseBySourceId(supabaseAdmin, user.id, sourceId);
+          results.push({
+            gmail_id: message.gmail_id,
+            subject: message.subject,
+            success: false,
+            skipped: true,
+            source: "ai",
+            reason: analyzeData.reason || "rejected",
+          });
+          continue;
+        }
+
+        const aiExpense = buildValidatedAiExpense(message, analyzeData);
+        if (!aiExpense) {
+          await deleteExpenseBySourceId(supabaseAdmin, user.id, sourceId);
+          results.push({
+            gmail_id: message.gmail_id,
+            subject: message.subject,
+            success: false,
+            skipped: true,
+            source: "ai",
+            reason: "ai-validation",
+          });
+          continue;
+        }
+
+        await upsertExpense(supabaseAdmin, user.id, sourceId, aiExpense);
+        await learnFromResult(supabaseAdmin, aiExpense, message);
+        results.push({
+          gmail_id: message.gmail_id,
+          subject: message.subject,
+          success: true,
+          source: "ai",
+          merchant: aiExpense.merchant,
+          amount: aiExpense.amount,
+        });
+      } catch (error) {
+        await deleteExpenseBySourceId(supabaseAdmin, user.id, sourceId);
+        results.push({
+          gmail_id: message.gmail_id,
+          subject: message.subject,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
-    // Update last_sync_at
-    await supabaseAdmin
-      .from("connected_emails")
-      .update({ last_sync_at: new Date().toISOString() })
-      .eq("user_id", user.id)
-      .eq("email", email);
+    await updateLastSync(supabaseAdmin, user.id, email);
 
-    const successCount = results.filter((r) => r.success).length;
+    const successCount = results.filter((result) => result.success).length;
     const bySource = {
-      rules: results.filter((r) => r.source === "rules" && r.success).length,
-      learned: results.filter((r) => r.source === "learned" && r.success).length,
-      ai: results.filter((r) => r.source === "ai" && r.success).length,
-      skipped: results.filter((r) => r.skipped).length,
+      rules: results.filter((result) => result.success && result.source === "rules").length,
+      learned: results.filter((result) => result.success && result.source === "learned").length,
+      ai: results.filter((result) => result.success && result.source === "ai").length,
+      skipped: results.filter((result) => result.skipped).length,
     };
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        analyzed: successCount,
-        total: results.length,
-        by_source: bySource,
-        results,
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  } catch (e) {
-    console.error("gmail-sync error:", e);
-    const msg = e instanceof Error ? e.message : "Erreur inconnue";
-    return new Response(JSON.stringify({ error: msg }), {
+    console.info("gmail-sync summary", {
+      user_id: user.id,
+      email,
+      total_messages: newMessages.length,
+      analyzed: successCount,
+      bySource,
+    });
+
+    return new Response(JSON.stringify({
+      success: true,
+      analyzed: successCount,
+      total: results.length,
+      by_source: bySource,
+      results,
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error("gmail-sync error:", error);
+    const message = error instanceof Error ? error.message : "Erreur inconnue";
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+}
+
+if (import.meta.main) {
+  serve(handleRequest);
+}
+
+export {
+  applyLearnedProfile,
+  applyMerchantRules,
+  buildValidatedAiExpense,
+  evaluateCandidate,
+  extractAmount,
+  handleRequest,
+  inferMerchantFromSender,
+  normalizeText,
+};
