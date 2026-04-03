@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "https://esm.sh/zod@3.25.76";
@@ -104,10 +103,10 @@ const GENERIC_DOMAIN_LABELS = new Set([
 ]);
 
 const HARD_PROOF_PATTERN =
-  /(confirmation de paiement|paiement confirme|paiement effectue|merci pour votre achat|facture|invoice|recu|receipt|prelevement|debit|payment due|amount due|montant paye|montant du|total ttc|numero de facture|numero de commande|commande n|order confirmed)/i;
+  /(confirmation de paiement|paiement confirme|paiement effectue|merci pour votre achat|facture|invoice|recu|receipt|prelevement|debit|payment due|amount due|montant paye|montant du|total ttc|numero de facture|numero de commande|commande n|order confirmed)/i;
 const TRANSACTION_KEYWORD_PATTERN =
   /(facture|invoice|recu|receipt|commande|order|paiement|payment|achat|purchase|prelevement|debit|abonnement|subscription|echeance|montant|amount|total|ttc|a payer|paid|billing)/i;
-const ORDER_REFERENCE_PATTERN = /(commande n|order|numero de commande|numero de facture)/i;
+const ORDER_REFERENCE_PATTERN = /(commande n|order|numero de commande|numero de facture)/i;
 const PROMO_PATTERN =
   /(tirage au sort|gagnez|remportez|offre|promotion|promo|newsletter|parrainage|code promo|bon plan|vente flash|reduction|soldes|jeu concours|black friday|cyber monday)/i;
 const INVESTMENT_PATTERN =
@@ -123,7 +122,7 @@ const LOGISTICS_PATTERN =
 const DOMAIN_SETUP_PATTERN =
   /(domaine .* enregistre|confirmation de contrat|hebergement active|dns|whois|site web cree|votre domaine .* bien ete enregistre|domaine .* registered)/i;
 const CONTENT_PATTERN = /(webinaire|webinar|blog|article|actualite|newsletter|evenement|event|livestream|podcast)/i;
-const UNKNOWN_PATTERN = /(inconnu|unknown|n a|aucun article|no item|sans objet)/i;
+const UNKNOWN_PATTERN = /(inconnu|unknown|n a|aucun article|no item|sans objet)/i;
 const KNOWN_SENDER_PATTERN = /(amazon|bouygues|paypal|orange|sfr|free|fnac|uber|netflix|spotify|apple|google|ionos|sncf|ouigo|semerap)/i;
 const BLOCKED_CATEGORY_PATTERN = /(investissement|epargne|finance|wallet|bourse)/i;
 const LEARNING_BLOCKLIST_PATTERN = /(fortuneo|premiere brique|wallet|cashback|reward|fdj|parionssport|tirage au sort)/i;
@@ -335,7 +334,7 @@ function normalizeText(value: string): string {
     .toLowerCase()
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
-    .replace(/[  ]/g, " ")
+    .replace(/[  ]/g, " ")
     .replace(/[^a-z0-9@.\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -362,7 +361,7 @@ function escapeRegExp(value: string): string {
 }
 
 function parseCurrencyAmount(raw: string): number | null {
-  let normalized = raw.trim().replace(/[\s  ]/g, "");
+  let normalized = raw.trim().replace(/[\s  ]/g, "");
   if (!normalized) return null;
 
   if (normalized.includes(",") && normalized.includes(".")) {
@@ -382,7 +381,7 @@ function parseCurrencyAmount(raw: string): number | null {
 }
 
 function extractCurrencyAmounts(text: string): number[] {
-  const normalized = text.replace(/[  ]/g, " ");
+  const normalized = text.replace(/[  ]/g, " ");
   const matches = [
     ...normalized.matchAll(/(?:€|eur)\s*(\d{1,3}(?:[ .]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)/gi),
     ...normalized.matchAll(/(\d{1,3}(?:[ .]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(?:€|eur)/gi),
@@ -397,18 +396,19 @@ function extractCurrencyAmounts(text: string): number[] {
   return Array.from(unique).sort((a, b) => b - a);
 }
 
+// FIX 2 : extractAmount avec fenêtre de 2 lignes consécutives pour
+// attraper les montants séparés du symbole € par un saut de ligne HTML
 function extractAmount(text: string, preferredKeywords: string[] = []): number | null {
-  const normalized = text.replace(//g, "
-").replace(/[  ]/g, " ");
+  const normalized = text.replace(/\n/g, "\n").replace(/[  ]/g, " ");
   const lines = normalized
-    .split(/
-+/)
+    .split(/\n+/)
     .map((line) => line.trim())
     .filter(Boolean);
 
   const keywords = Array.from(new Set([...preferredKeywords, ...GENERIC_AMOUNT_KEYWORDS])).filter(Boolean);
   const keywordRegex = new RegExp(keywords.map(escapeRegExp).join("|"), "i");
 
+  // Passe 1 : ligne par ligne (comportement original)
   for (const line of lines) {
     const normalizedLine = normalizeText(line);
     if (!keywordRegex.test(normalizedLine) && !/(€|eur)/i.test(line)) continue;
@@ -419,6 +419,17 @@ function extractAmount(text: string, preferredKeywords: string[] = []): number |
     }
   }
 
+  // FIX 2 : Passe 2 — fenêtres de 2 lignes consécutives
+  // Cas fréquent : symbole € sur une ligne, chiffre sur la suivante (emails HTML mal décodés)
+  for (let i = 0; i < lines.length - 1; i++) {
+    const twoLines = lines[i] + " " + lines[i + 1];
+    const normalizedTwo = normalizeText(twoLines);
+    if (!keywordRegex.test(normalizedTwo) && !/(€|eur)/i.test(twoLines)) continue;
+    const amounts = extractCurrencyAmounts(twoLines);
+    if (amounts.length > 0) return Math.max(...amounts);
+  }
+
+  // Passe 3 : fallback global
   const allAmounts = extractCurrencyAmounts(normalized);
   return allAmounts.length > 0 ? Math.max(...allAmounts) : null;
 }
@@ -478,40 +489,27 @@ function htmlToText(value: string): string {
 
 function removeQuotedSections(body: string): string {
   let cleaned = body;
-  cleaned = cleaned.replace(/
->.*$/gm, "");
-  cleaned = cleaned.replace(/
-On .* wrote:[\s\S]*$/i, "");
-  cleaned = cleaned.replace(/
-Le .* a ecrit :[\s\S]*$/i, "");
-  cleaned = cleaned.replace(/
--{2,}\s*Original Message\s*-{2,}[\s\S]*$/i, "");
-  cleaned = cleaned.replace(/
-From:\s.*[\s\S]*$/i, "");
-  cleaned = cleaned.replace(/
-De\s*:\s.*[\s\S]*$/i, "");
+  cleaned = cleaned.replace(/\n>.*$/gm, "");
+  cleaned = cleaned.replace(/\nOn .* wrote:[\s\S]*$/i, "");
+  cleaned = cleaned.replace(/\nLe .* a ecrit :[\s\S]*$/i, "");
+  cleaned = cleaned.replace(/\n-{2,}\s*Original Message\s*-{2,}[\s\S]*$/i, "");
+  cleaned = cleaned.replace(/\nFrom:\s.*[\s\S]*$/i, "");
+  cleaned = cleaned.replace(/\nDe\s*:\s.*[\s\S]*$/i, "");
   return cleaned;
 }
 
 function sanitizeBody(body: string): string {
   return removeQuotedSections(body)
-    .replace(//g, "
-")
-    .replace(/[ 	]+
-/g, "
-")
-    .replace(/[ 	]{2,}/g, " ")
-    .replace(/
-{3,}/g, "
-
-")
+    .replace(/\r/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
 function focusEmailBody(body: string): string {
   const lines = body
-    .split(/
-+/)
+    .split(/\n+/)
     .map((line) => line.trim())
     .filter(Boolean)
     .slice(0, 220);
@@ -541,8 +539,7 @@ function focusEmailBody(body: string): string {
     selectedLines.push(line);
   }
 
-  return selectedLines.join("
-").slice(0, 6000);
+  return selectedLines.join("\n").slice(0, 6000);
 }
 
 function parseSender(from: string): { senderEmail: string; senderDomain: string; senderName: string } {
@@ -575,8 +572,8 @@ function inferMerchantFromSender(senderDomain: string, senderName: string): stri
     [/amazon/i, "Amazon"],
     [/bouygues|bouyguestelecom/i, "Bouygues Telecom"],
     [/orange/i, "Orange"],
-    [/sfr/i, "SFR"],
-    [/free/i, "Free"],
+    [/sfr/i, "SFR"],
+    [/free/i, "Free"],
     [/fnac/i, "Fnac"],
     [/paypal/i, "PayPal"],
     [/uber/i, "Uber"],
@@ -613,6 +610,9 @@ function inferMerchantMetadata(merchant: string | null | undefined): { category:
   return null;
 }
 
+// FIX 1 : LOGISTICS_PATTERN ne bloque plus les expéditeurs connus (ex: Amazon
+// qui joint parfois tracking + montant dans le même email)
+// FIX 3 : seuil score abaissé de 5 à 4 pour les marchands telecom aux emails courts
 function evaluateCandidate(message: EmailMessage): CandidateDecision {
   const text = message.normalized_text;
   const amount = extractAmount(message.body);
@@ -645,7 +645,9 @@ function evaluateCandidate(message: EmailMessage): CandidateDecision {
     return { isCandidate: false, reason: "domain-setup", score: 0, amount, hasHardProof, hasTransactionKeyword };
   }
 
-  if (LOGISTICS_PATTERN.test(text) && amount === null && !hasHardProof) {
+  // FIX 1 : on ne filtre sur LOGISTICS que si l'expéditeur est inconnu
+  // Un expéditeur connu (Amazon, SNCF...) peut légitimement mêler tracking et montant
+  if (LOGISTICS_PATTERN.test(text) && amount === null && !hasHardProof && !knownSender) {
     return { isCandidate: false, reason: "logistics", score: 0, amount, hasHardProof, hasTransactionKeyword };
   }
 
@@ -660,8 +662,11 @@ function evaluateCandidate(message: EmailMessage): CandidateDecision {
   if (hasOrderReference) score += 1;
   if (knownSender) score += 1;
 
+  // FIX 3 : seuil abaissé de 5 à 4
+  // Les emails courts d'opérateurs telecom (Bouygues, Orange, SFR, Free)
+  // scorent souvent 4 (amount=3 + transactionKeyword=2 sans hardProof ni knownSender détecté)
   const isCandidate =
-    score >= 5 ||
+    score >= 4 ||
     (amount !== null && (hasTransactionKeyword || hasHardProof)) ||
     (hasHardProof && knownSender) ||
     (hasOrderReference && amount !== null);
@@ -953,8 +958,7 @@ async function fetchMessageDetails(accessToken: string, messageId: string): Prom
     payloadBody,
   ]
     .filter(Boolean)
-    .join("
-");
+    .join("\n");
 
   const sanitizedBody = sanitizeBody(mergedBody);
   const focusedBody = focusEmailBody(sanitizedBody);
@@ -968,11 +972,7 @@ async function fetchMessageDetails(accessToken: string, messageId: string): Prom
     from,
     date,
     body,
-    raw_text: `De: ${from}
-Sujet: ${subject}
-Date: ${date}
-
-${body}`,
+    raw_text: `De: ${from}\nSujet: ${subject}\nDate: ${date}\n\n${body}`,
     sender_email: senderEmail,
     sender_domain: senderDomain,
     sender_name: senderName,
