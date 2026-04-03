@@ -1,43 +1,42 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// ===================== CORS =====================
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform",
 };
 
-// --- CONFIGURATION DES FILTRES ---
+// ===================== FILTERS =====================
 const JUNK_KEYWORDS =
-  /(newsletter|offre|profitez|cadeau|parrainage|avis|votre panier|expédition|suivi|tracking|votre avis|bon plan|réduction|promo)/i;
+  /(newsletter|offre|profitez|cadeau|parrainage|avis|panier|expédition|suivi|tracking|bon plan|réduction|promo)/i;
+
 const EXPENSE_SIGNALS =
   /(facture|reçu|receipt|invoice|commande|order|paiement|payment|prélèvement|débit|confirmation|échéance|abonnement)/i;
 
-// --- UTILITAIRES DE NETTOYAGE ---
-
+// ===================== HELPERS =====================
 function normalizeText(value: string): string {
   return value.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-/**
- * Nettoie le HTML pour garder la proximité entre les mots et les prix
- */
 function cleanEmailBody(html: string): string {
   if (!html) return "";
   return html
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-    .replace(/<\/p>|<\/div>|<\/tr>|<td>|<\/td>/gi, " ") // Remplace les balises de bloc par des espaces
+    .replace(/<\/p>|<\/div>|<\/tr>|<td>|<\/td>/gi, " ")
     .replace(/<[^>]*>/g, " ")
     .replace(/&nbsp;/g, " ")
-    .replace(/&euro;/g, "€")
+    .replace(/&euro;/gi, "€")
     .replace(/\s+/g, " ")
     .trim();
 }
 
 function parseCurrencyAmount(raw: string): number | null {
   if (!raw) return null;
+
   let normalized = raw.replace(/[\s\u00a0\u202f]/g, "");
+
   if (normalized.includes(",") && normalized.includes(".")) {
     if (normalized.lastIndexOf(",") > normalized.lastIndexOf(".")) {
       normalized = normalized.replace(/\./g, "").replace(",", ".");
@@ -47,51 +46,39 @@ function parseCurrencyAmount(raw: string): number | null {
   } else {
     normalized = normalized.replace(",", ".");
   }
+
   const parsed = Number.parseFloat(normalized.replace(/[^\d.]/g, ""));
   if (isNaN(parsed) || parsed <= 0) return null;
   return Math.round(parsed * 100) / 100;
 }
 
-// --- LOGIQUE D'IDENTIFICATION ---
-
-/**
- * Identifie le marchand de manière dynamique (Premium -> DB -> Email Display Name -> Domaine)
- */
+// ===================== MERCHANT =====================
 async function identifyMerchant(from: string, supabaseAdmin: any): Promise<string | null> {
   const fromLower = from.toLowerCase();
 
-  // 1. Marchands "Premium" (Précision 100%)
   if (fromLower.includes("amazon")) return "Amazon";
   if (fromLower.includes("uber")) return fromLower.includes("eats") ? "Uber Eats" : "Uber";
-  if (fromLower.includes("bouygues")) return "Bouygues Telecom";
   if (fromLower.includes("netflix")) return "Netflix";
   if (fromLower.includes("spotify")) return "Spotify";
-  if (fromLower.includes("apple")) return "Apple";
   if (fromLower.includes("sncf")) return "SNCF";
 
-  // 2. Extraire le domaine pour chercher dans l'historique d'apprentissage
   const domainMatch = fromLower.match(/@([\w.-]+)\./);
   const domain = domainMatch ? domainMatch[1] : null;
 
-  if (domain && domain.length > 2) {
-    const { data: profile } = await supabaseAdmin
+  if (domain) {
+    const { data } = await supabaseAdmin
       .from("merchant_profiles")
       .select("normalized_name")
       .contains("patterns", [domain])
       .maybeSingle();
-    if (profile) return profile.normalized_name;
+
+    if (data) return data.normalized_name;
   }
 
-  // 3. Extraire le nom d'affichage de l'email (ex: "Boulangerie Paul" <contact@paul.fr>)
-  const displayNameMatch = from.match(/^"?(.*?)"?\s*<.*>/);
-  if (displayNameMatch && displayNameMatch[1]) {
-    const name = displayNameMatch[1].trim();
-    const genericTerms = /^(service client|facture|noreply|no-reply|contact|support|info|votre facture)$/i;
-    if (!genericTerms.test(name) && name.length > 2) return name;
-  }
+  const displayMatch = from.match(/^"?(.*?)"?\s*</);
+  if (displayMatch?.[1]?.length > 2) return displayMatch[1].trim();
 
-  // 4. Fallback sur le domaine
-  if (domain && domain.length > 2) {
+  if (domain) {
     return domain
       .split(/[-.]/)
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
@@ -101,59 +88,38 @@ async function identifyMerchant(from: string, supabaseAdmin: any): Promise<strin
   return null;
 }
 
-/**
- * EXTRACTEUR UNIVERSEL : Cherche un montant à proximité d'une "Ancre"
- */
+// ===================== AMOUNT =====================
 function universalAmountExtractor(text: string): number | null {
-  const normalized = text.toLowerCase();
-  const anchors = [
-    "total ttc",
-    "total",
-    "montant",
-    "net à payer",
-    "somme",
-    "combien",
-    "total à payer",
-    "total a payer",
-    "amount",
-    "total amount",
-    "due",
-    "payer",
-    "payé",
-  ];
+  const anchors = ["total", "total ttc", "montant", "net à payer", "amount", "due"];
 
   for (const anchor of anchors) {
-    // Fenêtre de 60 caractères après l'ancre pour trouver un prix
-    const regex = new RegExp(`${anchor}[^0-9€]{0,60}(\\d{1,3}(?:[ .\\s]\\d{3})*[.,]\\d{2})\\s*(?:€|eur)`, "i");
-    const match = normalized.match(regex);
+    const regex = new RegExp(`${anchor}[^\\d€]{0,60}(\\d{1,3}(?:[ .]\\d{3})*[.,]\\d{2})\\s*(€|eur)`, "i");
+    const match = text.match(regex);
     if (match) {
       const val = parseCurrencyAmount(match[1]);
       if (val && val < 5000) return val;
     }
   }
 
-  // Fallback : prendre le montant le plus élevé (souvent le TTC)
-  const allAmounts = Array.from(normalized.matchAll(/(\d{1,3}(?:[ .]\d{3})*[.,]\d{2})\s*(?:€|eur)/g))
+  const all = [...text.matchAll(/(\d{1,3}(?:[ .]\d{3})*[.,]\d{2})\s*(€|eur)/gi)]
     .map((m) => parseCurrencyAmount(m[1]))
     .filter((v): v is number => v !== null && v < 5000);
 
-  return allAmounts.length > 0 ? Math.max(...allAmounts) : null;
+  return all.length ? Math.max(...all) : null;
 }
 
 function getExpenseScore(subject: string, body: string): number {
   let score = 0;
-  const text = (subject + " " + body).toLowerCase();
+  const text = `${subject} ${body}`.toLowerCase();
   if (EXPENSE_SIGNALS.test(text)) score += 3;
   if (/[0-9][.,][0-9]{2}\s*(€|eur)/i.test(text)) score += 2;
   if (JUNK_KEYWORDS.test(text)) score -= 4;
   return score;
 }
 
-// --- GMAIL HELPERS ---
-
+// ===================== GMAIL =====================
 function decodeBase64Url(data: string): string {
-  const normalized = data.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+  const padded = data.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (data.length % 4)) % 4);
   try {
     return atob(padded);
   } catch {
@@ -162,30 +128,26 @@ function decodeBase64Url(data: string): string {
 }
 
 function flattenParts(payload: any): any[] {
-  const parts: any[] = [];
-  if (payload?.parts) {
-    for (const part of payload.parts) {
-      if (part.parts) parts.push(...flattenParts(part));
-      else parts.push(part);
-    }
-  }
-  return parts;
+  if (!payload) return [];
+  if (!payload.parts) return [payload];
+  return payload.parts.flatMap((p: any) => (p.parts ? flattenParts(p) : p));
 }
 
-// ===================== MAIN HANDLER =====================
-
+// ===================== HANDLER =====================
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const authHeader = req.headers.get("Authorization");
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    if (!authHeader) throw new Error("Authorization header manquant");
 
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
-    const supabaseAuth = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader! } },
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+    const supabaseAuth = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
     });
 
     const {
@@ -194,8 +156,8 @@ serve(async (req) => {
     if (!user) throw new Error("Non autorisé");
 
     const { email } = await req.json();
+    console.log("Gmail sync start", { userId: user.id, email });
 
-    // 1. RÉCUPÉRATION TOKENS & GMAIL (Simplifié pour l'exemple)
     const { data: tokenData } = await supabaseAdmin
       .from("gmail_tokens")
       .select("*")
@@ -203,80 +165,75 @@ serve(async (req) => {
       .eq("email", email)
       .single();
 
-    if (!tokenData) throw new Error("Gmail non connecté");
+    if (!tokenData?.access_token) throw new Error("Gmail non connecté");
 
-    // Appel API Gmail (Note: Assure-toi que searchFinancialEmails est bien défini ou utilise cette logique)
-    const accessToken = tokenData.access_token;
+    const query = `(total OR montant OR invoice) (EUR OR €) newer_than:30d -newsletter`;
     const listRes = await fetch(
-      `https://www.googleapis.com/gmail/v1/users/me/messages?q="total" ("€" OR "eur") newer_than:30d -newsletter&maxResults=50`,
-      { headers: { Authorization: `Bearer ${accessToken}` } },
+      `https://www.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=50`,
+      { headers: { Authorization: `Bearer ${tokenData.access_token}` } },
     );
-    const listData = await listRes.json();
-    const messageIds = (listData.messages || []).map((m: any) => m.id);
 
+    if (!listRes.ok) {
+      console.error("Gmail list error", await listRes.text());
+      throw new Error("Erreur Gmail");
+    }
+
+    const listData = await listRes.json();
+    const messages = listData.messages || [];
     const results = [];
 
-    for (const messageId of messageIds) {
-      // Vérifier si déjà traité
-      const { data: existing } = await supabaseAdmin
+    for (const { id } of messages) {
+      const { data: exists } = await supabaseAdmin
         .from("expenses")
         .select("id")
-        .eq("source_id", `gmail_${messageId}`)
+        .eq("source_id", `gmail_${id}`)
         .maybeSingle();
-      if (existing) continue;
 
-      // Fetch message detail
-      const msgRes = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${messageId}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
+      if (exists) continue;
+
+      const msgRes = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${id}`, {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
       });
-      const msgData = await msgRes.json();
+      if (!msgRes.ok) continue;
 
-      const headers = msgData.payload.headers;
+      const msg = await msgRes.json();
+      const headers = msg.payload.headers || [];
+
       const subject = headers.find((h: any) => h.name === "Subject")?.value || "";
       const from = headers.find((h: any) => h.name === "From")?.value || "";
       const dateRaw = headers.find((h: any) => h.name === "Date")?.value || "";
 
+      const parts = flattenParts(msg.payload);
+      const html = parts.find((p) => p.mimeType === "text/html");
+      const text = parts.find((p) => p.mimeType === "text/plain");
+
       let body = "";
-      const parts = flattenParts(msgData.payload);
-      const htmlPart = parts.find((p) => p.mimeType === "text/html");
-      const textPart = parts.find((p) => p.mimeType === "text/plain");
+      if (html?.body?.data) body = cleanEmailBody(decodeBase64Url(html.body.data));
+      else if (text?.body?.data) body = normalizeText(decodeBase64Url(text.body.data));
 
-      if (htmlPart) body = cleanEmailBody(decodeBase64Url(htmlPart.body.data));
-      else if (textPart) body = normalizeText(decodeBase64Url(textPart.body.data));
-
-      // 2. LOGIQUE DE DÉCISION
       const score = getExpenseScore(subject, body);
       if (score < 3) continue;
 
       const merchant = await identifyMerchant(from, supabaseAdmin);
       const amount = universalAmountExtractor(body);
 
+      const dateIso = isNaN(Date.parse(dateRaw))
+        ? new Date().toISOString().split("T")[0]
+        : new Date(dateRaw).toISOString().split("T")[0];
+
       if (merchant && amount) {
-        // SUCCÈS SANS IA
         await supabaseAdmin.from("expenses").insert({
           user_id: user.id,
           source: "email",
-          source_id: `gmail_${messageId}`,
+          source_id: `gmail_${id}`,
           fournisseur: merchant,
           montant_total: amount,
-          date_expense: new Date(dateRaw).toISOString().split("T")[0],
           devise: "EUR",
+          date_expense: dateIso,
           description: subject,
         });
-        results.push({ id: messageId, merchant, amount, source: "rules" });
-      } else if (score >= 5) {
-        // FALLBACK IA (Seulement pour les cas complexes avec gros signal)
-        const analyzeRes = await fetch(`${supabaseUrl}/functions/v1/analyze-document`, {
-          method: "POST",
-          headers: { Authorization: authHeader!, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            source: "email",
-            raw_text: `De: ${from}\nSujet: ${subject}\n\n${body}`,
-            source_id: `gmail_${messageId}`,
-            skip_usage_check: true,
-          }),
-        });
-        if (analyzeRes.ok) results.push({ id: messageId, source: "ai" });
+
+        results.push({ id, merchant, amount });
       }
     }
 
@@ -284,7 +241,8 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message }), {
+    console.error("gmail-callback error", e);
+    return new Response(JSON.stringify({ error: String(e.message || e) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
