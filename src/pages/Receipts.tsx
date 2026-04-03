@@ -1,6 +1,23 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Upload, Camera, FileText, ChevronRight, Mail, Landmark, RefreshCw, Plus, Check, Loader2, X, ShoppingCart, Sparkles, Coins, Pencil, Trash2 } from "lucide-react";
+import {
+  Upload,
+  Camera,
+  FileText,
+  ChevronRight,
+  Mail,
+  Landmark,
+  RefreshCw,
+  Plus,
+  Check,
+  Loader2,
+  X,
+  ShoppingCart,
+  Sparkles,
+  Coins,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import AppLayout from "@/components/AppLayout";
 import PremiumCTA from "@/components/PremiumCTA";
@@ -14,14 +31,41 @@ import { Progress } from "@/components/ui/progress";
 import CashExpenseDialog from "@/components/CashExpenseDialog";
 import EditExpenseDialog from "@/components/EditExpenseDialog";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-type ConnectedEmail = { id: string; email: string; provider: string; label: string | null; status: string; last_sync_at: string | null };
-type ConnectedBank = { id: string; bank_name: string; account_label: string | null; account_type: string | null; status: string; last_sync_at: string | null };
+type ConnectedEmail = {
+  id: string;
+  email: string;
+  provider: string;
+  label: string | null;
+  status: string;
+  last_sync_at: string | null;
+};
+type ConnectedBank = {
+  id: string;
+  bank_name: string;
+  account_label: string | null;
+  account_type: string | null;
+  status: string;
+  last_sync_at: string | null;
+};
 
-type ReceiptProduct = { name: string; qty: number; unit: string; unitPrice: number; total: number; pricePerUnit?: string };
+type ReceiptProduct = {
+  name: string;
+  qty: number;
+  unit: string;
+  unitPrice: number;
+  total: number;
+  pricePerUnit?: string;
+};
 type Receipt = {
   id: string;
   store: string;
@@ -41,9 +85,18 @@ const emailProviders = [
 ];
 
 const bankList = [
-  "BNP Paribas", "Crédit Agricole", "Société Générale", "Crédit Mutuel",
-  "La Banque Postale", "LCL", "Caisse d'Épargne", "Boursorama",
-  "Fortuneo", "N26", "Revolut", "Autre",
+  "BNP Paribas",
+  "Crédit Agricole",
+  "Société Générale",
+  "Crédit Mutuel",
+  "La Banque Postale",
+  "LCL",
+  "Caisse d'Épargne",
+  "Boursorama",
+  "Fortuneo",
+  "N26",
+  "Revolut",
+  "Autre",
 ];
 
 const Receipts = () => {
@@ -80,9 +133,14 @@ const Receipts = () => {
   useEffect(() => {
     const reloadEmails = () => {
       if (user) {
-        supabase.from("connected_emails").select("*").eq("user_id", user.id).order("created_at").then(({ data }) => {
-          setEmails((data as ConnectedEmail[]) || []);
-        });
+        supabase
+          .from("connected_emails")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at")
+          .then(({ data }) => {
+            setEmails((data as ConnectedEmail[]) || []);
+          });
       }
     };
 
@@ -121,7 +179,9 @@ const Receipts = () => {
       return {
         id: e.id,
         store: e.magasin || e.fournisseur || "Inconnu",
-        date: e.date_expense ? new Date(e.date_expense).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "Date inconnue",
+        date: e.date_expense
+          ? new Date(e.date_expense).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
+          : "Date inconnue",
         total: `€${(e.montant_total || 0).toFixed(2)}`,
         items: articles.length,
         status: "Analysé",
@@ -152,7 +212,12 @@ const Receipts = () => {
       const [emailRes, bankRes, expenseRes] = await Promise.all([
         supabase.from("connected_emails").select("*").eq("user_id", user.id).order("created_at"),
         supabase.from("connected_bank_accounts").select("*").eq("user_id", user.id).order("created_at"),
-        supabase.from("expenses").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
+        supabase
+          .from("expenses")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(50),
       ]);
       setEmails((emailRes.data as ConnectedEmail[]) || []);
       setBanks((bankRes.data as ConnectedBank[]) || []);
@@ -209,18 +274,16 @@ const Receipts = () => {
     try {
       // 1. Upload to storage
       const filePath = `${user.id}/${Date.now()}_${file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from("documents")
-        .upload(filePath, file);
+      const { error: uploadError } = await supabase.storage.from("documents").upload(filePath, file);
 
       if (uploadError) throw new Error("Erreur d'upload: " + uploadError.message);
 
       setAnalysisProgress(25);
       setAnalysisStep("Création du document…");
 
-      const { data: { publicUrl } } = supabase.storage
-        .from("documents")
-        .getPublicUrl(filePath);
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("documents").getPublicUrl(filePath);
 
       // 2. Create document record
       const source = file.type === "application/pdf" ? "invoice" : "receipt";
@@ -254,7 +317,9 @@ const Receipts = () => {
         rawText = await new Promise<string>((resolve) => {
           reader.onload = () => {
             const base64 = (reader.result as string).split(",")[1];
-            resolve(`[Image de ticket de caisse encodée en base64]\nNom du fichier: ${file.name}\nVeuillez analyser cette image de ticket de caisse et extraire les informations.`);
+            resolve(
+              `[Image de ticket de caisse encodée en base64]\nNom du fichier: ${file.name}\nVeuillez analyser cette image de ticket de caisse et extraire les informations.`,
+            );
           };
           reader.readAsDataURL(file);
         });
@@ -305,14 +370,16 @@ const Receipts = () => {
         const newReceipt: Receipt = {
           id: e.id,
           store: e.magasin || e.fournisseur || "Inconnu",
-          date: e.date_expense ? new Date(e.date_expense).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "Aujourd'hui",
+          date: e.date_expense
+            ? new Date(e.date_expense).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
+            : "Aujourd'hui",
           total: `€${(e.montant_total || 0).toFixed(2)}`,
           items: articles.length,
           status: "Analysé",
           products: articles,
           source: e.source,
         };
-        setExpenses(prev => [newReceipt, ...prev]);
+        setExpenses((prev) => [newReceipt, ...prev]);
       }
 
       setAnalysisProgress(100);
@@ -381,8 +448,11 @@ const Receipts = () => {
       .select("*")
       .single();
     setSaving(false);
-    if (error) { toast.error("Erreur lors de l'ajout"); return; }
-    setEmails(prev => [...prev, data as ConnectedEmail]);
+    if (error) {
+      toast.error("Erreur lors de l'ajout");
+      return;
+    }
+    setEmails((prev) => [...prev, data as ConnectedEmail]);
     setNewEmail("");
     setNewEmailProvider("gmail");
     setShowEmailDialog(false);
@@ -398,6 +468,9 @@ const Receipts = () => {
     try {
       const { data, error } = await supabase.functions.invoke(funcName, {
         body: { email: emailAddr },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
       if (error) throw error;
       if (data?.analyzed > 0) {
@@ -419,7 +492,9 @@ const Receipts = () => {
           return {
             id: e.id,
             store: e.magasin || e.fournisseur || "Inconnu",
-            date: e.date_expense ? new Date(e.date_expense).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "Date inconnue",
+            date: e.date_expense
+              ? new Date(e.date_expense).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
+              : "Date inconnue",
             total: `€${(e.montant_total || 0).toFixed(2)}`,
             items: articles.length,
             status: "Analysé",
@@ -428,7 +503,9 @@ const Receipts = () => {
           };
         });
         setExpenses(mapped);
-        setEmails(prev => prev.map(em => em.email === emailAddr ? { ...em, last_sync_at: new Date().toISOString() } : em));
+        setEmails((prev) =>
+          prev.map((em) => (em.email === emailAddr ? { ...em, last_sync_at: new Date().toISOString() } : em)),
+        );
       } else {
         toast.info(data?.message || "Aucun email financier trouvé");
       }
@@ -448,8 +525,11 @@ const Receipts = () => {
       .select("*")
       .single();
     setSaving(false);
-    if (error) { toast.error("Erreur lors de l'ajout"); return; }
-    setBanks(prev => [...prev, data as ConnectedBank]);
+    if (error) {
+      toast.error("Erreur lors de l'ajout");
+      return;
+    }
+    setBanks((prev) => [...prev, data as ConnectedBank]);
     setNewBankName("");
     setNewBankLabel("");
     setShowBankDialog(false);
@@ -470,15 +550,21 @@ const Receipts = () => {
   const hasEmails = emails.length > 0;
   const hasBanks = banks.length > 0;
 
-  const inputClass = "w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all";
+  const inputClass =
+    "w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all";
 
   const sourceIcon = (source?: string) => {
     switch (source) {
-      case "receipt": return "🧾";
-      case "invoice": return "📄";
-      case "email": return "📧";
-      case "bank": return "🏦";
-      default: return "🧾";
+      case "receipt":
+        return "🧾";
+      case "invoice":
+        return "📄";
+      case "email":
+        return "📧";
+      case "bank":
+        return "🏦";
+      default:
+        return "🧾";
     }
   };
 
@@ -488,7 +574,9 @@ const Receipts = () => {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Capture des dépenses</h1>
-            <p className="text-sm text-muted-foreground mt-1">Importez et centralisez toutes vos dépenses, quel que soit leur format.</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Importez et centralisez toutes vos dépenses, quel que soit leur format.
+            </p>
           </div>
         </div>
 
@@ -532,14 +620,20 @@ const Receipts = () => {
               <p className="text-xs text-muted-foreground mt-1">JPG, PNG, WebP ou PDF — max 10 Mo</p>
               <div className="flex items-center justify-center gap-4 mt-6">
                 <button
-                  onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
                   className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
                 >
                   <Camera className="h-4 w-4" />
                   Prendre une photo
                 </button>
                 <button
-                  onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
                   className="inline-flex items-center gap-2 bg-card text-foreground border border-border px-4 py-2 rounded-lg text-sm font-medium hover:bg-secondary transition-colors"
                 >
                   <FileText className="h-4 w-4" />
@@ -562,7 +656,9 @@ const Receipts = () => {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            onClick={() => hasEmails ? handleSyncEmail(emails[0]?.email, emails[0]?.provider) : setShowEmailDialog(true)}
+            onClick={() =>
+              hasEmails ? handleSyncEmail(emails[0]?.email, emails[0]?.provider) : setShowEmailDialog(true)
+            }
             className="bg-card rounded-2xl border border-border p-6 hover:border-primary/30 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-4">
@@ -572,13 +668,19 @@ const Receipts = () => {
               <div className="flex-1 min-w-0">
                 {hasEmails ? (
                   <>
-                    <p className="text-sm font-semibold text-foreground">📥 {emails.length} email{emails.length > 1 ? "s" : ""} connecté{emails.length > 1 ? "s" : ""}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{emails.map(e => e.email).join(", ")}</p>
+                    <p className="text-sm font-semibold text-foreground">
+                      📥 {emails.length} email{emails.length > 1 ? "s" : ""} connecté{emails.length > 1 ? "s" : ""}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                      {emails.map((e) => e.email).join(", ")}
+                    </p>
                   </>
                 ) : (
                   <>
                     <p className="text-sm font-semibold text-foreground">📥 Emails : connexion messagerie</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Importez automatiquement vos reçus depuis votre boîte mail</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Importez automatiquement vos reçus depuis votre boîte mail
+                    </p>
                   </>
                 )}
               </div>
@@ -586,7 +688,10 @@ const Receipts = () => {
                 <div className="flex items-center gap-2 shrink-0">
                   <RefreshCw className={`h-4 w-4 text-primary ${syncing ? "animate-spin" : ""}`} />
                   <button
-                    onClick={(e) => { e.stopPropagation(); setShowEmailDialog(true); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowEmailDialog(true);
+                    }}
                     className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
                   >
                     <Plus className="h-3.5 w-3.5 text-primary" />
@@ -600,7 +705,10 @@ const Receipts = () => {
               <div className="mt-3 pt-3 border-t border-border">
                 <p className="text-[10px] text-muted-foreground">{formatSyncDate(emails[0]?.last_sync_at)}</p>
                 <button
-                  onClick={(e) => { e.stopPropagation(); navigate("/settings"); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate("/settings");
+                  }}
                   className="text-[10px] text-primary font-medium hover:underline mt-0.5"
                 >
                   Gérer dans les paramètres →
@@ -614,7 +722,7 @@ const Receipts = () => {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            onClick={() => hasBanks ? toast.info("Synchronisation en cours…") : setShowBankDialog(true)}
+            onClick={() => (hasBanks ? toast.info("Synchronisation en cours…") : setShowBankDialog(true))}
             className="bg-card rounded-2xl border border-border p-6 hover:border-primary/30 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-4">
@@ -624,13 +732,19 @@ const Receipts = () => {
               <div className="flex-1 min-w-0">
                 {hasBanks ? (
                   <>
-                    <p className="text-sm font-semibold text-foreground">🏦 {banks.length} compte{banks.length > 1 ? "s" : ""} connecté{banks.length > 1 ? "s" : ""}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{banks.map(b => b.account_label || b.bank_name).join(", ")}</p>
+                    <p className="text-sm font-semibold text-foreground">
+                      🏦 {banks.length} compte{banks.length > 1 ? "s" : ""} connecté{banks.length > 1 ? "s" : ""}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                      {banks.map((b) => b.account_label || b.bank_name).join(", ")}
+                    </p>
                   </>
                 ) : (
                   <>
                     <p className="text-sm font-semibold text-foreground">🏦 Banque : connexion sécurisée</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Synchronisez vos transactions bancaires en toute sécurité</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Synchronisez vos transactions bancaires en toute sécurité
+                    </p>
                   </>
                 )}
               </div>
@@ -638,7 +752,10 @@ const Receipts = () => {
                 <div className="flex items-center gap-2 shrink-0">
                   <RefreshCw className="h-4 w-4 text-primary" />
                   <button
-                    onClick={(e) => { e.stopPropagation(); setShowBankDialog(true); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowBankDialog(true);
+                    }}
                     className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
                   >
                     <Plus className="h-3.5 w-3.5 text-primary" />
@@ -652,7 +769,10 @@ const Receipts = () => {
               <div className="mt-3 pt-3 border-t border-border">
                 <p className="text-[10px] text-muted-foreground">{formatSyncDate(banks[0]?.last_sync_at)}</p>
                 <button
-                  onClick={(e) => { e.stopPropagation(); navigate("/settings"); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate("/settings");
+                  }}
                   className="text-[10px] text-primary font-medium hover:underline mt-0.5"
                 >
                   Gérer dans les paramètres →
@@ -682,12 +802,13 @@ const Receipts = () => {
           </motion.div>
         </div>
 
-
         {/* Receipt List */}
         <div className="bg-card rounded-2xl border border-border overflow-hidden">
           <div className="px-4 py-3 border-b border-border flex items-center justify-between">
             <p className="text-sm font-semibold text-foreground">Dépenses analysées</p>
-            <Badge variant="secondary" className="text-xs">{expenses.length} résultat{expenses.length > 1 ? "s" : ""}</Badge>
+            <Badge variant="secondary" className="text-xs">
+              {expenses.length} résultat{expenses.length > 1 ? "s" : ""}
+            </Badge>
           </div>
           {loading ? (
             <div className="p-8 text-center">
@@ -705,30 +826,48 @@ const Receipts = () => {
           ) : (
             <div className="divide-y divide-border">
               {expenses.map((r) => (
-                <div key={r.id} className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-3 p-4 items-center hover:bg-secondary/50 transition-colors">
-                  <div onClick={() => setSelectedReceipt(r)} className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center text-lg cursor-pointer">
+                <div
+                  key={r.id}
+                  className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-3 p-4 items-center hover:bg-secondary/50 transition-colors"
+                >
+                  <div
+                    onClick={() => setSelectedReceipt(r)}
+                    className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center text-lg cursor-pointer"
+                  >
                     {sourceIcon(r.source)}
                   </div>
                   <div onClick={() => setSelectedReceipt(r)} className="cursor-pointer">
                     <p className="text-sm font-medium text-foreground">{r.store}</p>
-                    <p className="text-[10px] text-muted-foreground">{r.date} · {r.items > 0 ? `${r.items} article${r.items > 1 ? "s" : ""}` : (r.description || "Aucun article")}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {r.date} ·{" "}
+                      {r.items > 0 ? `${r.items} article${r.items > 1 ? "s" : ""}` : r.description || "Aucun article"}
+                    </p>
                   </div>
                   <span className="text-sm font-semibold tabular-nums text-foreground">{r.total}</span>
                   <button
-                    onClick={(e) => { e.stopPropagation(); handleEditExpense(r.id); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEditExpense(r.id);
+                    }}
                     className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
                     title="Modifier"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
                   <button
-                    onClick={(e) => { e.stopPropagation(); setDeletingExpenseId(r.id); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeletingExpenseId(r.id);
+                    }}
                     className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
                     title="Supprimer"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
-                  <ChevronRight onClick={() => setSelectedReceipt(r)} className="h-4 w-4 text-muted-foreground cursor-pointer" />
+                  <ChevronRight
+                    onClick={() => setSelectedReceipt(r)}
+                    className="h-4 w-4 text-muted-foreground cursor-pointer"
+                  />
                 </div>
               ))}
             </div>
@@ -749,7 +888,8 @@ const Receipts = () => {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground">
-                  {expenses.length} dépense{expenses.length > 1 ? "s" : ""} capturée{expenses.length > 1 ? "s" : ""} — passez à l'analyse !
+                  {expenses.length} dépense{expenses.length > 1 ? "s" : ""} capturée{expenses.length > 1 ? "s" : ""} —
+                  passez à l'analyse !
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Découvrez où va votre argent, détectez les abonnements cachés et optimisez votre budget.
@@ -786,7 +926,7 @@ const Receipts = () => {
             <div>
               <label className="text-sm font-medium text-foreground block mb-1.5">Fournisseur</label>
               <div className="flex gap-2">
-                {emailProviders.map(p => (
+                {emailProviders.map((p) => (
                   <button
                     key={p.id}
                     onClick={() => setNewEmailProvider(p.id)}
@@ -802,7 +942,9 @@ const Receipts = () => {
             {newEmailProvider === "gmail" ? (
               <>
                 <div className="bg-secondary/50 rounded-xl p-3">
-                  <p className="text-[11px] text-muted-foreground">🔒 Connexion sécurisée via Google OAuth. Nous n'accédons qu'en lecture seule à vos emails.</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    🔒 Connexion sécurisée via Google OAuth. Nous n'accédons qu'en lecture seule à vos emails.
+                  </p>
                 </div>
                 <button
                   onClick={handleAddEmail}
@@ -813,10 +955,22 @@ const Receipts = () => {
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <svg className="h-4 w-4" viewBox="0 0 24 24">
-                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
-                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                      <path
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
+                        fill="#4285F4"
+                      />
+                      <path
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                        fill="#34A853"
+                      />
+                      <path
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                        fill="#FBBC05"
+                      />
+                      <path
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                        fill="#EA4335"
+                      />
                     </svg>
                   )}
                   Se connecter avec Google
@@ -825,7 +979,9 @@ const Receipts = () => {
             ) : newEmailProvider === "outlook" ? (
               <>
                 <div className="bg-secondary/50 rounded-xl p-3">
-                  <p className="text-[11px] text-muted-foreground">🔒 Connexion sécurisée via Microsoft OAuth. Nous n'accédons qu'en lecture seule à vos emails.</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    🔒 Connexion sécurisée via Microsoft OAuth. Nous n'accédons qu'en lecture seule à vos emails.
+                  </p>
                 </div>
                 <button
                   onClick={handleAddEmail}
@@ -836,10 +992,10 @@ const Receipts = () => {
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <svg className="h-4 w-4" viewBox="0 0 23 23">
-                      <path fill="#f35325" d="M1 1h10v10H1z"/>
-                      <path fill="#81bc06" d="M12 1h10v10H12z"/>
-                      <path fill="#05a6f0" d="M1 12h10v10H1z"/>
-                      <path fill="#ffba08" d="M12 12h10v10H12z"/>
+                      <path fill="#f35325" d="M1 1h10v10H1z" />
+                      <path fill="#81bc06" d="M12 1h10v10H12z" />
+                      <path fill="#05a6f0" d="M1 12h10v10H1z" />
+                      <path fill="#ffba08" d="M12 12h10v10H12z" />
                     </svg>
                   )}
                   Se connecter avec Microsoft
@@ -858,7 +1014,10 @@ const Receipts = () => {
                   />
                 </div>
                 <div className="bg-secondary/50 rounded-xl p-3">
-                  <p className="text-[11px] text-muted-foreground">⚠️ L'import automatique n'est disponible que pour Gmail et Outlook. Les autres fournisseurs nécessitent un import manuel.</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    ⚠️ L'import automatique n'est disponible que pour Gmail et Outlook. Les autres fournisseurs
+                    nécessitent un import manuel.
+                  </p>
                 </div>
                 <button
                   onClick={handleAddEmail}
@@ -885,7 +1044,7 @@ const Receipts = () => {
             <div>
               <label className="text-sm font-medium text-foreground block mb-1.5">Banque</label>
               <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
-                {bankList.map(b => (
+                {bankList.map((b) => (
                   <button
                     key={b}
                     onClick={() => setNewBankName(b)}
@@ -907,7 +1066,9 @@ const Receipts = () => {
               />
             </div>
             <div className="bg-secondary/50 rounded-xl p-3">
-              <p className="text-[11px] text-muted-foreground">🔒 Vos identifiants bancaires ne sont jamais stockés. Connexion sécurisée et chiffrée.</p>
+              <p className="text-[11px] text-muted-foreground">
+                🔒 Vos identifiants bancaires ne sont jamais stockés. Connexion sécurisée et chiffrée.
+              </p>
             </div>
             <button
               onClick={handleAddBank}
@@ -933,7 +1094,9 @@ const Receipts = () => {
                   </div>
                   <div>
                     <SheetTitle className="text-lg">{selectedReceipt.store}</SheetTitle>
-                    <p className="text-xs text-muted-foreground">{selectedReceipt.date} · {selectedReceipt.items} articles</p>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedReceipt.date} · {selectedReceipt.items} articles
+                    </p>
                   </div>
                 </div>
               </SheetHeader>
@@ -954,18 +1117,27 @@ const Receipts = () => {
                     <span className="text-right w-16">Total</span>
                   </div>
                   {selectedReceipt.products.map((p, i) => (
-                    <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2.5 rounded-lg hover:bg-secondary/50 transition-colors items-center">
+                    <div
+                      key={i}
+                      className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2.5 rounded-lg hover:bg-secondary/50 transition-colors items-center"
+                    >
                       <div>
                         <p className="text-sm font-medium text-foreground">{p.name}</p>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-[10px] text-muted-foreground">Qté: {p.qty}</span>
                           {p.pricePerUnit && (
-                            <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">{p.pricePerUnit}</span>
+                            <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">
+                              {p.pricePerUnit}
+                            </span>
                           )}
                         </div>
                       </div>
-                      <span className="text-xs tabular-nums text-muted-foreground text-right w-20">{p.unitPrice.toFixed(2)} €</span>
-                      <span className="text-sm tabular-nums font-semibold text-foreground text-right w-16">{p.total.toFixed(2)} €</span>
+                      <span className="text-xs tabular-nums text-muted-foreground text-right w-20">
+                        {p.unitPrice.toFixed(2)} €
+                      </span>
+                      <span className="text-sm tabular-nums font-semibold text-foreground text-right w-16">
+                        {p.total.toFixed(2)} €
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -997,14 +1169,20 @@ const Receipts = () => {
           const newReceipt: Receipt = {
             id: data.id,
             store: data.magasin || "Inconnu",
-            date: data.date_expense ? new Date(data.date_expense).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "Aujourd'hui",
+            date: data.date_expense
+              ? new Date(data.date_expense).toLocaleDateString("fr-FR", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })
+              : "Aujourd'hui",
             total: `€${(data.montant_total || 0).toFixed(2)}`,
             items: articles.length,
             status: "Analysé",
             products: articles,
             source: data.source,
           };
-          setExpenses(prev => [newReceipt, ...prev]);
+          setExpenses((prev) => [newReceipt, ...prev]);
         }}
       />
 
@@ -1027,7 +1205,11 @@ const Receipts = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteExpense} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={handleDeleteExpense}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Supprimer
             </AlertDialogAction>
