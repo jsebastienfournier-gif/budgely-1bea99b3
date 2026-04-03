@@ -11,7 +11,19 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const MAX_MESSAGES_PER_SYNC = 100;
+const MAX_MESSAGES = 100;
+
+/* ============================================================
+   CLASSIFICATION
+============================================================ */
+
+type FinancialEmailClass = "PAYMENT" | "NOTIFICATION" | "PROMOTION" | "UNKNOWN";
+
+const PAYMENT_VERBS = ["paiement", "payé", "prélev", "debit", "facturé", "transaction", "total payé"];
+
+const CREDIT_TERMS = ["crédité", "gain", "tirage", "récompense", "cashback"];
+
+const PROMO_TERMS = ["offre", "promotion", "newsletter", "remportez"];
 
 /* ============================================================
    UTILS
@@ -22,7 +34,7 @@ function normalize(text: string): string {
     .toLowerCase()
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
-    .replace(/[^a-z0-9€@.\s]/g, " ")
+    .replace(/[^a-z0-9€.\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -58,16 +70,21 @@ function extractDate(raw: string): string | null {
   return isNaN(d.getTime()) ? null : d.toISOString().split("T")[0];
 }
 
-function parseSender(from: string) {
-  const emailMatch = from.match(/<([^>]+)>/);
-  const email = (emailMatch?.[1] ?? from).trim().toLowerCase();
-  const domain = email.includes("@") ? email.split("@")[1] : "";
-  const name =
-    from
-      .replace(/<[^>]+>/g, "")
-      .replace(/["']/g, "")
-      .trim() || domain;
-  return { email, domain, name };
+/* ============================================================
+   CLASSIFIER
+============================================================ */
+
+function classifyEmail(bodyNorm: string, amount: number | null): FinancialEmailClass {
+  if (PROMO_TERMS.some((t) => bodyNorm.includes(t))) return "PROMOTION";
+  if (CREDIT_TERMS.some((t) => bodyNorm.includes(t))) return "NOTIFICATION";
+
+  const hasPaymentVerb = PAYMENT_VERBS.some((v) => bodyNorm.includes(v));
+
+  if (amount !== null && amount > 0 && hasPaymentVerb) {
+    return "PAYMENT";
+  }
+
+  return "UNKNOWN";
 }
 
 /* ============================================================
@@ -80,8 +97,6 @@ serve(async (req) => {
   }
 
   try {
-    /* ---------------- AUTH ---------------- */
-
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return new Response("Unauthorized", { status: 401 });
 
@@ -101,8 +116,6 @@ serve(async (req) => {
     const { email } = await req.json();
     const supabaseAdmin = createClient<Database>(supabaseUrl, serviceKey);
 
-    /* ---------------- CONNECTED EMAIL ---------------- */
-
     const { data: connectedEmail } = await supabaseAdmin
       .from("connected_emails")
       .select("id, last_sync_at")
@@ -110,11 +123,7 @@ serve(async (req) => {
       .eq("email", email)
       .single();
 
-    if (!connectedEmail) {
-      throw new Error("Connected email not found");
-    }
-
-    /* ---------------- TOKENS ---------------- */
+    if (!connectedEmail) throw new Error("Connected email not found");
 
     const { data: token } = await supabaseAdmin
       .from("gmail_tokens")
@@ -125,50 +134,44 @@ serve(async (req) => {
 
     if (!token) throw new Error("Gmail not connected");
 
-    const accessToken = token.access_token;
-
-    /* ---------------- CURSEUR INCRÉMENTAL ---------------- */
-
-    const afterTimestamp = connectedEmail.last_sync_at
+    const afterTs = connectedEmail.last_sync_at
       ? Math.floor(new Date(connectedEmail.last_sync_at).getTime() / 1000)
       : null;
 
-    let gmailQuery = "newer_than:365d";
-    if (afterTimestamp) gmailQuery += ` after:${afterTimestamp}`;
-
-    /* ---------------- LISTE SMTP ---------------- */
+    let query = "newer_than:365d";
+    if (afterTs) query += ` after:${afterTs}`;
 
     const listRes = await fetch(
-      `https://www.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(
-        gmailQuery,
-      )}&maxResults=${MAX_MESSAGES_PER_SYNC}`,
-      { headers: { Authorization: `Bearer ${accessToken}` } },
+      `https://www.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${MAX_MESSAGES}`,
+      { headers: { Authorization: `Bearer ${token.access_token}` } },
     );
 
     const listData = await listRes.json();
-    const messageIds: string[] = listData.messages?.map((m: any) => m.id) ?? [];
+    const ids = listData.messages?.map((m: any) => m.id) ?? [];
 
-    let processed = 0;
+    let payments = 0;
+    let classified = {
+      PAYMENT: 0,
+      NOTIFICATION: 0,
+      PROMOTION: 0,
+      UNKNOWN: 0,
+    };
 
-    /* ---------------- PROCESS ---------------- */
-
-    for (const messageId of messageIds) {
+    for (const id of ids) {
       const { data: exists } = await supabaseAdmin
         .from("expenses")
         .select("id")
         .eq("user_id", user.id)
-        .eq("source_id", `gmail_${messageId}`)
+        .eq("source_id", `gmail_${id}`)
         .maybeSingle();
-
       if (exists) continue;
 
-      const msgRes = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
+      const msgRes = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`, {
+        headers: { Authorization: `Bearer ${token.access_token}` },
       });
 
       const msg = await msgRes.json();
       const headers = msg.payload?.headers ?? [];
-
       const subject = headers.find((h: any) => h.name === "Subject")?.value || "";
       const from = headers.find((h: any) => h.name === "From")?.value || "";
       const date = headers.find((h: any) => h.name === "Date")?.value || "";
@@ -181,40 +184,18 @@ serve(async (req) => {
       if (!body) continue;
 
       const bodyNorm = normalize(body);
-
-      /* ========= FILTRES MINIMAUX (CRITIQUES) ========= */
-
-      // 1. Bloquer crédits / gains / tirages
-      if (
-        bodyNorm.includes("credit") ||
-        bodyNorm.includes("gagne") ||
-        bodyNorm.includes("tirage") ||
-        bodyNorm.includes("recompense")
-      ) {
-        continue;
-      }
-
-      // 2. Exiger preuve explicite de paiement
-      const hasPaymentProof =
-        bodyNorm.includes("€") ||
-        bodyNorm.includes("eur") ||
-        bodyNorm.includes("facture") ||
-        bodyNorm.includes("recu") ||
-        bodyNorm.includes("paiement") ||
-        bodyNorm.includes("prelev");
-
-      if (!hasPaymentProof) continue;
-
       const amount = extractAmount(body);
-      if (amount === null || amount <= 0) continue;
+      const classification = classifyEmail(bodyNorm, amount);
 
-      const sender = parseSender(from);
+      classified[classification]++;
+
+      if (classification !== "PAYMENT") continue;
 
       await supabaseAdmin.from("expenses").insert({
         user_id: user.id,
         source: "email",
-        source_id: `gmail_${messageId}`,
-        fournisseur: sender.name || sender.domain,
+        source_id: `gmail_${id}`,
+        fournisseur: from,
         montant_total: amount,
         description: subject,
         date_expense: extractDate(date),
@@ -222,10 +203,8 @@ serve(async (req) => {
         type_document: "email_financier",
       });
 
-      processed++;
+      payments++;
     }
-
-    /* ---------------- UPDATE CURSOR ---------------- */
 
     await supabaseAdmin
       .from("connected_emails")
@@ -235,8 +214,9 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        processed,
-        scanned: messageIds.length,
+        scanned: ids.length,
+        payments,
+        classified,
       }),
       { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } },
     );
