@@ -29,7 +29,7 @@ const PrivacyPolicy = () => (
           <h2 className="text-lg font-semibold text-foreground">Responsable du traitement</h2>
           <p>
             Le responsable du traitement des données personnelles est :<br />
-            <strong className="text-foreground">[Nom de la société]</strong><br />
+            <strong className="text-foreground">Budgely</strong><br />
             Email : contact@budgely.fr
           </p>
         </section>
