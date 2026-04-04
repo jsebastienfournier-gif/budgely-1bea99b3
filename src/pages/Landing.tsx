@@ -260,7 +260,7 @@ const Landing = () => {
               <Link to="/mentions-legales" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
                 Mentions légales
               </Link>
-              <Link to="/confidentialite" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+              <Link to="/privacy" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
                 Politique de confidentialité
               </Link>
               <Link to="/cgu" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
