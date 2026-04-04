@@ -3,6 +3,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 
+const openInNewTab = (url: string) => {
+  const a = document.createElement("a");
+  a.href = url;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+};
+
 export const useCheckout = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState<string | null>(null);
@@ -21,10 +31,8 @@ export const useCheckout = () => {
 
       if (error) throw error;
       if (data?.url) {
-        const win = window.open(data.url, "_blank");
-        if (!win) {
-          window.location.href = data.url;
-        }
+        openInNewTab(data.url);
+        toast({ title: "Redirection en cours", description: "La page de paiement s'ouvre dans un nouvel onglet." });
       }
     } catch (err: any) {
       console.error("Checkout error:", err);
@@ -40,10 +48,7 @@ export const useCheckout = () => {
       const { data, error } = await supabase.functions.invoke("customer-portal");
       if (error) throw error;
       if (data?.url) {
-        const win = window.open(data.url, "_blank");
-        if (!win) {
-          window.location.href = data.url;
-        }
+        openInNewTab(data.url);
       }
     } catch (err: any) {
       console.error("Portal error:", err);
