@@ -245,7 +245,11 @@ const Transactions = () => {
           <PremiumCTA message="Analyse illimitée disponible avec Premium" />
         </div>
 
-        <div className="mt-8 sm:mt-10 pt-6 border-t border-border text-center">
+        <div className="mt-8 sm:mt-10 pt-6 border-t border-border flex items-center justify-center gap-6">
+          <Link to="/receipts" className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
+            Capture des dépenses
+            <ArrowRight className="h-4 w-4" />
+          </Link>
           <Link to="/insights" className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
             Voir toutes les optimisations
             <ArrowRight className="h-4 w-4" />
