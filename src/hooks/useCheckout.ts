@@ -3,14 +3,27 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 
-const openInNewTab = (url: string) => {
-  const a = document.createElement("a");
-  a.href = url;
-  a.target = "_blank";
-  a.rel = "noopener noreferrer";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+const POPUP_BLOCKED_MESSAGE = "Autorisez l'ouverture de la fenêtre de paiement, puis réessayez.";
+
+const openPendingWindow = (title: string, message: string) => {
+  const popup = window.open("", "_blank");
+
+  if (!popup) {
+    return null;
+  }
+
+  popup.document.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8" /><title>${title}</title></head><body><p>${message}</p></body></html>`);
+  popup.document.close();
+
+  return popup;
+};
+
+const redirectPopup = (popup: Window | null, url: string) => {
+  if (!popup || popup.closed) {
+    throw new Error(POPUP_BLOCKED_MESSAGE);
+  }
+
+  popup.location.replace(url);
 };
 
 export const useCheckout = () => {
@@ -23,6 +36,12 @@ export const useCheckout = () => {
       return;
     }
 
+    const popup = openPendingWindow("Redirection vers le paiement", "Ouverture sécurisée de la page de paiement...");
+    if (!popup) {
+      toast({ title: "Fenêtre bloquée", description: POPUP_BLOCKED_MESSAGE, variant: "destructive" });
+      return;
+    }
+
     setLoading(priceId);
     try {
       const { data, error } = await supabase.functions.invoke("create-checkout", {
@@ -30,11 +49,14 @@ export const useCheckout = () => {
       });
 
       if (error) throw error;
-      if (data?.url) {
-        openInNewTab(data.url);
-        toast({ title: "Redirection en cours", description: "La page de paiement s'ouvre dans un nouvel onglet." });
-      }
+      if (!data?.url) throw new Error("Lien de paiement introuvable");
+
+      redirectPopup(popup, data.url);
     } catch (err: any) {
+      if (!popup.closed) {
+        popup.close();
+      }
+
       console.error("Checkout error:", err);
       toast({ title: "Erreur", description: err.message || "Impossible de démarrer le paiement", variant: "destructive" });
     } finally {
@@ -44,13 +66,24 @@ export const useCheckout = () => {
 
   const openPortal = async () => {
     if (!user) return;
+
+    const popup = openPendingWindow("Ouverture du portail", "Ouverture de votre espace de gestion...");
+    if (!popup) {
+      toast({ title: "Fenêtre bloquée", description: POPUP_BLOCKED_MESSAGE, variant: "destructive" });
+      return;
+    }
+
     try {
       const { data, error } = await supabase.functions.invoke("customer-portal");
       if (error) throw error;
-      if (data?.url) {
-        openInNewTab(data.url);
-      }
+      if (!data?.url) throw new Error("Lien du portail introuvable");
+
+      redirectPopup(popup, data.url);
     } catch (err: any) {
+      if (!popup.closed) {
+        popup.close();
+      }
+
       console.error("Portal error:", err);
       toast({ title: "Erreur", description: err.message || "Impossible d'ouvrir le portail", variant: "destructive" });
     }
