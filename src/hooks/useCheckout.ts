@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
+import { invokeAuthenticatedFunction } from "@/lib/edge-functions";
 
 const POPUP_BLOCKED_MESSAGE = "Autorisez l'ouverture de la fenêtre de paiement, puis réessayez.";
 
@@ -44,11 +44,7 @@ export const useCheckout = () => {
 
     setLoading(priceId);
     try {
-      const { data, error } = await supabase.functions.invoke("create-checkout", {
-        body: { priceId },
-      });
-
-      if (error) throw error;
+      const data = await invokeAuthenticatedFunction<{ url?: string }>("create-checkout", { priceId });
       if (!data?.url) throw new Error("Lien de paiement introuvable");
 
       redirectPopup(popup, data.url);
@@ -74,8 +70,7 @@ export const useCheckout = () => {
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke("customer-portal");
-      if (error) throw error;
+      const data = await invokeAuthenticatedFunction<{ url?: string }>("customer-portal");
       if (!data?.url) throw new Error("Lien du portail introuvable");
 
       redirectPopup(popup, data.url);

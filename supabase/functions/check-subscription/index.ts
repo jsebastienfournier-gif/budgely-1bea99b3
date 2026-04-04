@@ -19,41 +19,73 @@ serve(async (req) => {
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader) throw new Error("No authorization header provided");
-
-  // User-context client for auth validation
-  const supabaseAuth = createClient(
-    supabaseUrl,
-    Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-    { global: { headers: { Authorization: authHeader } } }
-  );
-
-  // Service role client for DB mutations (bypasses RLS)
-  const supabaseAdmin = createClient(
-    supabaseUrl,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    { auth: { persistSession: false } }
-  );
 
   try {
     logStep("Function started");
 
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
+
+    const token = authHeader.replace("Bearer ", "").trim();
+
+    // User-context client for auth validation
+    const supabaseAuth = createClient(
+      supabaseUrl,
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      {
+        auth: { persistSession: false },
+        global: { headers: { Authorization: authHeader } },
+      }
+    );
+
+    // Service role client for DB mutations (bypasses RLS)
+    const supabaseAdmin = createClient(
+      supabaseUrl,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
+    );
+
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
 
-    const { data: userData, error: userError } = await supabaseAuth.auth.getUser();
-    if (userError) throw new Error(`Authentication error: ${userError.message}`);
-    const user = userData.user;
-    if (!user?.email) throw new Error("User not authenticated or email not available");
-    logStep("User authenticated", { email: user.email });
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    const userId = typeof claimsData?.claims?.sub === "string" ? claimsData.claims.sub : null;
+    let userEmail = typeof claimsData?.claims?.email === "string" ? claimsData.claims.email : null;
+
+    if (claimsError || !userId) {
+      logStep("Authentication error", { error: claimsError?.message ?? "Missing sub claim" });
+      return new Response(JSON.stringify({ error: "Authentication error: invalid or expired session" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
+
+    if (!userEmail) {
+      const { data: userData, error: userError } = await supabaseAuth.auth.getUser(token);
+      if (userError || !userData.user?.email) {
+        logStep("Authentication error", { error: userError?.message ?? "Email not available" });
+        return new Response(JSON.stringify({ error: "Authentication error: email not available" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 401,
+        });
+      }
+
+      userEmail = userData.user.email;
+    }
+
+    logStep("User authenticated", { email: userEmail });
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    const customers = await stripe.customers.list({ email: userEmail, limit: 1 });
 
     if (customers.data.length === 0) {
       logStep("No customer found");
-      await supabaseAdmin.from("user_plans").upsert({ user_id: user.id, plan: "free", expires_at: null }, { onConflict: "user_id" });
+      await supabaseAdmin.from("user_plans").upsert({ user_id: userId, plan: "free", expires_at: null }, { onConflict: "user_id" });
       return new Response(
         JSON.stringify({ subscribed: false, plan: "free", product_id: null, subscription_end: null }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
@@ -82,7 +114,7 @@ serve(async (req) => {
 
     if (!sub) {
       logStep("No active subscription");
-      await supabaseAdmin.from("user_plans").upsert({ user_id: user.id, plan: "free", expires_at: null }, { onConflict: "user_id" });
+      await supabaseAdmin.from("user_plans").upsert({ user_id: userId, plan: "free", expires_at: null }, { onConflict: "user_id" });
       return new Response(
         JSON.stringify({ subscribed: false, plan: "free", product_id: null, subscription_end: null }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
@@ -116,7 +148,7 @@ serve(async (req) => {
       .from("user_plans")
       .upsert(
         {
-          user_id: user.id,
+          user_id: userId,
           plan,
           started_at: new Date(sub.created * 1000).toISOString(),
           expires_at: subscriptionEnd || null,

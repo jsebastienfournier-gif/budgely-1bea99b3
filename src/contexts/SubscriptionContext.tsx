@@ -1,7 +1,16 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { PlanKey } from "@/lib/stripe-plans";
+import { invokeAuthenticatedFunction } from "@/lib/edge-functions";
+
+type CheckSubscriptionResponse = {
+  plan?: PlanKey;
+  subscribed?: boolean;
+  product_id?: string | null;
+  price_id?: string | null;
+  subscription_end?: string | null;
+  status?: string | null;
+};
 
 type SubscriptionState = {
   plan: PlanKey;
@@ -47,8 +56,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke("check-subscription");
-      if (error) throw error;
+      const data = await invokeAuthenticatedFunction<CheckSubscriptionResponse>("check-subscription");
 
       setState({
         plan: data.plan || "free",
