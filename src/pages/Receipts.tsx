@@ -329,13 +329,17 @@ const Receipts = () => {
       setAnalysisStep("Analyse IA en cours…");
 
       // 4. Call AI analysis
-      const { data: result, error: fnError } = await supabase.functions.invoke("analyze-document", {
-        body: {
+      let result: any;
+      let fnError: any = null;
+      try {
+        result = await invokeAuthenticatedFunction("analyze-document", {
           document_id: doc.id,
           source,
           raw_text: rawText,
-        },
-      });
+        });
+      } catch (e: any) {
+        fnError = { message: e.message };
+      }
 
       if (fnError) {
         // Check for plan limit errors
