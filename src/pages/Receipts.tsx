@@ -413,7 +413,7 @@ const Receipts = () => {
     if (newEmailProvider === "gmail") {
       setSaving(true);
       try {
-        const { data, error } = await supabase.functions.invoke("gmail-auth");
+        const data = await invokeAuthenticatedFunction<{ url?: string }>("gmail-auth");
         if (error) throw error;
         if (data?.url) {
           window.location.href = data.url;
