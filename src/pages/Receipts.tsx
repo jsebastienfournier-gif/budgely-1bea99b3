@@ -23,6 +23,7 @@ import AppLayout from "@/components/AppLayout";
 import PremiumCTA from "@/components/PremiumCTA";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { invokeAuthenticatedFunction } from "@/lib/edge-functions";
 import { toast } from "sonner";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -329,13 +330,17 @@ const Receipts = () => {
       setAnalysisStep("Analyse IA en cours…");
 
       // 4. Call AI analysis
-      const { data: result, error: fnError } = await supabase.functions.invoke("analyze-document", {
-        body: {
+      let result: any;
+      let fnError: any = null;
+      try {
+        result = await invokeAuthenticatedFunction("analyze-document", {
           document_id: doc.id,
           source,
           raw_text: rawText,
-        },
-      });
+        });
+      } catch (e: any) {
+        fnError = { message: e.message };
+      }
 
       if (fnError) {
         // Check for plan limit errors
@@ -408,8 +413,8 @@ const Receipts = () => {
     if (newEmailProvider === "gmail") {
       setSaving(true);
       try {
-        const { data, error } = await supabase.functions.invoke("gmail-auth");
-        if (error) throw error;
+        const data = await invokeAuthenticatedFunction<{ url?: string }>("gmail-auth");
+        if (data?.url) {
         if (data?.url) {
           window.location.href = data.url;
           return;
@@ -425,8 +430,8 @@ const Receipts = () => {
     if (newEmailProvider === "outlook") {
       setSaving(true);
       try {
-        const { data, error } = await supabase.functions.invoke("microsoft-auth");
-        if (error) throw error;
+        const data = await invokeAuthenticatedFunction<{ url?: string }>("microsoft-auth");
+        if (data?.url) {
         if (data?.url) {
           window.location.href = data.url;
           return;
@@ -466,14 +471,7 @@ const Receipts = () => {
     const providerLabel = provider === "microsoft" ? "Outlook" : "Gmail";
     toast.info(`Synchronisation ${providerLabel} en cours…`);
     try {
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      const { data, error } = await supabase.functions.invoke(funcName, {
-        body: { email: emailAddr },
-        headers: {
-          Authorization: `Bearer ${currentSession?.access_token}`,
-        },
-      });
-      if (error) throw error;
+      const data = await invokeAuthenticatedFunction<any>(funcName, { email: emailAddr });
       if (data?.analyzed > 0) {
         toast.success(`${data.analyzed} email(s) analysé(s) sur ${data.total}`);
         const { data: expenseRes } = await supabase
