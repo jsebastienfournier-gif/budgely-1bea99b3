@@ -431,7 +431,6 @@ const Receipts = () => {
       try {
         const data = await invokeAuthenticatedFunction<{ url?: string }>("microsoft-auth");
         if (data?.url) {
-        if (data?.url) {
           window.location.href = data.url;
           return;
         }
