@@ -333,12 +333,15 @@ const Receipts = () => {
       let result: any;
       let fnError: any = null;
       try {
+        console.log("[analyze-document] Calling with source:", source, "doc_id:", doc.id, "raw_text length:", rawText.length);
         result = await invokeAuthenticatedFunction("analyze-document", {
           document_id: doc.id,
           source,
           raw_text: rawText,
         });
+        console.log("[analyze-document] Result:", JSON.stringify(result).slice(0, 500));
       } catch (e: any) {
+        console.error("[analyze-document] Error:", e.message, e);
         fnError = { message: e.message };
       }
 
