@@ -471,14 +471,7 @@ const Receipts = () => {
     const providerLabel = provider === "microsoft" ? "Outlook" : "Gmail";
     toast.info(`Synchronisation ${providerLabel} en cours…`);
     try {
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      const { data, error } = await supabase.functions.invoke(funcName, {
-        body: { email: emailAddr },
-        headers: {
-          Authorization: `Bearer ${currentSession?.access_token}`,
-        },
-      });
-      if (error) throw error;
+      const data = await invokeAuthenticatedFunction<any>(funcName, { email: emailAddr });
       if (data?.analyzed > 0) {
         toast.success(`${data.analyzed} email(s) analysé(s) sur ${data.total}`);
         const { data: expenseRes } = await supabase
