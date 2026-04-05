@@ -271,13 +271,12 @@ serve(async (req) => {
       await supabaseAdmin.from("documents").update({ status: "processing" }).eq("id", document_id);
     }
 
-    // Call Lovable AI
+    // Call Railway backend
     const systemPrompt = PROMPTS[source] || PROMPTS.receipt;
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResponse = await fetch(`${RAILWAY_URL}/v1/chat/completions`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${lovableApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -291,21 +290,15 @@ serve(async (req) => {
 
     if (!aiResponse.ok) {
       const statusCode = aiResponse.status;
+      const errText = await aiResponse.text();
+      console.error("Railway backend error:", statusCode, errText);
       if (statusCode === 429) {
         return new Response(JSON.stringify({ error: "Rate limit atteint. Réessayez dans quelques instants." }), {
           status: 429,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (statusCode === 402) {
-        return new Response(JSON.stringify({ error: "Crédits IA épuisés. Contactez le support." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const errText = await aiResponse.text();
-      console.error("AI gateway error:", statusCode, errText);
-      throw new Error(`AI gateway error: ${statusCode}`);
+      throw new Error(`Railway backend error: ${statusCode}`);
     }
 
     const aiData = await aiResponse.json();
