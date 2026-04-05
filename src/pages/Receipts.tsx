@@ -415,7 +415,6 @@ const Receipts = () => {
       try {
         const data = await invokeAuthenticatedFunction<{ url?: string }>("gmail-auth");
         if (data?.url) {
-        if (data?.url) {
           window.location.href = data.url;
           return;
         }
@@ -431,7 +430,6 @@ const Receipts = () => {
       setSaving(true);
       try {
         const data = await invokeAuthenticatedFunction<{ url?: string }>("microsoft-auth");
-        if (data?.url) {
         if (data?.url) {
           window.location.href = data.url;
           return;
