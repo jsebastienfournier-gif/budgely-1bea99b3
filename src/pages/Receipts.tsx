@@ -130,6 +130,7 @@ const Receipts = () => {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [validatingId, setValidatingId] = useState<string | null>(null);
 
   // Handle Gmail/Microsoft OAuth callback params
   useEffect(() => {
