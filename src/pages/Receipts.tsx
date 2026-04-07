@@ -848,7 +848,7 @@ const Receipts = () => {
                   >
                     {sourceIcon(r.source)}
                   </div>
-                  <div onClick={() => setSelectedReceipt(r)} className="cursor-pointer">
+                  <div onClick={() => setSelectedReceipt(r)} className="cursor-pointer flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground">{r.store}</p>
                     <p className="text-[10px] text-muted-foreground">
                       {r.date} ·{" "}
