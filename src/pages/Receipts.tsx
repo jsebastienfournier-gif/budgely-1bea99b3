@@ -77,6 +77,7 @@ type Receipt = {
   products: ReceiptProduct[];
   source?: string;
   description?: string;
+  source_id?: string;
 };
 
 const emailProviders = [
