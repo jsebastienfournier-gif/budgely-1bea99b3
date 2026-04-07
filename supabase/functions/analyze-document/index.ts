@@ -274,17 +274,15 @@ serve(async (req) => {
     // Call Railway backend
     const systemPrompt = PROMPTS[source] || PROMPTS.receipt;
 
-    const aiResponse = await fetch(`${RAILWAY_URL}/v1/chat/completions`, {
+    const aiResponse = await fetch(RAILWAY_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: raw_text },
-        ],
+        source,
+        raw_text,
+        system_prompt: systemPrompt,
       }),
     });
 
