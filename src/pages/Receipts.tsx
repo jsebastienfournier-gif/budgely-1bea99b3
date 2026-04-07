@@ -840,7 +840,7 @@ const Receipts = () => {
               {expenses.map((r) => (
                 <div
                   key={r.id}
-                  className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-3 p-4 items-center hover:bg-secondary/50 transition-colors"
+                  className="flex flex-wrap items-center gap-3 p-4 hover:bg-secondary/50 transition-colors"
                 >
                   <div
                     onClick={() => setSelectedReceipt(r)}
