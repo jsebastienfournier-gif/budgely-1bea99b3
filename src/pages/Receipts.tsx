@@ -255,6 +255,25 @@ const Receipts = () => {
     }
   };
 
+  const handleValidateEmail = async (sourceId: string, status: "approved" | "rejected") => {
+    const messageId = sourceId.replace(/^gmail_/, "");
+    setValidatingId(sourceId);
+    try {
+      const res = await fetch("https://budgely-backend-production.up.railway.app/api/gmail/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message_id: messageId, status }),
+      });
+      if (!res.ok) throw new Error(`Erreur ${res.status}`);
+      toast.success(status === "approved" ? "Email approuvé ✓" : "Email refusé ✗");
+      reloadExpenses();
+    } catch (err: any) {
+      toast.error("Erreur : " + (err.message || "Impossible de valider"));
+    } finally {
+      setValidatingId(null);
+    }
+  };
+
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0 || !user) return;
 
