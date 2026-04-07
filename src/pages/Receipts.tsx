@@ -77,6 +77,7 @@ type Receipt = {
   products: ReceiptProduct[];
   source?: string;
   description?: string;
+  source_id?: string;
 };
 
 const emailProviders = [
@@ -129,6 +130,7 @@ const Receipts = () => {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [validatingId, setValidatingId] = useState<string | null>(null);
 
   // Handle Gmail/Microsoft OAuth callback params
   useEffect(() => {
@@ -189,6 +191,7 @@ const Receipts = () => {
         products: articles,
         source: e.source,
         description: e.description || "",
+        source_id: e.source_id || undefined,
       };
     });
   };
@@ -249,6 +252,25 @@ const Receipts = () => {
     if (raw) {
       setEditingExpense(raw);
       setShowEditDialog(true);
+    }
+  };
+
+  const handleValidateEmail = async (sourceId: string, status: "approved" | "rejected") => {
+    const messageId = sourceId.replace(/^gmail_/, "");
+    setValidatingId(sourceId);
+    try {
+      const res = await fetch("https://budgely-backend-production.up.railway.app/api/gmail/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message_id: messageId, status }),
+      });
+      if (!res.ok) throw new Error(`Erreur ${res.status}`);
+      toast.success(status === "approved" ? "Email approuvé ✓" : "Email refusé ✗");
+      reloadExpenses();
+    } catch (err: any) {
+      toast.error("Erreur : " + (err.message || "Impossible de valider"));
+    } finally {
+      setValidatingId(null);
     }
   };
 
@@ -818,7 +840,7 @@ const Receipts = () => {
               {expenses.map((r) => (
                 <div
                   key={r.id}
-                  className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-3 p-4 items-center hover:bg-secondary/50 transition-colors"
+                  className="flex flex-wrap items-center gap-3 p-4 hover:bg-secondary/50 transition-colors"
                 >
                   <div
                     onClick={() => setSelectedReceipt(r)}
@@ -826,7 +848,7 @@ const Receipts = () => {
                   >
                     {sourceIcon(r.source)}
                   </div>
-                  <div onClick={() => setSelectedReceipt(r)} className="cursor-pointer">
+                  <div onClick={() => setSelectedReceipt(r)} className="cursor-pointer flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground">{r.store}</p>
                     <p className="text-[10px] text-muted-foreground">
                       {r.date} ·{" "}
@@ -834,6 +856,32 @@ const Receipts = () => {
                     </p>
                   </div>
                   <span className="text-sm font-semibold tabular-nums text-foreground">{r.total}</span>
+                  {r.source === "email" && r.source_id && (
+                    <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleValidateEmail(r.source_id!, "approved");
+                        }}
+                        disabled={validatingId === r.source_id}
+                        className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-green-500/10 hover:text-green-600 transition-colors disabled:opacity-50"
+                        title="Approuver"
+                      >
+                        <Check className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleValidateEmail(r.source_id!, "rejected");
+                        }}
+                        disabled={validatingId === r.source_id}
+                        className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
+                        title="Refuser"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </>
+                  )}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
