@@ -190,6 +190,7 @@ const Receipts = () => {
         products: articles,
         source: e.source,
         description: e.description || "",
+        source_id: e.source_id || undefined,
       };
     });
   };
