@@ -207,7 +207,7 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const RAILWAY_URL = "https://budgely-backend-production.up.railway.app";
+    const RAILWAY_URL = "https://budgely-backend-production.up.railway.app/api/documentai/parse";
 
     // Auth client to get user
     const supabaseAuth = createClient(supabaseUrl, supabaseKey, {
@@ -274,17 +274,15 @@ serve(async (req) => {
     // Call Railway backend
     const systemPrompt = PROMPTS[source] || PROMPTS.receipt;
 
-    const aiResponse = await fetch(`${RAILWAY_URL}/v1/chat/completions`, {
+    const aiResponse = await fetch(RAILWAY_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: raw_text },
-        ],
+        source,
+        raw_text,
+        system_prompt: systemPrompt,
       }),
     });
 
@@ -302,7 +300,18 @@ serve(async (req) => {
     }
 
     const aiData = await aiResponse.json();
-    const content = aiData.choices?.[0]?.message?.content || "";
+    
+    // Support multiple response formats from Railway backend
+    let content: string;
+    if (aiData.choices?.[0]?.message?.content) {
+      // OpenAI-compatible format
+      content = aiData.choices[0].message.content;
+    } else if (typeof aiData === "string") {
+      content = aiData;
+    } else {
+      // Assume Railway returns parsed data directly
+      content = JSON.stringify(aiData.result ?? aiData.data ?? aiData);
+    }
 
     // Parse JSON from AI response
     let parsed: any;
