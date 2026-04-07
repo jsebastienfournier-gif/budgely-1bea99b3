@@ -300,7 +300,18 @@ serve(async (req) => {
     }
 
     const aiData = await aiResponse.json();
-    const content = aiData.choices?.[0]?.message?.content || "";
+    
+    // Support multiple response formats from Railway backend
+    let content: string;
+    if (aiData.choices?.[0]?.message?.content) {
+      // OpenAI-compatible format
+      content = aiData.choices[0].message.content;
+    } else if (typeof aiData === "string") {
+      content = aiData;
+    } else {
+      // Assume Railway returns parsed data directly
+      content = JSON.stringify(aiData.result ?? aiData.data ?? aiData);
+    }
 
     // Parse JSON from AI response
     let parsed: any;
