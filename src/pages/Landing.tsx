@@ -122,7 +122,10 @@ const Landing = () => {
           transition={{ duration: 0.7 }}
           className="max-w-5xl mx-auto"
         >
-          <div className="bg-card rounded-2xl border border-border p-2 shadow-lg">
+          <div className="bg-card rounded-2xl border border-border p-2 shadow-lg relative">
+            <div className="absolute top-4 right-4 z-10 bg-primary/10 text-primary text-[10px] font-semibold uppercase tracking-wider px-3 py-1 rounded-full border border-primary/20">
+              Données de démonstration
+            </div>
             <div className="bg-secondary/50 rounded-xl p-6 md:p-10">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
