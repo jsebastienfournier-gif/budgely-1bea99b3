@@ -132,7 +132,97 @@ const Receipts = () => {
   const [deleting, setDeleting] = useState(false);
   const [validatingId, setValidatingId] = useState<string | null>(null);
 
-  // Handle Gmail/Microsoft OAuth callback params
+  // Sync bank transactions from Railway backend
+  const handleSyncBank = async () => {
+    if (!user || syncing) return;
+    setSyncing(true);
+    toast.info("Synchronisation bancaire en cours…");
+    try {
+      const res = await fetch(
+        `https://budgely-backend-production.up.railway.app/powens/transactions?user_id=${encodeURIComponent(user.id)}`
+      );
+      if (!res.ok) throw new Error(`Erreur ${res.status}`);
+      const transactions: Array<{
+        id: string;
+        amount: number;
+        currency: string;
+        date: string;
+        label: string;
+        category: string;
+        account_id: string;
+      }> = await res.json();
+
+      if (!transactions.length) {
+        toast.info("Aucune nouvelle transaction bancaire trouvée");
+        return;
+      }
+
+      // Map Powens category to app categories
+      const categoryMap: Record<string, string> = {
+        Food: "Alimentation",
+        Subscription: "Abonnements",
+        Transport: "Transport",
+        Housing: "Logement",
+        Health: "Santé",
+        Entertainment: "Loisirs",
+        Restaurant: "Restaurants",
+        Savings: "Épargne",
+        Investment: "Investissement",
+      };
+
+      const rows = transactions.map((tx) => ({
+        user_id: user.id,
+        source: "bank" as const,
+        source_id: tx.id,
+        montant_total: Math.abs(tx.amount),
+        devise: tx.currency || "EUR",
+        date_expense: tx.date,
+        fournisseur: tx.label,
+        categorie: categoryMap[tx.category] || "Autres",
+        description: tx.label,
+        abonnement_detecte: tx.category === "Subscription",
+      }));
+
+      // Upsert: skip already imported transactions (by source_id)
+      const { data: existing } = await supabase
+        .from("expenses")
+        .select("source_id")
+        .eq("user_id", user.id)
+        .eq("source", "bank")
+        .in("source_id", rows.map((r) => r.source_id!));
+
+      const existingIds = new Set((existing || []).map((e: any) => e.source_id));
+      const newRows = rows.filter((r) => !existingIds.has(r.source_id));
+
+      if (newRows.length === 0) {
+        toast.info("Toutes les transactions sont déjà importées");
+        return;
+      }
+
+      const { error } = await supabase.from("expenses").insert(newRows);
+      if (error) throw new Error(error.message);
+
+      toast.success(`${newRows.length} transaction(s) bancaire(s) importée(s)`);
+
+      // Update bank last_sync_at
+      await supabase
+        .from("connected_bank_accounts")
+        .update({ last_sync_at: new Date().toISOString() })
+        .eq("user_id", user.id);
+
+      setBanks((prev) =>
+        prev.map((b) => ({ ...b, last_sync_at: new Date().toISOString() }))
+      );
+
+      reloadExpenses();
+    } catch (err: any) {
+      toast.error("Erreur de synchronisation bancaire : " + (err.message || "Erreur inconnue"));
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // Handle Gmail/Microsoft/Powens OAuth callback params
   useEffect(() => {
     const reloadEmails = () => {
       if (user) {
@@ -165,6 +255,17 @@ const Receipts = () => {
     }
     if (searchParams.get("microsoft_error")) {
       toast.error("Erreur de connexion Outlook : " + searchParams.get("microsoft_error"));
+      setSearchParams({}, { replace: true });
+    }
+    // Powens callback
+    if (searchParams.get("powens_connected") === "true") {
+      toast.success("Compte bancaire connecté via Powens !");
+      setSearchParams({}, { replace: true });
+      // Auto-sync transactions after connection
+      handleSyncBank();
+    }
+    if (searchParams.get("powens_error")) {
+      toast.error("Erreur de connexion Powens : " + searchParams.get("powens_error"));
       setSearchParams({}, { replace: true });
     }
   }, [searchParams]);
@@ -727,7 +828,7 @@ const Receipts = () => {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            onClick={() => (hasBanks ? toast.info("Synchronisation en cours…") : setShowBankDialog(true))}
+            onClick={() => (hasBanks ? handleSyncBank() : setShowBankDialog(true))}
             className="bg-card rounded-2xl border border-border p-6 hover:border-primary/30 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-4">
@@ -755,7 +856,16 @@ const Receipts = () => {
               </div>
               {hasBanks ? (
                 <div className="flex items-center gap-2 shrink-0">
-                  <RefreshCw className="h-4 w-4 text-primary" />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSyncBank();
+                    }}
+                    disabled={syncing}
+                    className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 text-primary ${syncing ? "animate-spin" : ""}`} />
+                  </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
