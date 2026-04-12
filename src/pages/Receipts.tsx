@@ -1069,45 +1069,23 @@ const Receipts = () => {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Connecter un compte bancaire</DialogTitle>
-            <DialogDescription>Ajoutez un compte bancaire pour synchroniser vos transactions.</DialogDescription>
+            <DialogDescription>
+              Vous allez être redirigé vers notre partenaire sécurisé pour connecter votre banque et synchroniser vos transactions automatiquement.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
-            <div>
-              <label className="text-sm font-medium text-foreground block mb-1.5">Banque</label>
-              <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
-                {bankList.map((b) => (
-                  <button
-                    key={b}
-                    onClick={() => setNewBankName(b)}
-                    className={`p-2.5 rounded-xl border text-xs font-medium transition-colors ${newBankName === b ? "border-primary bg-primary/5 text-primary" : "border-border text-foreground hover:bg-secondary"}`}
-                  >
-                    {b}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground block mb-1.5">Libellé du compte (optionnel)</label>
-              <input
-                type="text"
-                value={newBankLabel}
-                onChange={(e) => setNewBankLabel(e.target.value)}
-                placeholder="Ex: Compte courant, Livret A…"
-                className={inputClass}
-              />
-            </div>
             <div className="bg-secondary/50 rounded-xl p-3">
               <p className="text-[11px] text-muted-foreground">
-                🔒 Vos identifiants bancaires ne sont jamais stockés. Connexion sécurisée et chiffrée.
+                🔒 Vos identifiants bancaires ne sont jamais stockés. Connexion sécurisée via Powens, agréé par l'ACPR Banque de France.
               </p>
             </div>
             <button
               onClick={handleAddBank}
-              disabled={saving || !newBankName}
+              disabled={saving}
               className="w-full inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              Connecter
+              Connecter ma banque
             </button>
           </div>
         </DialogContent>
