@@ -529,23 +529,16 @@ const Receipts = () => {
   };
 
   const handleAddBank = async () => {
-    if (!newBankName.trim() || !user) return;
+    if (!user) return;
     setSaving(true);
-    const { data, error } = await supabase
-      .from("connected_bank_accounts")
-      .insert({ user_id: user.id, bank_name: newBankName, account_label: newBankLabel.trim() || null })
-      .select("*")
-      .single();
-    setSaving(false);
-    if (error) {
-      toast.error("Erreur lors de l'ajout");
-      return;
+    try {
+      // Redirect to Powens init on Railway backend
+      const powensUrl = `https://budgely-backend-production.up.railway.app/powens/init?user_id=${encodeURIComponent(user.id)}`;
+      window.location.href = powensUrl;
+    } catch (err: any) {
+      setSaving(false);
+      toast.error("Erreur lors de la connexion bancaire : " + (err.message || "Erreur inconnue"));
     }
-    setBanks((prev) => [...prev, data as ConnectedBank]);
-    setNewBankName("");
-    setNewBankLabel("");
-    setShowBankDialog(false);
-    toast.success("Compte bancaire connecté !");
   };
 
   const formatSyncDate = (date: string | null) => {
