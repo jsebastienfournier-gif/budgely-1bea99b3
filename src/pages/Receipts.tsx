@@ -856,7 +856,16 @@ const Receipts = () => {
               </div>
               {hasBanks ? (
                 <div className="flex items-center gap-2 shrink-0">
-                  <RefreshCw className="h-4 w-4 text-primary" />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSyncBank();
+                    }}
+                    disabled={syncing}
+                    className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 text-primary ${syncing ? "animate-spin" : ""}`} />
+                  </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
