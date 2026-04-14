@@ -9,6 +9,7 @@ import { Loader2, ExternalLink, RefreshCw } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
+import UsageOverview from "@/components/UsageOverview";
 
 const Subscription = () => {
   const { plan, subscribed, subscriptionEnd, status, loading, refresh } = useSubscription();
@@ -84,6 +85,8 @@ const Subscription = () => {
             )}
           </div>
         </div>
+
+        <UsageOverview />
 
         <PricingSection />
       </div>
