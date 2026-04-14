@@ -633,9 +633,15 @@ const Receipts = () => {
     if (!user) return;
     setSaving(true);
     try {
-      // Redirect to Powens init on Railway backend
+      // Fetch redirect URL from Railway backend, then redirect
       const powensUrl = `https://budgely-backend-production.up.railway.app/powens/init?user_id=${encodeURIComponent(user.id)}`;
-      window.location.href = powensUrl;
+      const res = await fetch(powensUrl);
+      const data = await res.json();
+      if (data.redirect_url) {
+        window.location.href = data.redirect_url;
+      } else {
+        throw new Error("Aucune URL de redirection reçue");
+      }
     } catch (err: any) {
       setSaving(false);
       toast.error("Erreur lors de la connexion bancaire : " + (err.message || "Erreur inconnue"));
