@@ -85,15 +85,44 @@ function buildTopMerchants(expenses: Expense[]) {
     .slice(0, 5);
 }
 
+const quickActions = [
+  { to: "/receipts", icon: Camera, label: "Capture", desc: "Ajouter des dépenses", color: "text-primary" },
+  { to: "/transactions", icon: PieChartIcon, label: "Analyses", desc: "Comprendre vos dépenses", color: "text-chart-2" },
+  { to: "/insights", icon: Lightbulb, label: "Optimisations", desc: "Réduire vos coûts", color: "text-chart-4" },
+];
+
+const QuickActions = () => (
+  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
+    {quickActions.map((a) => (
+      <Link key={a.to} to={a.to}>
+        <motion.div
+          whileHover={{ y: -2 }}
+          className="group flex items-center gap-4 bg-card rounded-2xl p-4 border border-border hover:border-primary/30 transition-colors cursor-pointer"
+        >
+          <div className={`h-10 w-10 rounded-xl bg-secondary flex items-center justify-center ${a.color}`}>
+            <a.icon className="h-5 w-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-foreground">{a.label}</p>
+            <p className="text-xs text-muted-foreground">{a.desc}</p>
+          </div>
+          <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+        </motion.div>
+      </Link>
+    ))}
+  </div>
+);
+
 const EmptyState = () => (
   <div className="flex flex-col items-center justify-center py-20 text-center">
     <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
       <Inbox className="h-7 w-7 text-muted-foreground" />
     </div>
     <h2 className="text-lg font-semibold text-foreground mb-1">Aucune dépense enregistrée</h2>
-    <p className="text-sm text-muted-foreground max-w-sm">
+    <p className="text-sm text-muted-foreground max-w-sm mb-6">
       Importez vos tickets, emails ou relevés bancaires depuis la page Capture pour alimenter votre tableau de bord.
     </p>
+    <QuickActions />
   </div>
 );
 
