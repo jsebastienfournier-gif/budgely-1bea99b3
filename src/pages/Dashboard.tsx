@@ -1,10 +1,11 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { TrendingDown, TrendingUp, Wallet, Sparkles, Inbox, Loader2 } from "lucide-react";
+import { TrendingDown, TrendingUp, Wallet, Sparkles, Inbox, Loader2, Camera, PieChart as PieChartIcon, Lightbulb, ArrowRight } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid,
 } from "recharts";
+import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { useExpenses, Expense } from "@/hooks/useExpenses";
 import { format, subMonths, startOfMonth, endOfMonth, parseISO } from "date-fns";
