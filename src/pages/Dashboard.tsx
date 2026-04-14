@@ -186,7 +186,7 @@ const Dashboard = () => {
           </p>
         </div>
 
-        {/* Summary Cards */}
+        <QuickActions />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <motion.div {...fadeUp} className="bg-card rounded-2xl p-6 shadow-sm border border-border">
             <div className="flex items-center justify-between mb-3">
