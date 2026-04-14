@@ -139,7 +139,8 @@ const Receipts = () => {
     toast.info("Synchronisation bancaire en cours…");
     try {
       const res = await fetch(
-        `https://budgely-backend-production.up.railway.app/powens/transactions?user_id=${encodeURIComponent(user.id)}`
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/powens-proxy?action=transactions&user_id=${encodeURIComponent(user.id)}`,
+        { headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } }
       );
       if (!res.ok) throw new Error(`Erreur ${res.status}`);
       const transactions: Array<{
@@ -633,9 +634,11 @@ const Receipts = () => {
     if (!user) return;
     setSaving(true);
     try {
-      // Fetch redirect URL from Railway backend, then redirect
-      const powensUrl = `https://budgely-backend-production.up.railway.app/powens/init?user_id=${encodeURIComponent(user.id)}`;
-      const res = await fetch(powensUrl);
+      // Fetch redirect URL via edge function proxy
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/powens-proxy?action=init&user_id=${encodeURIComponent(user.id)}`,
+        { headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } }
+      );
       const data = await res.json();
       if (data.redirect_url) {
         window.location.href = data.redirect_url;
