@@ -86,6 +86,8 @@ const Subscription = () => {
           </div>
         </div>
 
+        <UsageOverview />
+
         <PricingSection />
       </div>
     </AppLayout>
