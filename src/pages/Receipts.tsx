@@ -17,11 +17,13 @@ import {
   Coins,
   Pencil,
   Trash2,
+  Lock,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import AppLayout from "@/components/AppLayout";
 import PremiumCTA from "@/components/PremiumCTA";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { supabase } from "@/integrations/supabase/client";
 import { invokeAuthenticatedFunction } from "@/lib/edge-functions";
 import { toast } from "sonner";
@@ -103,6 +105,7 @@ const bankList = [
 
 const Receipts = () => {
   const { user } = useAuth();
+  const { plan } = useSubscription();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
