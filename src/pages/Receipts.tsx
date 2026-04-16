@@ -17,11 +17,13 @@ import {
   Coins,
   Pencil,
   Trash2,
+  Lock,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import AppLayout from "@/components/AppLayout";
 import PremiumCTA from "@/components/PremiumCTA";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { supabase } from "@/integrations/supabase/client";
 import { invokeAuthenticatedFunction } from "@/lib/edge-functions";
 import { toast } from "sonner";
@@ -103,6 +105,7 @@ const bankList = [
 
 const Receipts = () => {
   const { user } = useAuth();
+  const { plan } = useSubscription();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -837,12 +840,28 @@ const Receipts = () => {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            onClick={() => (hasBanks ? handleSyncBank() : setShowBankDialog(true))}
-            className="bg-card rounded-2xl border border-border p-6 hover:border-primary/30 transition-colors cursor-pointer"
+            onClick={() => {
+              if (plan === "free") {
+                navigate("/subscription");
+                return;
+              }
+              hasBanks ? handleSyncBank() : setShowBankDialog(true);
+            }}
+            className={`bg-card rounded-2xl border p-6 transition-colors ${
+              plan === "free"
+                ? "border-border/50 bg-muted/30 cursor-pointer hover:border-primary/20"
+                : "border-border hover:border-primary/30 cursor-pointer"
+            }`}
           >
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <Landmark className="h-6 w-6 text-primary" />
+              <div className={`h-12 w-12 rounded-xl flex items-center justify-center shrink-0 ${
+                plan === "free" ? "bg-muted" : "bg-primary/10"
+              }`}>
+                {plan === "free" ? (
+                  <Lock className="h-5 w-5 text-muted-foreground" />
+                ) : (
+                  <Landmark className="h-6 w-6 text-primary" />
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 {hasBanks ? (
@@ -856,14 +875,18 @@ const Receipts = () => {
                   </>
                 ) : (
                   <>
-                    <p className="text-sm font-semibold text-foreground">🏦 Banque : connexion sécurisée</p>
+                    <p className={`text-sm font-semibold ${plan === "free" ? "text-muted-foreground" : "text-foreground"}`}>
+                      🏦 Banque : connexion sécurisée
+                    </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Synchronisez vos transactions bancaires en toute sécurité
+                      {plan === "free"
+                        ? "Disponible dans les offres Essentiel et Premium"
+                        : "Synchronisez vos transactions bancaires en toute sécurité"}
                     </p>
                   </>
                 )}
               </div>
-              {hasBanks ? (
+              {plan !== "free" && hasBanks ? (
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     onClick={(e) => {
@@ -884,6 +907,13 @@ const Receipts = () => {
                   >
                     <Plus className="h-3.5 w-3.5 text-primary" />
                   </button>
+                </div>
+              ) : plan === "free" ? (
+                <div className="shrink-0">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
+                    Passer à Essentiel
+                    <ChevronRight className="h-3 w-3" />
+                  </span>
                 </div>
               ) : (
                 <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -1189,23 +1219,46 @@ const Receipts = () => {
           <DialogHeader>
             <DialogTitle>Connecter un compte bancaire</DialogTitle>
             <DialogDescription>
-              Vous allez être redirigé vers notre partenaire sécurisé pour connecter votre banque et synchroniser vos transactions automatiquement.
+              {plan === "free"
+                ? "Cette fonctionnalité est disponible à partir de l'offre Essentiel."
+                : "Vous allez être redirigé vers notre partenaire sécurisé pour connecter votre banque et synchroniser vos transactions automatiquement."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
-            <div className="bg-secondary/50 rounded-xl p-3">
-              <p className="text-[11px] text-muted-foreground">
-                🔒 Vos identifiants bancaires ne sont jamais stockés. Connexion sécurisée via Powens, agréé par l'ACPR Banque de France.
-              </p>
-            </div>
-            <button
-              onClick={handleAddBank}
-              disabled={saving}
-              className="w-full inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              Connecter ma banque
-            </button>
+            {plan === "free" ? (
+              <div className="bg-muted rounded-xl p-4 text-center">
+                <Lock className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground mb-3">
+                  La connexion bancaire est réservée aux offres payantes
+                </p>
+                <button
+                  onClick={() => {
+                    setShowBankDialog(false);
+                    navigate("/subscription");
+                  }}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+                >
+                  Découvrir les offres
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="bg-secondary/50 rounded-xl p-3">
+                  <p className="text-[11px] text-muted-foreground">
+                    🔒 Vos identifiants bancaires ne sont jamais stockés. Connexion sécurisée via Powens, agréé par l'ACPR Banque de France.
+                  </p>
+                </div>
+                <button
+                  onClick={handleAddBank}
+                  disabled={saving}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                  Connecter ma banque
+                </button>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
