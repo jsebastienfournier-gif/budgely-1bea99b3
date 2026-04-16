@@ -857,11 +857,7 @@ const Receipts = () => {
               <div className={`h-12 w-12 rounded-xl flex items-center justify-center shrink-0 ${
                 plan === "free" ? "bg-muted" : "bg-primary/10"
               }`}>
-                {plan === "free" ? (
-                  <Lock className="h-5 w-5 text-muted-foreground" />
-                ) : (
-                  <Landmark className="h-6 w-6 text-primary" />
-                )}
+                <Landmark className={`h-6 w-6 ${plan === "free" ? "text-muted-foreground" : "text-primary"}`} />
               </div>
               <div className="flex-1 min-w-0">
                 {hasBanks ? (
