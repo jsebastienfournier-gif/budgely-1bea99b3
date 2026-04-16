@@ -853,7 +853,7 @@ const Receipts = () => {
                 : "border-border hover:border-primary/30 cursor-pointer"
             }`}
           >
-            <div className="flex items-center gap-4">
+            <div className="flex items-start gap-4">
               <div className={`h-12 w-12 rounded-xl flex items-center justify-center shrink-0 ${
                 plan === "free" ? "bg-muted" : "bg-primary/10"
               }`}>
@@ -878,11 +878,17 @@ const Receipts = () => {
                     <p className={`text-sm font-semibold ${plan === "free" ? "text-muted-foreground" : "text-foreground"}`}>
                       🏦 Banque : connexion sécurisée
                     </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-1">
                       {plan === "free"
                         ? "Disponible dans les offres Essentiel et Premium"
                         : "Synchronisez vos transactions bancaires en toute sécurité"}
                     </p>
+                    {plan === "free" && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary bg-primary/10 px-2 py-1 rounded-full mt-2">
+                        Passer à Essentiel
+                        <ChevronRight className="h-3 w-3" />
+                      </span>
+                    )}
                   </>
                 )}
               </div>
@@ -908,16 +914,9 @@ const Receipts = () => {
                     <Plus className="h-3.5 w-3.5 text-primary" />
                   </button>
                 </div>
-              ) : plan === "free" ? (
-                <div className="shrink-0">
-                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
-                    Passer à Essentiel
-                    <ChevronRight className="h-3 w-3" />
-                  </span>
-                </div>
-              ) : (
-                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-              )}
+              ) : plan !== "free" ? (
+                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-3" />
+              ) : null}
             </div>
             {hasBanks && (
               <div className="mt-3 pt-3 border-t border-border">
