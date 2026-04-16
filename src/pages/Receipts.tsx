@@ -840,12 +840,28 @@ const Receipts = () => {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            onClick={() => (hasBanks ? handleSyncBank() : setShowBankDialog(true))}
-            className="bg-card rounded-2xl border border-border p-6 hover:border-primary/30 transition-colors cursor-pointer"
+            onClick={() => {
+              if (plan === "free") {
+                navigate("/subscription");
+                return;
+              }
+              hasBanks ? handleSyncBank() : setShowBankDialog(true);
+            }}
+            className={`bg-card rounded-2xl border p-6 transition-colors ${
+              plan === "free"
+                ? "border-border/50 bg-muted/30 cursor-pointer hover:border-primary/20"
+                : "border-border hover:border-primary/30 cursor-pointer"
+            }`}
           >
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <Landmark className="h-6 w-6 text-primary" />
+              <div className={`h-12 w-12 rounded-xl flex items-center justify-center shrink-0 ${
+                plan === "free" ? "bg-muted" : "bg-primary/10"
+              }`}>
+                {plan === "free" ? (
+                  <Lock className="h-5 w-5 text-muted-foreground" />
+                ) : (
+                  <Landmark className="h-6 w-6 text-primary" />
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 {hasBanks ? (
@@ -859,14 +875,18 @@ const Receipts = () => {
                   </>
                 ) : (
                   <>
-                    <p className="text-sm font-semibold text-foreground">🏦 Banque : connexion sécurisée</p>
+                    <p className={`text-sm font-semibold ${plan === "free" ? "text-muted-foreground" : "text-foreground"}`}>
+                      🏦 Banque : connexion sécurisée
+                    </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Synchronisez vos transactions bancaires en toute sécurité
+                      {plan === "free"
+                        ? "Disponible dans les offres Essentiel et Premium"
+                        : "Synchronisez vos transactions bancaires en toute sécurité"}
                     </p>
                   </>
                 )}
               </div>
-              {hasBanks ? (
+              {plan !== "free" && hasBanks ? (
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     onClick={(e) => {
@@ -887,6 +907,13 @@ const Receipts = () => {
                   >
                     <Plus className="h-3.5 w-3.5 text-primary" />
                   </button>
+                </div>
+              ) : plan === "free" ? (
+                <div className="shrink-0">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
+                    Passer à Essentiel
+                    <ChevronRight className="h-3 w-3" />
+                  </span>
                 </div>
               ) : (
                 <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
