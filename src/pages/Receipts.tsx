@@ -1219,23 +1219,46 @@ const Receipts = () => {
           <DialogHeader>
             <DialogTitle>Connecter un compte bancaire</DialogTitle>
             <DialogDescription>
-              Vous allez être redirigé vers notre partenaire sécurisé pour connecter votre banque et synchroniser vos transactions automatiquement.
+              {plan === "free"
+                ? "Cette fonctionnalité est disponible à partir de l'offre Essentiel."
+                : "Vous allez être redirigé vers notre partenaire sécurisé pour connecter votre banque et synchroniser vos transactions automatiquement."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
-            <div className="bg-secondary/50 rounded-xl p-3">
-              <p className="text-[11px] text-muted-foreground">
-                🔒 Vos identifiants bancaires ne sont jamais stockés. Connexion sécurisée via Powens, agréé par l'ACPR Banque de France.
-              </p>
-            </div>
-            <button
-              onClick={handleAddBank}
-              disabled={saving}
-              className="w-full inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              Connecter ma banque
-            </button>
+            {plan === "free" ? (
+              <div className="bg-muted rounded-xl p-4 text-center">
+                <Lock className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground mb-3">
+                  La connexion bancaire est réservée aux offres payantes
+                </p>
+                <button
+                  onClick={() => {
+                    setShowBankDialog(false);
+                    navigate("/subscription");
+                  }}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+                >
+                  Découvrir les offres
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="bg-secondary/50 rounded-xl p-3">
+                  <p className="text-[11px] text-muted-foreground">
+                    🔒 Vos identifiants bancaires ne sont jamais stockés. Connexion sécurisée via Powens, agréé par l'ACPR Banque de France.
+                  </p>
+                </div>
+                <button
+                  onClick={handleAddBank}
+                  disabled={saving}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                  Connecter ma banque
+                </button>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
