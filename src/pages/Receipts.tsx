@@ -441,7 +441,7 @@ const Receipts = () => {
       setAnalysisProgress(60);
       setAnalysisStep("Analyse IA en cours…");
 
-      const RAILWAY_PARSE_URL = "https://budgely-backend-production.up.railway.app/api/documentai/parse";
+      const RAILWAY_PARSE_URL = "https://budgely-backend-production.up.railway.app/api/document/parse";
       let parsed: any = null;
       try {
         console.log("[railway/parse] Uploading file:", file.name, file.type, file.size);
