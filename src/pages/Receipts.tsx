@@ -434,9 +434,16 @@ const Receipts = () => {
       setAnalysisProgress(40);
       setAnalysisStep("Envoi au moteur d'analyse…");
 
-      // 3. Send the actual file to Railway backend (Document AI) — bypass edge function
-      const formData = new FormData();
-      formData.append("file", file);
+      // 3. Send the file as base64 JSON to Railway backend (Document AI)
+      const fileBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(",")[1]);
+        };
+        reader.onerror = reject;
+      });
 
       setAnalysisProgress(60);
       setAnalysisStep("Analyse IA en cours…");
@@ -444,10 +451,15 @@ const Receipts = () => {
       const RAILWAY_PARSE_URL = "https://budgely-backend-production.up.railway.app/api/document/parse";
       let parsed: any = null;
       try {
-        console.log("[railway/parse] Uploading file:", file.name, file.type, file.size);
+        console.log("[railway/parse] Uploading file (base64):", file.name, file.type, file.size);
         const res = await fetch(RAILWAY_PARSE_URL, {
           method: "POST",
-          body: formData,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content_base64: fileBase64,
+            file_name: file.name,
+            mime_type: file.type,
+          }),
         });
         const text = await res.text();
         console.log("[railway/parse] Status:", res.status, "Body:", text.slice(0, 500));
