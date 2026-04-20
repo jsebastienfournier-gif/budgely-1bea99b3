@@ -432,70 +432,79 @@ const Receipts = () => {
       if (docError) throw new Error("Erreur document: " + docError.message);
 
       setAnalysisProgress(40);
-      setAnalysisStep("Extraction du texte…");
+      setAnalysisStep("Envoi au moteur d'analyse…");
 
-      // 3. Extract text (for images, convert to base64 for AI vision)
-      let rawText = "";
-      if (file.type === "application/pdf") {
-        rawText = `[Fichier PDF: ${file.name}] Contenu à analyser.`;
-        // In production, use a PDF parser service
-      } else {
-        // Convert image to base64 for description
-        const reader = new FileReader();
-        rawText = await new Promise<string>((resolve) => {
-          reader.onload = () => {
-            const base64 = (reader.result as string).split(",")[1];
-            resolve(
-              `[Image de ticket de caisse encodée en base64]\nNom du fichier: ${file.name}\nVeuillez analyser cette image de ticket de caisse et extraire les informations.`,
-            );
-          };
-          reader.readAsDataURL(file);
-        });
-      }
+      // 3. Send the actual file to Railway backend (Document AI) — bypass edge function
+      const formData = new FormData();
+      formData.append("file", file);
 
       setAnalysisProgress(60);
       setAnalysisStep("Analyse IA en cours…");
 
-      // 4. Call AI analysis
-      let result: any;
-      let fnError: any = null;
+      const RAILWAY_PARSE_URL = "https://budgely-backend-production.up.railway.app/api/documentai/parse";
+      let parsed: any = null;
       try {
-        console.log("[analyze-document] Calling with source:", source, "doc_id:", doc.id, "raw_text length:", rawText.length);
-        result = await invokeAuthenticatedFunction("analyze-document", {
-          document_id: doc.id,
-          source,
-          raw_text: rawText,
+        console.log("[railway/parse] Uploading file:", file.name, file.type, file.size);
+        const res = await fetch(RAILWAY_PARSE_URL, {
+          method: "POST",
+          body: formData,
         });
-        console.log("[analyze-document] Result:", JSON.stringify(result).slice(0, 500));
+        const text = await res.text();
+        console.log("[railway/parse] Status:", res.status, "Body:", text.slice(0, 500));
+        if (!res.ok) {
+          let msg = `Erreur backend (${res.status})`;
+          try {
+            const j = JSON.parse(text);
+            msg = j.error || j.message || msg;
+          } catch {}
+          throw new Error(msg);
+        }
+        parsed = JSON.parse(text);
       } catch (e: any) {
-        console.error("[analyze-document] Error:", e.message, e);
-        fnError = { message: e.message };
+        console.error("[railway/parse] Error:", e);
+        await supabase.from("documents").update({ status: "failed", error_message: e.message }).eq("id", doc.id);
+        throw e;
       }
 
-      if (fnError) {
-        // Check for plan limit errors
-        if (fnError.message?.includes("limit_reached")) {
-          toast.error("Limite mensuelle atteinte. Passez à Premium pour des analyses illimitées !");
-          return;
-        }
-        throw new Error(fnError.message || "Erreur d'analyse");
-      }
-
-      if (result?.error) {
-        if (result.error === "limit_reached") {
-          toast.error(result.message || "Limite atteinte");
-          return;
-        }
-        throw new Error(result.error);
-      }
-
-      setAnalysisProgress(90);
+      setAnalysisProgress(85);
       setAnalysisStep("Enregistrement…");
 
+      // 4. Insert expense from parsed result
+      const e = parsed?.expense || parsed?.data || parsed || {};
+      const articlesRaw = e.articles || e.items || [];
+      const expensePayload = {
+        user_id: user.id,
+        document_id: doc.id,
+        source: source as "receipt" | "invoice",
+        magasin: e.magasin || e.store || null,
+        fournisseur: e.fournisseur || e.merchant || e.magasin || null,
+        date_expense: e.date_expense || e.date || null,
+        montant_total: typeof e.montant_total === "number" ? e.montant_total : (typeof e.total === "number" ? e.total : null),
+        devise: e.devise || e.currency || "EUR",
+        categorie: e.categorie || e.category || null,
+        moyen_paiement: e.moyen_paiement || e.payment_method || null,
+        numero_facture: e.numero_facture || e.invoice_number || null,
+        type_document: e.type_document || source,
+        articles: articlesRaw,
+        raw_ai_response: parsed,
+      };
+
+      const { data: inserted, error: insertError } = await supabase
+        .from("expenses")
+        .insert(expensePayload)
+        .select()
+        .single();
+
+      if (insertError) {
+        await supabase.from("documents").update({ status: "failed", error_message: insertError.message }).eq("id", doc.id);
+        throw new Error("Enregistrement: " + insertError.message);
+      }
+
+      await supabase.from("documents").update({ status: "completed" }).eq("id", doc.id);
+
       // 5. Add to local state
-      if (result?.expense) {
-        const e = result.expense;
-        const articles = (e.articles || []).map((a: any) => ({
+      if (inserted) {
+        const articles = (Array.isArray(articlesRaw) ? articlesRaw : []).map((a: any) => ({
           name: a.nom || a.name || "",
           qty: a.quantite || a.qty || 1,
           unit: a.unite || a.unit || "pce",
@@ -503,16 +512,16 @@ const Receipts = () => {
           total: a.prix_total || a.total || 0,
         }));
         const newReceipt: Receipt = {
-          id: e.id,
-          store: e.magasin || e.fournisseur || "Inconnu",
-          date: e.date_expense
-            ? new Date(e.date_expense).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
+          id: inserted.id,
+          store: inserted.magasin || inserted.fournisseur || "Inconnu",
+          date: inserted.date_expense
+            ? new Date(inserted.date_expense).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
             : "Aujourd'hui",
-          total: `€${(e.montant_total || 0).toFixed(2)}`,
+          total: `€${(inserted.montant_total || 0).toFixed(2)}`,
           items: articles.length,
           status: "Analysé",
           products: articles,
-          source: e.source,
+          source: inserted.source,
         };
         setExpenses((prev) => [newReceipt, ...prev]);
       }
