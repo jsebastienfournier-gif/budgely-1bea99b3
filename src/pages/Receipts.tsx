@@ -80,6 +80,7 @@ type Receipt = {
   source?: string;
   description?: string;
   source_id?: string;
+  document_id?: string | null;
 };
 
 const emailProviders = [
@@ -134,6 +135,8 @@ const Receipts = () => {
   const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [validatingId, setValidatingId] = useState<string | null>(null);
+  const [documentPreview, setDocumentPreview] = useState<{ url: string; mime: string | null; name: string | null } | null>(null);
+  const [loadingDoc, setLoadingDoc] = useState(false);
 
   // Sync bank transactions from Railway backend
   const handleSyncBank = async () => {
@@ -297,6 +300,7 @@ const Receipts = () => {
         source: e.source,
         description: e.description || "",
         source_id: e.source_id || undefined,
+        document_id: e.document_id || null,
       };
     });
   };
@@ -534,6 +538,7 @@ const Receipts = () => {
           status: "Analysé",
           products: articles,
           source: inserted.source,
+          document_id: inserted.document_id || null,
         };
         setExpenses((prev) => [newReceipt, ...prev]);
       }
@@ -1280,7 +1285,15 @@ const Receipts = () => {
       </Dialog>
 
       {/* Receipt detail sheet */}
-      <Sheet open={!!selectedReceipt} onOpenChange={(open) => !open && setSelectedReceipt(null)}>
+      <Sheet
+        open={!!selectedReceipt}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedReceipt(null);
+            setDocumentPreview(null);
+          }
+        }}
+      >
         <SheetContent className="sm:max-w-lg overflow-y-auto">
           {selectedReceipt && (
             <>
@@ -1305,6 +1318,95 @@ const Receipts = () => {
                 </div>
                 <span className="text-base font-bold text-foreground">{selectedReceipt.total}</span>
               </div>
+
+              {/* Document preview */}
+              {selectedReceipt.document_id && (
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Document source</p>
+                    {documentPreview && (
+                      <a
+                        href={documentPreview.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary font-medium hover:underline"
+                      >
+                        Ouvrir →
+                      </a>
+                    )}
+                  </div>
+                  {loadingDoc ? (
+                    <div className="flex items-center justify-center h-40 bg-secondary/50 rounded-xl">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : documentPreview ? (
+                    documentPreview.mime?.startsWith("image/") ? (
+                      <a href={documentPreview.url} target="_blank" rel="noopener noreferrer">
+                        <img
+                          src={documentPreview.url}
+                          alt={documentPreview.name || "Document"}
+                          className="w-full max-h-96 object-contain rounded-xl border border-border bg-secondary/30"
+                        />
+                      </a>
+                    ) : documentPreview.mime === "application/pdf" ? (
+                      <iframe
+                        src={documentPreview.url}
+                        title={documentPreview.name || "PDF"}
+                        className="w-full h-96 rounded-xl border border-border bg-secondary/30"
+                      />
+                    ) : (
+                      <a
+                        href={documentPreview.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 p-4 bg-secondary/50 rounded-xl hover:bg-secondary transition-colors"
+                      >
+                        <FileText className="h-6 w-6 text-primary" />
+                        <span className="text-sm text-foreground">{documentPreview.name || "Télécharger"}</span>
+                      </a>
+                    )
+                  ) : (
+                    <button
+                      onClick={async () => {
+                        if (!selectedReceipt.document_id) return;
+                        setLoadingDoc(true);
+                        try {
+                          const { data: doc } = await supabase
+                            .from("documents")
+                            .select("file_url, file_name, mime_type")
+                            .eq("id", selectedReceipt.document_id)
+                            .maybeSingle();
+                          if (!doc?.file_url) {
+                            toast.error("Document introuvable");
+                            return;
+                          }
+                          // Extract storage path from public URL
+                          const match = doc.file_url.match(/\/documents\/(.+)$/);
+                          const path = match ? decodeURIComponent(match[1]) : null;
+                          if (!path) {
+                            toast.error("Chemin du document invalide");
+                            return;
+                          }
+                          const { data: signed, error } = await supabase.storage
+                            .from("documents")
+                            .createSignedUrl(path, 3600);
+                          if (error || !signed?.signedUrl) {
+                            toast.error("Impossible de charger le document");
+                            return;
+                          }
+                          setDocumentPreview({ url: signed.signedUrl, mime: doc.mime_type, name: doc.file_name });
+                        } finally {
+                          setLoadingDoc(false);
+                        }
+                      }}
+                      className="w-full inline-flex items-center justify-center gap-2 bg-secondary text-foreground px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-secondary/70 transition-colors"
+                    >
+                      <FileText className="h-4 w-4" />
+                      Voir le document
+                    </button>
+                  )}
+                </div>
+              )}
 
               {selectedReceipt.products.length > 0 ? (
                 <div className="space-y-1">
