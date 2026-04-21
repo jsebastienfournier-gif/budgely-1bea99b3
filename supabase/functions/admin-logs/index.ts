@@ -95,8 +95,7 @@ Deno.serve(async (req) => {
       `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(query)}`,
       {
         headers: {
-          Authorization: `Bearer ${serviceKey}`,
-          apikey: serviceKey,
+          Authorization: `Bearer ${mgmtToken}`,
         },
       },
     );
