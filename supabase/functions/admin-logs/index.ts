@@ -42,6 +42,18 @@ Deno.serve(async (req) => {
       });
     }
 
+    const mgmtToken = Deno.env.get("SUPABASE_ACCESS_TOKEN");
+    if (!mgmtToken) {
+      return new Response(
+        JSON.stringify({
+          error: "Configuration manquante",
+          detail:
+            "Pour consulter les logs, ajoute un secret SUPABASE_ACCESS_TOKEN (Personal Access Token créé sur https://supabase.com/dashboard/account/tokens). La clé service_role ne fonctionne pas pour l'API Analytics.",
+        }),
+        { status: 501, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const url = new URL(req.url);
     const logType = url.searchParams.get("type") || "postgres";
     const limit = Math.min(parseInt(url.searchParams.get("limit") || "100"), 500);
