@@ -135,6 +135,8 @@ const Receipts = () => {
   const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [validatingId, setValidatingId] = useState<string | null>(null);
+  const [documentPreview, setDocumentPreview] = useState<{ url: string; mime: string | null; name: string | null } | null>(null);
+  const [loadingDoc, setLoadingDoc] = useState(false);
 
   // Sync bank transactions from Railway backend
   const handleSyncBank = async () => {
@@ -298,6 +300,7 @@ const Receipts = () => {
         source: e.source,
         description: e.description || "",
         source_id: e.source_id || undefined,
+        document_id: e.document_id || null,
       };
     });
   };
@@ -535,6 +538,7 @@ const Receipts = () => {
           status: "Analysé",
           products: articles,
           source: inserted.source,
+          document_id: inserted.document_id || null,
         };
         setExpenses((prev) => [newReceipt, ...prev]);
       }
