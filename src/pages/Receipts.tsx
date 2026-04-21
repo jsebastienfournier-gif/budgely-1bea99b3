@@ -80,6 +80,7 @@ type Receipt = {
   source?: string;
   description?: string;
   source_id?: string;
+  document_id?: string | null;
 };
 
 const emailProviders = [
