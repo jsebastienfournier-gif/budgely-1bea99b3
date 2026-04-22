@@ -730,7 +730,10 @@ const Receipts = () => {
           type="file"
           accept="image/jpeg,image/png,image/webp,application/pdf"
           className="hidden"
-          onChange={(e) => handleFileUpload(e.target.files)}
+          onChange={(e) => {
+            handleFileUpload(e.target.files);
+            e.target.value = "";
+          }}
         />
 
         {/* Upload Area */}
