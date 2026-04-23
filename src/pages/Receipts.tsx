@@ -1352,11 +1352,26 @@ const Receipts = () => {
                         />
                       </a>
                     ) : documentPreview.mime === "application/pdf" ? (
-                      <iframe
-                        src={documentPreview.url}
-                        title={documentPreview.name || "PDF"}
+                      <object
+                        data={`${documentPreview.url}#toolbar=0&view=FitH`}
+                        type="application/pdf"
                         className="w-full h-96 rounded-xl border border-border bg-secondary/30"
-                      />
+                      >
+                        <a
+                          href={documentPreview.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex flex-col items-center justify-center gap-2 h-96 bg-secondary/50 rounded-xl hover:bg-secondary transition-colors"
+                        >
+                          <FileText className="h-8 w-8 text-primary" />
+                          <span className="text-sm text-foreground">
+                            {documentPreview.name || "Ouvrir le PDF"}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            Cliquez pour ouvrir dans un nouvel onglet
+                          </span>
+                        </a>
+                      </object>
                     ) : (
                       <a
                         href={documentPreview.url}
