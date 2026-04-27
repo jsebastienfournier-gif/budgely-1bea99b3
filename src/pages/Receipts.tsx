@@ -612,7 +612,12 @@ const Receipts = () => {
     const providerLabel = provider === "microsoft" ? "Outlook" : "Gmail";
     toast.info(`Synchronisation ${providerLabel} en cours…`);
     try {
-      const data = await invokeAuthenticatedFunction<any>(funcName, { email: emailAddr });
+      const railwayJwt = await getRailwayToken().catch(() => null);
+      const data = await invokeAuthenticatedFunction<any>(
+        funcName,
+        { email: emailAddr },
+        railwayJwt ? { "X-Railway-JWT": railwayJwt } : undefined,
+      );
       if (data?.analyzed > 0) {
         toast.success(`${data.analyzed} email(s) analysé(s) sur ${data.total}`);
         const { data: expenseRes } = await supabase
