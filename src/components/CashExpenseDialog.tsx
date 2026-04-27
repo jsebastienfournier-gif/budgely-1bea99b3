@@ -77,7 +77,7 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
 
       // Synchronisation Railway (best-effort)
       try {
-        await railwayFetch("/expenses", {
+        await railwayFetch("/expenses/", {
           method: "POST",
           body: {
             amount: Number(totalAmount.toFixed(2)),
