@@ -144,6 +144,8 @@ serve(async (req) => {
       });
     }
 
+    const railwayJwt = req.headers.get("X-Railway-JWT") || req.headers.get("x-railway-jwt") || "";
+
     const results = [];
     for (const msg of messages) {
       try {
@@ -152,6 +154,7 @@ serve(async (req) => {
           headers: {
             Authorization: authHeader,
             "Content-Type": "application/json",
+            ...(railwayJwt ? { "X-Railway-JWT": railwayJwt } : {}),
           },
           body: JSON.stringify({
             source: "email",
