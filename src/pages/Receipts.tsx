@@ -347,11 +347,17 @@ const Receipts = () => {
     if (!deletingExpenseId) return;
     setDeleting(true);
 
-    // 1) Suppression côté backend Railway (best-effort, n'empêche pas la suppression locale)
-    try {
-      await railwayFetch(`/expenses/${deletingExpenseId}`, { method: "DELETE" });
-    } catch (e) {
-      console.warn("[railway/expenses/delete] échec, on continue:", e);
+    // 1) Suppression côté backend Railway (best-effort, utilise l'ID Railway uniquement)
+    const rawRow = rawExpenses.find((e) => e.id === deletingExpenseId);
+    const railwayId = rawRow?.railway_id;
+    if (railwayId) {
+      try {
+        await railwayFetch(`/expenses/${railwayId}`, { method: "DELETE" });
+      } catch (e) {
+        console.warn("[railway/expenses/delete] échec, on continue:", e);
+      }
+    } else {
+      console.info("[railway/expenses/delete] pas de railway_id, suppression Supabase uniquement");
     }
 
     // 2) Suppression côté Supabase
