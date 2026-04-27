@@ -273,45 +273,51 @@ serve(async (req) => {
       await supabaseAdmin.from("documents").update({ status: "processing" }).eq("id", document_id);
     }
 
-    // Call Lovable AI Gateway
-    const systemPrompt = PROMPTS[source] || PROMPTS.receipt;
+    // Call Railway backend for parsing
+    if (!railwayJwt) {
+      if (document_id) {
+        await supabaseAdmin.from("documents").update({ status: "failed", error_message: "JWT Railway manquant" }).eq("id", document_id);
+      }
+      return new Response(JSON.stringify({ error: "X-Railway-JWT header manquant" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    const aiResponse = await fetch(LOVABLE_AI_URL, {
+    const aiResponse = await fetch(`${RAILWAY_BASE}/expenses/analyze-text`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${railwayJwt}`,
       },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: raw_text },
-        ],
-      }),
+      body: JSON.stringify({ source, raw_text }),
     });
 
     if (!aiResponse.ok) {
       const statusCode = aiResponse.status;
       const errText = await aiResponse.text();
-      console.error("Lovable AI error:", statusCode, errText);
+      console.error("Railway analyze-text error:", statusCode, errText);
+      if (statusCode === 401) {
+        return new Response(JSON.stringify({ error: "Authentification Railway expirée. Reconnectez-vous." }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       if (statusCode === 429) {
         return new Response(JSON.stringify({ error: "Rate limit atteint. Réessayez dans quelques instants." }), {
           status: 429,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (statusCode === 402) {
-        return new Response(JSON.stringify({ error: "Crédits IA épuisés. Veuillez recharger votre espace de travail Lovable." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      throw new Error(`Lovable AI error: ${statusCode}`);
+      throw new Error(`Railway backend error: ${statusCode}`);
     }
 
     const aiData = await aiResponse.json();
-    const content: string = aiData.choices?.[0]?.message?.content ?? "";
+    // Railway peut renvoyer soit déjà le JSON parsé, soit un wrapper { content / parsed / data }
+    const content: string =
+      typeof aiData === "string"
+        ? aiData
+        : aiData.content ?? aiData.text ?? aiData.choices?.[0]?.message?.content ?? JSON.stringify(aiData.parsed ?? aiData.data ?? aiData);
 
     // Parse JSON from AI response
     let parsed: any;
