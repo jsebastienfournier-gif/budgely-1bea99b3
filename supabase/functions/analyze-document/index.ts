@@ -209,8 +209,7 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
-    const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+    const railwayJwt = req.headers.get("X-Railway-JWT") || req.headers.get("x-railway-jwt");
 
     // Auth client to get user
     const supabaseAuth = createClient(supabaseUrl, supabaseKey, {
