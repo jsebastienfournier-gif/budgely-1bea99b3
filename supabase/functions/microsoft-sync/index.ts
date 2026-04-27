@@ -4,7 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "authorization, x-client-info, apikey, content-type, x-railway-jwt, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 async function refreshAccessToken(refreshToken: string): Promise<{ access_token: string; expires_in: number }> {
@@ -144,6 +144,8 @@ serve(async (req) => {
       });
     }
 
+    const railwayJwt = req.headers.get("X-Railway-JWT") || req.headers.get("x-railway-jwt") || "";
+
     const results = [];
     for (const msg of messages) {
       try {
@@ -152,6 +154,7 @@ serve(async (req) => {
           headers: {
             Authorization: authHeader,
             "Content-Type": "application/json",
+            ...(railwayJwt ? { "X-Railway-JWT": railwayJwt } : {}),
           },
           body: JSON.stringify({
             source: "email",

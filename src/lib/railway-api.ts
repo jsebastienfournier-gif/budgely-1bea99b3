@@ -72,6 +72,8 @@ const ensureToken = async (): Promise<string> => {
   return token;
 };
 
+export const getRailwayToken = ensureToken;
+
 type RequestOpts = {
   method?: string;
   body?: unknown;

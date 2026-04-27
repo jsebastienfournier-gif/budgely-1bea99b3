@@ -30,6 +30,7 @@ const getFunctionErrorMessage = (payload: unknown, status: number) => {
 export const invokeAuthenticatedFunction = async <T>(
   functionName: string,
   body?: unknown,
+  extraHeaders?: Record<string, string>,
 ): Promise<T> => {
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
   if (sessionError) {
@@ -44,6 +45,7 @@ export const invokeAuthenticatedFunction = async <T>(
   const headers: Record<string, string> = {
     apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
     Authorization: `Bearer ${accessToken}`,
+    ...(extraHeaders || {}),
   };
 
   if (body !== undefined) {

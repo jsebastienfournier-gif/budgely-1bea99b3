@@ -26,7 +26,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { supabase } from "@/integrations/supabase/client";
 import { invokeAuthenticatedFunction } from "@/lib/edge-functions";
-import { railwayFetch } from "@/lib/railway-api";
+import { railwayFetch, getRailwayToken } from "@/lib/railway-api";
 import { toast } from "sonner";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -612,7 +612,12 @@ const Receipts = () => {
     const providerLabel = provider === "microsoft" ? "Outlook" : "Gmail";
     toast.info(`Synchronisation ${providerLabel} en cours…`);
     try {
-      const data = await invokeAuthenticatedFunction<any>(funcName, { email: emailAddr });
+      const railwayJwt = await getRailwayToken().catch(() => null);
+      const data = await invokeAuthenticatedFunction<any>(
+        funcName,
+        { email: emailAddr },
+        railwayJwt ? { "X-Railway-JWT": railwayJwt } : undefined,
+      );
       if (data?.analyzed > 0) {
         toast.success(`${data.analyzed} email(s) analysé(s) sur ${data.total}`);
         const { data: expenseRes } = await supabase
