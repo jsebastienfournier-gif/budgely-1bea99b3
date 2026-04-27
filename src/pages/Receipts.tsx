@@ -568,7 +568,17 @@ const Receipts = () => {
 
     if (newEmailProvider === "gmail") {
       setSaving(true);
-      window.location.href = "https://budgely-backend-production.up.railway.app/api/auth/google";
+      try {
+        const data = await invokeAuthenticatedFunction<{ url?: string }>("gmail-auth");
+        if (data?.url) {
+          window.location.href = data.url;
+          return;
+        }
+        throw new Error("Aucune URL d'autorisation reçue");
+      } catch (err: any) {
+        toast.error("Erreur : " + (err.message || "Impossible de lancer la connexion Gmail"));
+        setSaving(false);
+      }
       return;
     }
 
