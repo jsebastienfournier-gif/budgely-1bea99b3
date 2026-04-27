@@ -457,7 +457,7 @@ const Receipts = () => {
         if (parsed?.status === "duplicate") {
           await supabase.from("documents").update({ status: "completed", error_message: parsed.message || "Doublon" }).eq("id", doc.id);
           toast.info(parsed.message || "Dépense déjà enregistrée");
-          setAnalyzing(false);
+          setUploading(false);
           setAnalysisProgress(0);
           setAnalysisStep("");
           return;
