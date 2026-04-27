@@ -26,6 +26,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { supabase } from "@/integrations/supabase/client";
 import { invokeAuthenticatedFunction } from "@/lib/edge-functions";
+import { railwayFetch } from "@/lib/railway-api";
 import { toast } from "sonner";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -438,46 +439,32 @@ const Receipts = () => {
       setAnalysisProgress(40);
       setAnalysisStep("Envoi au moteur d'analyse…");
 
-      // 3. Send the file as base64 JSON to Railway backend (Document AI)
-      const fileBase64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => {
-          const result = reader.result as string;
-          resolve(result.split(",")[1]);
-        };
-        reader.onerror = reject;
-      });
-
+      // 3. Envoyer le fichier au nouveau backend Railway : POST /expenses/upload (multipart)
       setAnalysisProgress(60);
       setAnalysisStep("Analyse IA en cours…");
 
-      const RAILWAY_PARSE_URL = "https://budgely-backend-production.up.railway.app/api/document/parse";
       let parsed: any = null;
       try {
-        console.log("[railway/parse] Uploading file (base64):", file.name, file.type, file.size);
-        const res = await fetch(RAILWAY_PARSE_URL, {
+        const fd = new FormData();
+        fd.append("file", file, file.name);
+        console.log("[railway/expenses/upload] Uploading:", file.name, file.type, file.size);
+        parsed = await railwayFetch<any>("/expenses/upload", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            content_base64: fileBase64,
-            file_name: file.name,
-            mime_type: file.type,
-          }),
+          body: fd,
+          isFormData: true,
         });
-        const text = await res.text();
-        console.log("[railway/parse] Status:", res.status, "Body:", text.slice(0, 500));
-        if (!res.ok) {
-          let msg = `Erreur backend (${res.status})`;
-          try {
-            const j = JSON.parse(text);
-            msg = j.error || j.message || msg;
-          } catch {}
-          throw new Error(msg);
+        console.log("[railway/expenses/upload] Response:", parsed);
+
+        if (parsed?.status === "duplicate") {
+          await supabase.from("documents").update({ status: "completed", error_message: parsed.message || "Doublon" }).eq("id", doc.id);
+          toast.info(parsed.message || "Dépense déjà enregistrée");
+          setUploading(false);
+          setAnalysisProgress(0);
+          setAnalysisStep("");
+          return;
         }
-        parsed = JSON.parse(text);
       } catch (e: any) {
-        console.error("[railway/parse] Error:", e);
+        console.error("[railway/expenses/upload] Error:", e);
         await supabase.from("documents").update({ status: "failed", error_message: e.message }).eq("id", doc.id);
         throw e;
       }
@@ -673,14 +660,13 @@ const Receipts = () => {
     if (!user) return;
     setSaving(true);
     try {
-      // Fetch redirect URL via edge function proxy
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/powens-proxy?action=init&user_id=${encodeURIComponent(user.id)}`,
-        { headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } }
+      // Nouvelle API Railway : GET /sources/powens/connect-url (auth Bearer)
+      const data = await railwayFetch<{ url?: string; redirect_url?: string }>(
+        "/sources/powens/connect-url"
       );
-      const data = await res.json();
-      if (data.redirect_url) {
-        window.location.href = data.redirect_url;
+      const url = data.url || data.redirect_url;
+      if (url) {
+        window.location.href = url;
       } else {
         throw new Error("Aucune URL de redirection reçue");
       }

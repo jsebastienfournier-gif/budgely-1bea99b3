@@ -40,6 +40,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    try { localStorage.removeItem("railway_jwt"); } catch {}
     setUser(null);
     setSession(null);
   };
