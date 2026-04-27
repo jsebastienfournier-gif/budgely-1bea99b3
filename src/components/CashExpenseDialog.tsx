@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { railwayFetch } from "@/lib/railway-api";
 import { toast } from "sonner";
 
 type ArticleRow = { name: string; qty: number; unitPrice: number };
