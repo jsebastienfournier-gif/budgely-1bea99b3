@@ -75,9 +75,9 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
 
       if (error) throw error;
 
-      // Synchronisation Railway (best-effort)
+      // Synchronisation Railway (best-effort) — récupère l'ID Railway et le stocke
       try {
-        await railwayFetch("/expenses/", {
+        const railwayResp = await railwayFetch<{ id?: string }>("/expenses/", {
           method: "POST",
           body: {
             amount: Number(totalAmount.toFixed(2)),
@@ -87,6 +87,15 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
             date: format(date, "yyyy-MM-dd"),
           },
         });
+        const railwayId = railwayResp?.id;
+        if (railwayId && data?.id) {
+          const { error: updErr } = await supabase
+            .from("expenses")
+            .update({ railway_id: railwayId } as any)
+            .eq("id", data.id);
+          if (updErr) console.warn("[railway/expenses/post] update railway_id failed:", updErr);
+          else (data as any).railway_id = railwayId;
+        }
       } catch (e) {
         console.warn("[railway/expenses/post] failed:", e);
       }
