@@ -346,6 +346,15 @@ const Receipts = () => {
   const handleDeleteExpense = async () => {
     if (!deletingExpenseId) return;
     setDeleting(true);
+
+    // 1) Suppression côté backend Railway (best-effort, n'empêche pas la suppression locale)
+    try {
+      await railwayFetch(`/expenses/${deletingExpenseId}`, { method: "DELETE" });
+    } catch (e) {
+      console.warn("[railway/expenses/delete] échec, on continue:", e);
+    }
+
+    // 2) Suppression côté Supabase
     const { error } = await supabase.from("expenses").delete().eq("id", deletingExpenseId);
     setDeleting(false);
     setDeletingExpenseId(null);
