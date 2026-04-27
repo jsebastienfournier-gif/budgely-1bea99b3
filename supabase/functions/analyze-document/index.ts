@@ -272,47 +272,45 @@ serve(async (req) => {
       await supabaseAdmin.from("documents").update({ status: "processing" }).eq("id", document_id);
     }
 
-    // Call Railway backend
+    // Call Lovable AI Gateway
     const systemPrompt = PROMPTS[source] || PROMPTS.receipt;
 
-    const aiResponse = await fetch(RAILWAY_URL, {
+    const aiResponse = await fetch(LOVABLE_AI_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
       },
       body: JSON.stringify({
-        source,
-        raw_text,
-        system_prompt: systemPrompt,
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: raw_text },
+        ],
       }),
     });
 
     if (!aiResponse.ok) {
       const statusCode = aiResponse.status;
       const errText = await aiResponse.text();
-      console.error("Railway backend error:", statusCode, errText);
+      console.error("Lovable AI error:", statusCode, errText);
       if (statusCode === 429) {
         return new Response(JSON.stringify({ error: "Rate limit atteint. Réessayez dans quelques instants." }), {
           status: 429,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      throw new Error(`Railway backend error: ${statusCode}`);
+      if (statusCode === 402) {
+        return new Response(JSON.stringify({ error: "Crédits IA épuisés. Veuillez recharger votre espace de travail Lovable." }), {
+          status: 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      throw new Error(`Lovable AI error: ${statusCode}`);
     }
 
     const aiData = await aiResponse.json();
-    
-    // Support multiple response formats from Railway backend
-    let content: string;
-    if (aiData.choices?.[0]?.message?.content) {
-      // OpenAI-compatible format
-      content = aiData.choices[0].message.content;
-    } else if (typeof aiData === "string") {
-      content = aiData;
-    } else {
-      // Assume Railway returns parsed data directly
-      content = JSON.stringify(aiData.result ?? aiData.data ?? aiData);
-    }
+    const content: string = aiData.choices?.[0]?.message?.content ?? "";
 
     // Parse JSON from AI response
     let parsed: any;
