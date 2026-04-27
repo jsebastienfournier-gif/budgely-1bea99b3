@@ -473,21 +473,35 @@ const Receipts = () => {
       setAnalysisStep("Enregistrement…");
 
       // 4. Insert expense from parsed result
-      const e = parsed?.expense || parsed?.data || parsed || {};
-      const articlesRaw = e.articles || e.items || [];
+      // Nouveau schéma Railway: { amount, merchant, date, articles, parsed: {...} }
+      // On reste tolérant aux anciens champs (expense/data, total, magasin, etc.)
+      const root = parsed?.expense || parsed?.data || parsed || {};
+      const p = root.parsed || {};
+      const articlesRaw = root.articles || p.articles || root.items || [];
+      const amount =
+        typeof root.amount === "number" ? root.amount
+        : typeof p.montant_total === "number" ? p.montant_total
+        : typeof root.montant_total === "number" ? root.montant_total
+        : typeof root.total === "number" ? root.total
+        : null;
+      const merchant = root.merchant || p.fournisseur || p.magasin || root.fournisseur || root.magasin || null;
+      const dateValue = root.date || p.date || p.date_facture || root.date_expense || null;
       const expensePayload = {
         user_id: user.id,
         document_id: doc.id,
         source: source as "receipt" | "invoice",
-        magasin: e.magasin || e.store || null,
-        fournisseur: e.fournisseur || e.merchant || e.magasin || null,
-        date_expense: e.date_expense || e.date || null,
-        montant_total: typeof e.montant_total === "number" ? e.montant_total : (typeof e.total === "number" ? e.total : null),
-        devise: e.devise || e.currency || "EUR",
-        categorie: e.categorie || e.category || null,
-        moyen_paiement: e.moyen_paiement || e.payment_method || null,
-        numero_facture: e.numero_facture || e.invoice_number || null,
-        type_document: e.type_document || source,
+        magasin: p.magasin || root.magasin || merchant || null,
+        fournisseur: merchant,
+        date_expense: dateValue,
+        montant_total: amount,
+        devise: p.devise || root.devise || root.currency || "EUR",
+        categorie: p.categorie || root.categorie || root.category || null,
+        moyen_paiement: p.moyen_paiement || root.moyen_paiement || root.payment_method || null,
+        numero_facture: p.numero_facture || root.numero_facture || root.invoice_number || null,
+        type_document: p.type_document || root.type_document || source,
+        description: p.description || p.details || root.description || null,
+        recurrence: p.recurrence || root.recurrence || null,
+        abonnement_detecte: p.abonnement_detecte ?? root.abonnement_detecte ?? false,
         articles: articlesRaw,
         raw_ai_response: parsed,
       };
