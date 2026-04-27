@@ -75,6 +75,22 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
 
       if (error) throw error;
 
+      // Synchronisation Railway (best-effort)
+      try {
+        await railwayFetch("/expenses", {
+          method: "POST",
+          body: {
+            amount: Number(totalAmount.toFixed(2)),
+            currency: "EUR",
+            merchant: location.trim(),
+            category: "alimentation",
+            date: format(date, "yyyy-MM-dd"),
+          },
+        });
+      } catch (e) {
+        console.warn("[railway/expenses/post] failed:", e);
+      }
+
       toast.success("Dépense en espèces ajoutée !");
       onExpenseAdded?.(data);
 
