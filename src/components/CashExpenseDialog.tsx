@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { railwayFetch } from "@/lib/railway-api";
 import { toast } from "sonner";
 
 type ArticleRow = { name: string; qty: number; unitPrice: number };
@@ -73,6 +74,22 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
       }).select().single();
 
       if (error) throw error;
+
+      // Synchronisation Railway (best-effort)
+      try {
+        await railwayFetch("/expenses", {
+          method: "POST",
+          body: {
+            amount: Number(totalAmount.toFixed(2)),
+            currency: "EUR",
+            merchant: location.trim(),
+            category: "alimentation",
+            date: format(date, "yyyy-MM-dd"),
+          },
+        });
+      } catch (e) {
+        console.warn("[railway/expenses/post] failed:", e);
+      }
 
       toast.success("Dépense en espèces ajoutée !");
       onExpenseAdded?.(data);
