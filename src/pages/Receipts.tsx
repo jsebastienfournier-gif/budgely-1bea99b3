@@ -673,14 +673,13 @@ const Receipts = () => {
     if (!user) return;
     setSaving(true);
     try {
-      // Fetch redirect URL via edge function proxy
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/powens-proxy?action=init&user_id=${encodeURIComponent(user.id)}`,
-        { headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } }
+      // Nouvelle API Railway : GET /sources/powens/connect-url (auth Bearer)
+      const data = await railwayFetch<{ url?: string; redirect_url?: string }>(
+        "/sources/powens/connect-url"
       );
-      const data = await res.json();
-      if (data.redirect_url) {
-        window.location.href = data.redirect_url;
+      const url = data.url || data.redirect_url;
+      if (url) {
+        window.location.href = url;
       } else {
         throw new Error("Aucune URL de redirection reçue");
       }
