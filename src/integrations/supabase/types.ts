@@ -319,6 +319,7 @@ export type Database = {
           montant_total: number | null
           moyen_paiement: string | null
           numero_facture: string | null
+          railway_id: string | null
           raw_ai_response: Json | null
           recurrence: string | null
           source: Database["public"]["Enums"]["document_source"]
@@ -344,6 +345,7 @@ export type Database = {
           montant_total?: number | null
           moyen_paiement?: string | null
           numero_facture?: string | null
+          railway_id?: string | null
           raw_ai_response?: Json | null
           recurrence?: string | null
           source: Database["public"]["Enums"]["document_source"]
@@ -369,6 +371,7 @@ export type Database = {
           montant_total?: number | null
           moyen_paiement?: string | null
           numero_facture?: string | null
+          railway_id?: string | null
           raw_ai_response?: Json | null
           recurrence?: string | null
           source?: Database["public"]["Enums"]["document_source"]
