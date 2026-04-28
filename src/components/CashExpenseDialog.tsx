@@ -185,6 +185,9 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
       setLocation("");
       setDate(new Date());
       setArticles([{ name: "", qty: 1, unitPrice: 0 }]);
+      setCategorie("");
+      setCategorieAuto(false);
+      setCategorieTouched(false);
       onOpenChange(false);
     } catch (err: any) {
       toast.error(err.message || "Erreur lors de l'enregistrement");
