@@ -146,7 +146,7 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
         articles: formattedArticles as any,
         moyen_paiement: "espèces",
         type_depense: "achat",
-        categorie: "Divers",
+        categorie: categorie || "Autre",
         devise: "EUR",
         description: `Dépense espèces — ${location.trim()}`,
       }).select().single();
