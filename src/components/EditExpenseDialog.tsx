@@ -86,6 +86,8 @@ const EditExpenseDialog = ({ open, onOpenChange, expense, onSaved }: Props) => {
           body: {
             amount: montant ? Number(parseFloat(montant).toFixed(2)) : 0,
             merchant: fournisseur || "",
+            category: (categorie || "Autre").toLowerCase(),
+            date: date || undefined,
           },
         });
       }
