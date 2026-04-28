@@ -248,6 +248,38 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
             />
           </div>
 
+          {/* Catégorie (auto-détectée, modifiable) */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <Label className="text-sm font-medium">Catégorie</Label>
+              {detecting && !categorieTouched && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Détection…
+                </span>
+              )}
+              {categorieAuto && !categorieTouched && categorie && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary">
+                  <Sparkles className="h-3 w-3" />
+                  Détectée auto
+                </span>
+              )}
+            </div>
+            <Select
+              value={categorie}
+              onValueChange={(v) => { setCategorie(v); setCategorieTouched(true); setCategorieAuto(false); }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Choisir une catégorie" />
+              </SelectTrigger>
+              <SelectContent>
+                {CATEGORIES.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Articles */}
           <div>
             <div className="flex items-center justify-between mb-2">
