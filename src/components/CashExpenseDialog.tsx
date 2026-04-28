@@ -161,7 +161,7 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
             amount: Number(totalAmount.toFixed(2)),
             currency: "EUR",
             merchant: location.trim(),
-            category: "alimentation",
+            category: (categorie || "Autre").toLowerCase(),
             date: format(date, "yyyy-MM-dd"),
           },
         });
