@@ -58,7 +58,54 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
   const [saving, setSaving] = useState(false);
   const [date, setDate] = useState<Date>(new Date());
   const [location, setLocation] = useState("");
+  const [categorie, setCategorie] = useState<string>("");
+  const [categorieAuto, setCategorieAuto] = useState(false);
+  const [categorieTouched, setCategorieTouched] = useState(false);
+  const [detecting, setDetecting] = useState(false);
   const [articles, setArticles] = useState<ArticleRow[]>([{ name: "", qty: 1, unitPrice: 0 }]);
+
+  // Auto-détection de la catégorie depuis le nom du commerçant
+  useEffect(() => {
+    const name = location.trim();
+    if (!name || categorieTouched) return;
+    let cancelled = false;
+    setDetecting(true);
+    const timer = setTimeout(async () => {
+      try {
+        // 1) Lookup merchant_profiles (apprentissage)
+        const normalized = normalizeName(name);
+        const { data: profiles } = await supabase
+          .from("merchant_profiles")
+          .select("category, confidence")
+          .eq("normalized_name", normalized)
+          .order("confidence", { ascending: false })
+          .limit(1);
+        let detected = profiles?.[0]?.category as string | undefined;
+
+        // 2) Fallback : mots-clés locaux
+        if (!detected) detected = guessCategoryLocal(name) || undefined;
+
+        if (!cancelled && detected && CATEGORIES.includes(detected)) {
+          setCategorie(detected);
+          setCategorieAuto(true);
+        }
+      } catch (e) {
+        console.warn("[category/detect] failed:", e);
+      } finally {
+        if (!cancelled) setDetecting(false);
+      }
+    }, 400);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [location, categorieTouched]);
+
+  // Reset détection quand le formulaire est fermé
+  useEffect(() => {
+    if (!open) {
+      setCategorie("");
+      setCategorieAuto(false);
+      setCategorieTouched(false);
+    }
+  }, [open]);
 
   const addArticle = () => setArticles(prev => [...prev, { name: "", qty: 1, unitPrice: 0 }]);
 
