@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { CalendarIcon, Plus, Trash2, Loader2, Check, Coins } from "lucide-react";
+import { CalendarIcon, Plus, Trash2, Loader2, Check, Coins, Sparkles } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -13,6 +14,36 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { railwayFetch } from "@/lib/railway-api";
 import { toast } from "sonner";
+
+const CATEGORIES = [
+  "Alimentation", "Transport", "Logement", "Santé", "Loisirs",
+  "Shopping", "Restauration", "Éducation", "Abonnements",
+  "Épargne", "Investissement", "Autre",
+];
+
+const normalizeName = (s: string) =>
+  s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  Alimentation: ["carrefour", "leclerc", "auchan", "lidl", "aldi", "monoprix", "franprix", "intermarche", "casino", "super u", "picard", "boulangerie", "boucherie", "primeur", "marche"],
+  Restauration: ["restaurant", "resto", "mcdo", "mcdonald", "kfc", "burger", "subway", "starbucks", "cafe", "brasserie", "pizzeria", "pizza", "kebab", "sushi", "uber eats", "deliveroo"],
+  Transport: ["sncf", "ratp", "uber", "bolt", "taxi", "essence", "total", "shell", "bp", "esso", "station", "parking", "blablacar", "ouigo", "trainline"],
+  Logement: ["edf", "engie", "veolia", "suez", "loyer", "syndic", "leroy merlin", "castorama", "bricorama", "ikea"],
+  Loisirs: ["cinema", "ugc", "pathe", "gaumont", "spotify", "deezer", "fnac", "decathlon", "concert", "theatre"],
+  Shopping: ["amazon", "zara", "h&m", "uniqlo", "zalando", "veepee", "shein", "asos"],
+  Santé: ["pharmacie", "pharma", "medecin", "docteur", "dentiste", "hopital", "clinique", "laboratoire"],
+  Abonnements: ["netflix", "prime video", "disney", "canal", "orange", "free", "sfr", "bouygues", "spotify", "icloud", "google one"],
+  Éducation: ["udemy", "coursera", "ecole", "universite", "librairie"],
+};
+
+const guessCategoryLocal = (name: string): string | null => {
+  const n = normalizeName(name);
+  if (!n) return null;
+  for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (keywords.some(k => n.includes(k))) return cat;
+  }
+  return null;
+};
 
 type ArticleRow = { name: string; qty: number; unitPrice: number };
 
@@ -27,7 +58,54 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
   const [saving, setSaving] = useState(false);
   const [date, setDate] = useState<Date>(new Date());
   const [location, setLocation] = useState("");
+  const [categorie, setCategorie] = useState<string>("");
+  const [categorieAuto, setCategorieAuto] = useState(false);
+  const [categorieTouched, setCategorieTouched] = useState(false);
+  const [detecting, setDetecting] = useState(false);
   const [articles, setArticles] = useState<ArticleRow[]>([{ name: "", qty: 1, unitPrice: 0 }]);
+
+  // Auto-détection de la catégorie depuis le nom du commerçant
+  useEffect(() => {
+    const name = location.trim();
+    if (!name || categorieTouched) return;
+    let cancelled = false;
+    setDetecting(true);
+    const timer = setTimeout(async () => {
+      try {
+        // 1) Lookup merchant_profiles (apprentissage)
+        const normalized = normalizeName(name);
+        const { data: profiles } = await supabase
+          .from("merchant_profiles")
+          .select("category, confidence")
+          .eq("normalized_name", normalized)
+          .order("confidence", { ascending: false })
+          .limit(1);
+        let detected = profiles?.[0]?.category as string | undefined;
+
+        // 2) Fallback : mots-clés locaux
+        if (!detected) detected = guessCategoryLocal(name) || undefined;
+
+        if (!cancelled && detected && CATEGORIES.includes(detected)) {
+          setCategorie(detected);
+          setCategorieAuto(true);
+        }
+      } catch (e) {
+        console.warn("[category/detect] failed:", e);
+      } finally {
+        if (!cancelled) setDetecting(false);
+      }
+    }, 400);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [location, categorieTouched]);
+
+  // Reset détection quand le formulaire est fermé
+  useEffect(() => {
+    if (!open) {
+      setCategorie("");
+      setCategorieAuto(false);
+      setCategorieTouched(false);
+    }
+  }, [open]);
 
   const addArticle = () => setArticles(prev => [...prev, { name: "", qty: 1, unitPrice: 0 }]);
 
@@ -68,7 +146,7 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
         articles: formattedArticles as any,
         moyen_paiement: "espèces",
         type_depense: "achat",
-        categorie: "Divers",
+        categorie: categorie || "Autre",
         devise: "EUR",
         description: `Dépense espèces — ${location.trim()}`,
       }).select().single();
@@ -83,7 +161,7 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
             amount: Number(totalAmount.toFixed(2)),
             currency: "EUR",
             merchant: location.trim(),
-            category: "alimentation",
+            category: (categorie || "Autre").toLowerCase(),
             date: format(date, "yyyy-MM-dd"),
           },
         });
@@ -107,6 +185,9 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
       setLocation("");
       setDate(new Date());
       setArticles([{ name: "", qty: 1, unitPrice: 0 }]);
+      setCategorie("");
+      setCategorieAuto(false);
+      setCategorieTouched(false);
       onOpenChange(false);
     } catch (err: any) {
       toast.error(err.message || "Erreur lors de l'enregistrement");
@@ -165,6 +246,38 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
               className={inputClass}
               maxLength={100}
             />
+          </div>
+
+          {/* Catégorie (auto-détectée, modifiable) */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <Label className="text-sm font-medium">Catégorie</Label>
+              {detecting && !categorieTouched && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Détection…
+                </span>
+              )}
+              {categorieAuto && !categorieTouched && categorie && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary">
+                  <Sparkles className="h-3 w-3" />
+                  Détectée auto
+                </span>
+              )}
+            </div>
+            <Select
+              value={categorie}
+              onValueChange={(v) => { setCategorie(v); setCategorieTouched(true); setCategorieAuto(false); }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Choisir une catégorie" />
+              </SelectTrigger>
+              <SelectContent>
+                {CATEGORIES.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Articles */}
