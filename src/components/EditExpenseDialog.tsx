@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { railwayFetch } from "@/lib/railway-api";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
@@ -65,11 +66,34 @@ const EditExpenseDialog = ({ open, onOpenChange, expense, onSaved }: Props) => {
       })
       .eq("id", expense.id);
 
-    setSaving(false);
     if (error) {
+      setSaving(false);
       toast.error("Erreur lors de la modification");
       return;
     }
+
+    // Sync Railway (best-effort) si la dépense a un railway_id
+    try {
+      const { data: row } = await supabase
+        .from("expenses")
+        .select("railway_id")
+        .eq("id", expense.id)
+        .maybeSingle();
+      const railwayId = (row as any)?.railway_id;
+      if (railwayId) {
+        await railwayFetch(`/expenses/${railwayId}`, {
+          method: "PUT",
+          body: {
+            amount: montant ? Number(parseFloat(montant).toFixed(2)) : 0,
+            merchant: fournisseur || "",
+          },
+        });
+      }
+    } catch (e) {
+      console.warn("[railway/expenses/put] failed:", e);
+    }
+
+    setSaving(false);
     toast.success("Dépense modifiée");
     onOpenChange(false);
     onSaved();
