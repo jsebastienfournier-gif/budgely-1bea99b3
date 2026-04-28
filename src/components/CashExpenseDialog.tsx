@@ -163,6 +163,7 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
             merchant: location.trim(),
             category: (categorie || "Autre").toLowerCase(),
             date: format(date, "yyyy-MM-dd"),
+            description: `Dépense espèces — ${location.trim()}`,
           },
         });
         const railwayId = railwayResp?.id;
