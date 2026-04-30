@@ -603,7 +603,7 @@ const Receipts = () => {
       try {
         // Connexion Outlook via le backend Railway (équivalent Powens/Gmail)
         const data = await railwayFetch<{ url?: string; redirect_url?: string }>(
-          "/sources/microsoft/connect-url"
+          "/outlook/auth-url"
         );
         const url = data.url || data.redirect_url;
         if (url) {
