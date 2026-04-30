@@ -601,9 +601,13 @@ const Receipts = () => {
     if (newEmailProvider === "outlook") {
       setSaving(true);
       try {
-        const data = await invokeAuthenticatedFunction<{ url?: string }>("microsoft-auth");
-        if (data?.url) {
-          window.location.href = data.url;
+        // Connexion Outlook via le backend Railway (équivalent Powens/Gmail)
+        const data = await railwayFetch<{ url?: string; redirect_url?: string }>(
+          "/sources/microsoft/connect-url"
+        );
+        const url = data.url || data.redirect_url;
+        if (url) {
+          window.location.href = url;
           return;
         }
         throw new Error("Aucune URL d'autorisation reçue");
@@ -637,16 +641,26 @@ const Receipts = () => {
   const handleSyncEmail = async (emailAddr: string, provider: string) => {
     if (!user || syncing) return;
     setSyncing(true);
-    const funcName = provider === "microsoft" ? "microsoft-sync" : "gmail-sync";
     const providerLabel = provider === "microsoft" ? "Outlook" : "Gmail";
     toast.info(`Synchronisation ${providerLabel} en cours…`);
     try {
-      const railwayJwt = await getRailwayToken().catch(() => null);
-      const data = await invokeAuthenticatedFunction<any>(
-        funcName,
-        { email: emailAddr },
-        railwayJwt ? { "X-Railway-JWT": railwayJwt } : undefined,
-      );
+      let data: any;
+
+      if (provider === "microsoft") {
+        // Synchronisation Outlook via le backend Railway
+        data = await railwayFetch<any>("/sources/microsoft/sync", {
+          method: "POST",
+          body: { email: emailAddr },
+        });
+      } else {
+        const railwayJwt = await getRailwayToken().catch(() => null);
+        data = await invokeAuthenticatedFunction<any>(
+          "gmail-sync",
+          { email: emailAddr },
+          railwayJwt ? { "X-Railway-JWT": railwayJwt } : undefined,
+        );
+      }
+
       if (data?.analyzed > 0) {
         toast.success(`${data.analyzed} email(s) analysé(s) sur ${data.total}`);
         const { data: expenseRes } = await supabase
