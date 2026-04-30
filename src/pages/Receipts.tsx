@@ -601,9 +601,13 @@ const Receipts = () => {
     if (newEmailProvider === "outlook") {
       setSaving(true);
       try {
-        const data = await invokeAuthenticatedFunction<{ url?: string }>("microsoft-auth");
-        if (data?.url) {
-          window.location.href = data.url;
+        // Connexion Outlook via le backend Railway (équivalent Powens/Gmail)
+        const data = await railwayFetch<{ url?: string; redirect_url?: string }>(
+          "/sources/microsoft/connect-url"
+        );
+        const url = data.url || data.redirect_url;
+        if (url) {
+          window.location.href = url;
           return;
         }
         throw new Error("Aucune URL d'autorisation reçue");
