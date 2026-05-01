@@ -136,7 +136,11 @@ const Receipts = () => {
   const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [validatingId, setValidatingId] = useState<string | null>(null);
-  const [documentPreview, setDocumentPreview] = useState<{ url: string; mime: string | null; name: string | null } | null>(null);
+  const [documentPreview, setDocumentPreview] = useState<{
+    url: string;
+    mime: string | null;
+    name: string | null;
+  } | null>(null);
   const [loadingDoc, setLoadingDoc] = useState(false);
 
   // Sync bank transactions from Railway backend
@@ -147,7 +151,7 @@ const Receipts = () => {
     try {
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/powens-proxy?action=transactions&user_id=${encodeURIComponent(user.id)}`,
-        { headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } }
+        { headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } },
       );
       if (!res.ok) throw new Error(`Erreur ${res.status}`);
       const transactions: Array<{
@@ -197,7 +201,10 @@ const Receipts = () => {
         .select("source_id")
         .eq("user_id", user.id)
         .eq("source", "bank")
-        .in("source_id", rows.map((r) => r.source_id!));
+        .in(
+          "source_id",
+          rows.map((r) => r.source_id!),
+        );
 
       const existingIds = new Set((existing || []).map((e: any) => e.source_id));
       const newRows = rows.filter((r) => !existingIds.has(r.source_id));
@@ -218,9 +225,7 @@ const Receipts = () => {
         .update({ last_sync_at: new Date().toISOString() })
         .eq("user_id", user.id);
 
-      setBanks((prev) =>
-        prev.map((b) => ({ ...b, last_sync_at: new Date().toISOString() }))
-      );
+      setBanks((prev) => prev.map((b) => ({ ...b, last_sync_at: new Date().toISOString() })));
 
       reloadExpenses();
     } catch (err: any) {
@@ -471,7 +476,10 @@ const Receipts = () => {
         console.log("[railway/expenses/upload] Response:", parsed);
 
         if (parsed?.status === "duplicate") {
-          await supabase.from("documents").update({ status: "completed", error_message: parsed.message || "Doublon" }).eq("id", doc.id);
+          await supabase
+            .from("documents")
+            .update({ status: "completed", error_message: parsed.message || "Doublon" })
+            .eq("id", doc.id);
           toast.info(parsed.message || "Dépense déjà enregistrée");
           setUploading(false);
           setAnalysisProgress(0);
@@ -494,11 +502,15 @@ const Receipts = () => {
       const p = root.parsed || {};
       const articlesRaw = root.articles || p.articles || root.items || [];
       const amount =
-        typeof root.amount === "number" ? root.amount
-        : typeof p.montant_total === "number" ? p.montant_total
-        : typeof root.montant_total === "number" ? root.montant_total
-        : typeof root.total === "number" ? root.total
-        : null;
+        typeof root.amount === "number"
+          ? root.amount
+          : typeof p.montant_total === "number"
+            ? p.montant_total
+            : typeof root.montant_total === "number"
+              ? root.montant_total
+              : typeof root.total === "number"
+                ? root.total
+                : null;
       const merchant = root.merchant || p.fournisseur || p.magasin || root.fournisseur || root.magasin || null;
       const dateValue = root.date || p.date || p.date_facture || root.date_expense || null;
       const expensePayload = {
@@ -528,7 +540,10 @@ const Receipts = () => {
         .single();
 
       if (insertError) {
-        await supabase.from("documents").update({ status: "failed", error_message: insertError.message }).eq("id", doc.id);
+        await supabase
+          .from("documents")
+          .update({ status: "failed", error_message: insertError.message })
+          .eq("id", doc.id);
         throw new Error("Enregistrement: " + insertError.message);
       }
 
@@ -547,7 +562,11 @@ const Receipts = () => {
           id: inserted.id,
           store: inserted.magasin || inserted.fournisseur || "Inconnu",
           date: inserted.date_expense
-            ? new Date(inserted.date_expense).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
+            ? new Date(inserted.date_expense).toLocaleDateString("fr-FR", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })
             : "Aujourd'hui",
           total: `€${(inserted.montant_total || 0).toFixed(2)}`,
           items: articles.length,
@@ -602,9 +621,7 @@ const Receipts = () => {
       setSaving(true);
       try {
         // Connexion Outlook via le backend Railway (équivalent Powens/Gmail)
-        const data = await railwayFetch<{ url?: string; redirect_url?: string }>(
-          "/outlook/auth-url"
-        );
+        const data = await railwayFetch<{ url?: string; redirect_url?: string }>("/sources/outlook/auth-url");
         const url = data.url || data.redirect_url;
         if (url) {
           window.location.href = url;
@@ -647,12 +664,22 @@ const Receipts = () => {
       let data: any;
 
       if (provider === "microsoft") {
-        // Synchronisation Outlook via le backend Railway
-        data = await railwayFetch<any>("/sources/microsoft/sync", {
+        // Récupérer la source Outlook de l'utilisateur
+        const sources = await railwayFetch<any>("/sources");
+        const outlookSource = sources.find((s: any) => s.provider === "outlook" && s.type === "mail");
+
+        if (!outlookSource) {
+          toast.error("Aucune source Outlook trouvée");
+          setSyncing(false);
+          return;
+        }
+
+        // Lancer la synchronisation Outlook
+        data = await railwayFetch<any>(`/sources/${outlookSource.id}/sync`, {
           method: "POST",
-          body: { email: emailAddr },
         });
       } else {
+        // Gmail : on garde ton flow existant
         const railwayJwt = await getRailwayToken().catch(() => null);
         data = await invokeAuthenticatedFunction<any>(
           "gmail-sync",
@@ -709,9 +736,7 @@ const Receipts = () => {
     setSaving(true);
     try {
       // Nouvelle API Railway : GET /sources/powens/connect-url (auth Bearer)
-      const data = await railwayFetch<{ url?: string; redirect_url?: string }>(
-        "/sources/powens/connect-url"
-      );
+      const data = await railwayFetch<{ url?: string; redirect_url?: string }>("/sources/powens/connect-url");
       const url = data.url || data.redirect_url;
       if (url) {
         window.location.href = url;
@@ -927,9 +952,11 @@ const Receipts = () => {
             }`}
           >
             <div className="flex items-start gap-4">
-              <div className={`h-12 w-12 rounded-xl flex items-center justify-center shrink-0 ${
-                plan === "free" ? "bg-muted" : "bg-primary/10"
-              }`}>
+              <div
+                className={`h-12 w-12 rounded-xl flex items-center justify-center shrink-0 ${
+                  plan === "free" ? "bg-muted" : "bg-primary/10"
+                }`}
+              >
                 <Landmark className={`h-6 w-6 ${plan === "free" ? "text-muted-foreground" : "text-primary"}`} />
               </div>
               <div className="flex-1 min-w-0">
@@ -944,7 +971,9 @@ const Receipts = () => {
                   </>
                 ) : (
                   <>
-                    <p className={`text-sm font-semibold ${plan === "free" ? "text-muted-foreground" : "text-foreground"}`}>
+                    <p
+                      className={`text-sm font-semibold ${plan === "free" ? "text-muted-foreground" : "text-foreground"}`}
+                    >
                       🏦 Banque : connexion sécurisée
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
@@ -1314,7 +1343,8 @@ const Receipts = () => {
               <>
                 <div className="bg-secondary/50 rounded-xl p-3">
                   <p className="text-[11px] text-muted-foreground">
-                    🔒 Vos identifiants bancaires ne sont jamais stockés. Connexion sécurisée via Powens, agréé par l'ACPR Banque de France.
+                    🔒 Vos identifiants bancaires ne sont jamais stockés. Connexion sécurisée via Powens, agréé par
+                    l'ACPR Banque de France.
                   </p>
                 </div>
                 <button
@@ -1370,7 +1400,9 @@ const Receipts = () => {
               {selectedReceipt.document_id && (
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Document source</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Document source
+                    </p>
                     {documentPreview && (
                       <a
                         href={documentPreview.url}
@@ -1408,9 +1440,7 @@ const Receipts = () => {
                           className="flex flex-col items-center justify-center gap-2 h-96 bg-secondary/50 rounded-xl hover:bg-secondary transition-colors"
                         >
                           <FileText className="h-8 w-8 text-primary" />
-                          <span className="text-sm text-foreground">
-                            {documentPreview.name || "Ouvrir le PDF"}
-                          </span>
+                          <span className="text-sm text-foreground">{documentPreview.name || "Ouvrir le PDF"}</span>
                           <span className="text-xs text-muted-foreground">
                             Cliquez pour ouvrir dans un nouvel onglet
                           </span>
