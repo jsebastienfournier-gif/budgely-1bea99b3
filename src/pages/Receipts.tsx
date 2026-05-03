@@ -332,17 +332,51 @@ const Receipts = () => {
     });
   };
 
+  const fetchRailwayEmailExpenses = async (): Promise<any[]> => {
+    try {
+      const raw = await railwayFetch<any[]>("/expenses/", { query: { source: "email" } });
+      if (!Array.isArray(raw)) return [];
+      return raw.map((e: any) => ({
+        id: e.id ?? e._id ?? crypto.randomUUID(),
+        montant_total: e.montant_total ?? e.amount ?? null,
+        categorie: e.categorie ?? e.category ?? null,
+        fournisseur: e.fournisseur ?? e.merchant ?? null,
+        magasin: e.magasin ?? null,
+        date_expense: e.date_expense ?? e.date ?? null,
+        source: "email",
+        description: e.description ?? null,
+        devise: e.devise ?? e.currency ?? "EUR",
+        abonnement_detecte: e.abonnement_detecte ?? false,
+        recurrence: e.recurrence ?? null,
+        created_at: e.created_at ?? new Date().toISOString(),
+        articles: e.articles ?? [],
+        railway_id: e.id ?? e._id ?? null,
+      }));
+    } catch (err) {
+      console.warn("Impossible de récupérer les dépenses email depuis Railway:", err);
+      return [];
+    }
+  };
+
   const reloadExpenses = async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from("expenses")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(50);
-    const raw = data || [];
-    setRawExpenses(raw);
-    setExpenses(mapExpenses(raw));
+    const [{ data }, railwayData] = await Promise.all([
+      supabase
+        .from("expenses")
+        .select("*")
+        .eq("user_id", user.id)
+        .neq("source", "email")
+        .order("created_at", { ascending: false })
+        .limit(50),
+      fetchRailwayEmailExpenses(),
+    ]);
+    const merged = [...(data || []), ...railwayData].sort((a, b) => {
+      const da = a.date_expense ? new Date(a.date_expense).getTime() : 0;
+      const db = b.date_expense ? new Date(b.date_expense).getTime() : 0;
+      return db - da;
+    });
+    setRawExpenses(merged);
+    setExpenses(mapExpenses(merged));
   };
 
   useEffect(() => {
