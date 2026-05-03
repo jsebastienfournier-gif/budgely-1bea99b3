@@ -681,8 +681,11 @@ const Receipts = () => {
     if (newEmailProvider === "outlook") {
       setSaving(true);
       try {
-        // Connexion Outlook via le backend Railway (équivalent Powens/Gmail)
-        const data = await railwayFetch<{ url?: string; redirect_url?: string }>("/sources/outlook/auth-url");
+        // Connexion Outlook via le backend Railway — on passe le redirect vers /receipts
+        const callbackUrl = `${window.location.origin}/receipts`;
+        const data = await railwayFetch<{ url?: string; redirect_url?: string }>("/sources/outlook/auth-url", {
+          query: { redirect_uri: callbackUrl, callback_url: callbackUrl },
+        });
         const url = data.url || data.redirect_url;
         if (url) {
           window.location.href = url;

@@ -1,5 +1,6 @@
+import { useEffect } from "react";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, Receipt, CreditCard, Mail, Brain, Users, TrendingDown, BarChart3, Shield } from "lucide-react";
 import PricingSection from "@/components/PricingSection";
 import ContactSection from "@/components/ContactSection";
@@ -24,6 +25,23 @@ const features = [
 ];
 
 const Landing = () => {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  // Si un callback OAuth (Gmail/Outlook/Powens) atterrit sur "/", rediriger vers /receipts
+  useEffect(() => {
+    if (
+      searchParams.get("microsoft_connected") ||
+      searchParams.get("microsoft_error") ||
+      searchParams.get("gmail_connected") ||
+      searchParams.get("gmail_error") ||
+      searchParams.get("powens_connected") ||
+      searchParams.get("powens_error")
+    ) {
+      navigate(`/receipts?${searchParams.toString()}`, { replace: true });
+    }
+  }, [searchParams, navigate]);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Nav */}
