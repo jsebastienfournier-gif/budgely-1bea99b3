@@ -119,7 +119,13 @@ export const railwayFetch = async <T = any>(path: string, opts: RequestOpts = {}
   // Si JWT invalide / expiré → on retente une fois après refresh
   if (res.status === 401) {
     clearToken();
-    token = await ensureToken();
+    try {
+      token = await ensureToken();
+    } catch {
+      // Re-login échoué → rediriger vers la page de connexion
+      window.location.href = "/auth";
+      throw new Error("Session Railway expirée, redirection vers la connexion.");
+    }
     res = await doFetch(token);
   }
 
