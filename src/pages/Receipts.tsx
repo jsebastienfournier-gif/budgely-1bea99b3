@@ -1627,7 +1627,16 @@ const Receipts = () => {
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">Aucun détail d'articles disponible</p>
+                <div className="py-4 space-y-2">
+                  {selectedReceipt.description ? (
+                    <div className="bg-secondary/50 rounded-xl px-4 py-3">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Motif / Description</p>
+                      <p className="text-sm text-foreground">{selectedReceipt.description}</p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center">Aucun détail d'articles disponible</p>
+                  )}
+                </div>
               )}
 
               <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
