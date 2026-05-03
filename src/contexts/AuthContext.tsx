@@ -31,6 +31,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      // Si l'utilisateur change (login/logout), on invalide le token Railway
+      // pour éviter qu'un ancien JWT périmé reste en cache
+      const prevUserId = user?.id;
+      const newUserId = s?.user?.id;
+      if (prevUserId !== newUserId) {
+        try { localStorage.removeItem("railway_jwt"); } catch {}
+      }
       setSession(s);
       setUser(s?.user ?? null);
     });

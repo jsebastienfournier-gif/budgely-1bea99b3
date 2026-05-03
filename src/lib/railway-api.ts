@@ -14,9 +14,27 @@ const derivePassword = (userId: string) => {
   return `bgly_${userId}_v1!`;
 };
 
-const setToken = (t: string) => localStorage.setItem(TOKEN_KEY, t);
-const getToken = () => localStorage.getItem(TOKEN_KEY);
-const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+const TOKEN_USER_KEY = "railway_jwt_uid";
+
+const setToken = (t: string, userId: string) => {
+  localStorage.setItem(TOKEN_KEY, t);
+  localStorage.setItem(TOKEN_USER_KEY, userId);
+};
+const getToken = (userId?: string) => {
+  // Rejeter le token s'il appartient à un autre utilisateur
+  if (userId) {
+    const storedUid = localStorage.getItem(TOKEN_USER_KEY);
+    if (storedUid && storedUid !== userId) {
+      clearToken();
+      return null;
+    }
+  }
+  return localStorage.getItem(TOKEN_KEY);
+};
+const clearToken = () => {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(TOKEN_USER_KEY);
+};
 
 export const railwayLogout = () => clearToken();
 
@@ -60,15 +78,15 @@ const loginOrRegister = async (email: string, password: string, fullName?: strin
 };
 
 const ensureToken = async (): Promise<string> => {
-  const cached = getToken();
-  if (cached) return cached;
-
   const { data: { user } } = await supabase.auth.getUser();
   if (!user?.email) throw new Error("Utilisateur non connecté");
 
+  const cached = getToken(user.id);
+  if (cached) return cached;
+
   const password = derivePassword(user.id);
   const token = await loginOrRegister(user.email, password, (user.user_metadata as any)?.full_name);
-  setToken(token);
+  setToken(token, user.id);
   return token;
 };
 
