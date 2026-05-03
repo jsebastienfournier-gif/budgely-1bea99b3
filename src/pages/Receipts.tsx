@@ -264,13 +264,23 @@ const Receipts = () => {
       const email = searchParams.get("email") || "";
       // Persist the connected Outlook email in connected_emails table
       if (user && email) {
-        supabase
+        const { data: existing } = await supabase
           .from("connected_emails")
-          .upsert(
-            { user_id: user.id, email, provider: "microsoft", status: "active" },
-            { onConflict: "user_id,email" }
-          )
-          .then(() => reloadEmails());
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("email", email)
+          .maybeSingle();
+        if (!existing) {
+          await supabase
+            .from("connected_emails")
+            .insert({ user_id: user.id, email, provider: "microsoft", status: "active" });
+        } else {
+          await supabase
+            .from("connected_emails")
+            .update({ status: "active" })
+            .eq("id", existing.id);
+        }
+        reloadEmails();
       }
       toast.success(`Outlook connecté : ${email}`);
       setSearchParams({}, { replace: true });
