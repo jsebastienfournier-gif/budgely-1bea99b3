@@ -1185,7 +1185,7 @@ const Receipts = () => {
                     <p className="text-sm font-medium text-foreground">{r.store}</p>
                     <p className="text-[10px] text-muted-foreground">
                       {r.date} ·{" "}
-                      {r.items > 0 ? `${r.items} article${r.items > 1 ? "s" : ""}` : r.description || "Aucun article"}
+                      {r.description || (r.items > 0 ? `${r.items} article${r.items > 1 ? "s" : ""}` : "Aucun article")}
                     </p>
                   </div>
                   <span className="text-sm font-semibold tabular-nums text-foreground">{r.total}</span>
