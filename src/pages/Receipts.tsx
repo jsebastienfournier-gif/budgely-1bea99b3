@@ -1594,6 +1594,13 @@ const Receipts = () => {
                 </div>
               )}
 
+              {selectedReceipt.description && (
+                <div className="bg-secondary/50 rounded-xl px-4 py-3 mb-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Motif / Description</p>
+                  <p className="text-sm text-foreground">{selectedReceipt.description}</p>
+                </div>
+              )}
+
               {selectedReceipt.products.length > 0 ? (
                 <div className="space-y-1">
                   <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
