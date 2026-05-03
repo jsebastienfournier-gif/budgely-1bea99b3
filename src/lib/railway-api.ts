@@ -78,15 +78,15 @@ const loginOrRegister = async (email: string, password: string, fullName?: strin
 };
 
 const ensureToken = async (): Promise<string> => {
-  const cached = getToken();
-  if (cached) return cached;
-
   const { data: { user } } = await supabase.auth.getUser();
   if (!user?.email) throw new Error("Utilisateur non connecté");
 
+  const cached = getToken(user.id);
+  if (cached) return cached;
+
   const password = derivePassword(user.id);
   const token = await loginOrRegister(user.email, password, (user.user_metadata as any)?.full_name);
-  setToken(token);
+  setToken(token, user.id);
   return token;
 };
 
