@@ -24,7 +24,9 @@ const getToken = (userId?: string) => {
   // Rejeter le token s'il appartient à un autre utilisateur
   if (userId) {
     const storedUid = localStorage.getItem(TOKEN_USER_KEY);
-    if (storedUid && storedUid !== userId) {
+    // Les anciens caches n'avaient pas d'UID associé : on les invalide
+    // pour éviter de réutiliser un JWT Railway d'un autre compte.
+    if (!storedUid || storedUid !== userId) {
       clearToken();
       return null;
     }
