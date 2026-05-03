@@ -7,6 +7,10 @@ import { supabase } from "@/integrations/supabase/client";
 export const RAILWAY_BASE = "https://budgely-backend-production.up.railway.app";
 
 const TOKEN_KEY = "railway_jwt";
+const TOKEN_USER_KEY = "railway_jwt_uid";
+const TOKEN_EMAIL_KEY = "railway_jwt_email";
+const TOKEN_VERSION_KEY = "railway_jwt_version";
+const TOKEN_VERSION = "2026-05-03-email-bound-v2";
 
 const derivePassword = (userId: string) => {
   // Mot de passe déterministe propre à Railway, dérivé de l'id Supabase.
@@ -14,19 +18,23 @@ const derivePassword = (userId: string) => {
   return `bgly_${userId}_v1!`;
 };
 
-const TOKEN_USER_KEY = "railway_jwt_uid";
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
-const setToken = (t: string, userId: string) => {
+const setToken = (t: string, userId: string, email: string) => {
   localStorage.setItem(TOKEN_KEY, t);
   localStorage.setItem(TOKEN_USER_KEY, userId);
+  localStorage.setItem(TOKEN_EMAIL_KEY, normalizeEmail(email));
+  localStorage.setItem(TOKEN_VERSION_KEY, TOKEN_VERSION);
 };
-const getToken = (userId?: string) => {
+const getToken = (userId?: string, email?: string) => {
   // Rejeter le token s'il appartient à un autre utilisateur
   if (userId) {
     const storedUid = localStorage.getItem(TOKEN_USER_KEY);
+    const storedEmail = localStorage.getItem(TOKEN_EMAIL_KEY);
+    const storedVersion = localStorage.getItem(TOKEN_VERSION_KEY);
     // Les anciens caches n'avaient pas d'UID associé : on les invalide
     // pour éviter de réutiliser un JWT Railway d'un autre compte.
-    if (!storedUid || storedUid !== userId) {
+    if (!storedUid || storedUid !== userId || storedVersion !== TOKEN_VERSION || (email && storedEmail !== normalizeEmail(email))) {
       clearToken();
       return null;
     }
@@ -36,6 +44,8 @@ const getToken = (userId?: string) => {
 const clearToken = () => {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(TOKEN_USER_KEY);
+  localStorage.removeItem(TOKEN_EMAIL_KEY);
+  localStorage.removeItem(TOKEN_VERSION_KEY);
 };
 
 export const railwayLogout = () => clearToken();
@@ -83,12 +93,12 @@ const ensureToken = async (): Promise<string> => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user?.email) throw new Error("Utilisateur non connecté");
 
-  const cached = getToken(user.id);
+  const cached = getToken(user.id, user.email);
   if (cached) return cached;
 
   const password = derivePassword(user.id);
   const token = await loginOrRegister(user.email, password, (user.user_metadata as any)?.full_name);
-  setToken(token, user.id);
+  setToken(token, user.id, user.email);
   return token;
 };
 
