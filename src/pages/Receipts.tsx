@@ -262,9 +262,30 @@ const Receipts = () => {
     }
     if (searchParams.get("microsoft_connected") === "true") {
       const email = searchParams.get("email") || "";
+      // Persist the connected Outlook email in connected_emails table
+      if (user && email) {
+        (async () => {
+          const { data: existing } = await supabase
+            .from("connected_emails")
+            .select("id")
+            .eq("user_id", user.id)
+            .eq("email", email)
+            .maybeSingle();
+          if (!existing) {
+            await supabase
+              .from("connected_emails")
+              .insert({ user_id: user.id, email, provider: "microsoft", status: "active" });
+          } else {
+            await supabase
+              .from("connected_emails")
+              .update({ status: "active" })
+              .eq("id", existing.id);
+          }
+          reloadEmails();
+        })();
+      }
       toast.success(`Outlook connecté : ${email}`);
       setSearchParams({}, { replace: true });
-      reloadEmails();
     }
     if (searchParams.get("microsoft_error")) {
       toast.error("Erreur de connexion Outlook : " + searchParams.get("microsoft_error"));
@@ -655,6 +676,21 @@ const Receipts = () => {
     toast.success("Adresse email connectée !");
   };
 
+  const handleDeleteEmail = async (emailId: string) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from("connected_emails")
+      .delete()
+      .eq("id", emailId)
+      .eq("user_id", user.id);
+    if (error) {
+      toast.error("Erreur lors de la suppression");
+      return;
+    }
+    setEmails((prev) => prev.filter((e) => e.id !== emailId));
+    toast.success("Adresse email déconnectée");
+  };
+
   const handleSyncEmail = async (emailAddr: string, provider: string) => {
     if (!user || syncing) return;
     setSyncing(true);
@@ -873,7 +909,7 @@ const Receipts = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
             onClick={() =>
-              hasEmails ? handleSyncEmail(emails[0]?.email, emails[0]?.provider) : setShowEmailDialog(true)
+              !hasEmails && setShowEmailDialog(true)
             }
             className="bg-card rounded-2xl border border-border p-6 hover:border-primary/30 transition-colors cursor-pointer"
           >
@@ -883,14 +919,9 @@ const Receipts = () => {
               </div>
               <div className="flex-1 min-w-0">
                 {hasEmails ? (
-                  <>
-                    <p className="text-sm font-semibold text-foreground">
-                      📥 {emails.length} email{emails.length > 1 ? "s" : ""} connecté{emails.length > 1 ? "s" : ""}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                      {emails.map((e) => e.email).join(", ")}
-                    </p>
-                  </>
+                  <p className="text-sm font-semibold text-foreground">
+                    📥 {emails.length} email{emails.length > 1 ? "s" : ""} connecté{emails.length > 1 ? "s" : ""}
+                  </p>
                 ) : (
                   <>
                     <p className="text-sm font-semibold text-foreground">📥 Emails : connexion messagerie</p>
@@ -901,34 +932,54 @@ const Receipts = () => {
                 )}
               </div>
               {hasEmails ? (
-                <div className="flex items-center gap-2 shrink-0">
-                  <RefreshCw className={`h-4 w-4 text-primary ${syncing ? "animate-spin" : ""}`} />
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowEmailDialog(true);
-                    }}
-                    className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
-                  >
-                    <Plus className="h-3.5 w-3.5 text-primary" />
-                  </button>
-                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowEmailDialog(true);
+                  }}
+                  className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors shrink-0"
+                >
+                  <Plus className="h-3.5 w-3.5 text-primary" />
+                </button>
               ) : (
                 <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
               )}
             </div>
             {hasEmails && (
-              <div className="mt-3 pt-3 border-t border-border">
-                <p className="text-[10px] text-muted-foreground">{formatSyncDate(emails[0]?.last_sync_at)}</p>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate("/settings");
-                  }}
-                  className="text-[10px] text-primary font-medium hover:underline mt-0.5"
-                >
-                  Gérer dans les paramètres →
-                </button>
+              <div className="mt-3 pt-3 border-t border-border space-y-2">
+                {emails.map((em) => (
+                  <div key={em.id} className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-foreground truncate">{em.email}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {em.provider === "microsoft" ? "Outlook" : em.provider === "gmail" ? "Gmail" : em.provider}
+                        {em.last_sync_at ? ` · ${formatSyncDate(em.last_sync_at)}` : ""}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSyncEmail(em.email, em.provider);
+                        }}
+                        className="h-6 w-6 rounded-md bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
+                        title="Synchroniser"
+                      >
+                        <RefreshCw className={`h-3 w-3 text-primary ${syncing ? "animate-spin" : ""}`} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteEmail(em.id);
+                        }}
+                        className="h-6 w-6 rounded-md bg-destructive/10 flex items-center justify-center hover:bg-destructive/20 transition-colors"
+                        title="Supprimer"
+                      >
+                        <Trash2 className="h-3 w-3 text-destructive" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </motion.div>
