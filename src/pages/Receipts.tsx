@@ -262,9 +262,18 @@ const Receipts = () => {
     }
     if (searchParams.get("microsoft_connected") === "true") {
       const email = searchParams.get("email") || "";
+      // Persist the connected Outlook email in connected_emails table
+      if (user && email) {
+        supabase
+          .from("connected_emails")
+          .upsert(
+            { user_id: user.id, email, provider: "microsoft", status: "active" },
+            { onConflict: "user_id,email" }
+          )
+          .then(() => reloadEmails());
+      }
       toast.success(`Outlook connecté : ${email}`);
       setSearchParams({}, { replace: true });
-      reloadEmails();
     }
     if (searchParams.get("microsoft_error")) {
       toast.error("Erreur de connexion Outlook : " + searchParams.get("microsoft_error"));
