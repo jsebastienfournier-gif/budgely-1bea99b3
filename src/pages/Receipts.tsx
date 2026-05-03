@@ -691,6 +691,7 @@ const Receipts = () => {
     toast.success("Adresse email déconnectée");
   };
 
+  const handleSyncEmail = async (emailAddr: string, provider: string) => {
     if (!user || syncing) return;
     setSyncing(true);
     const providerLabel = provider === "microsoft" ? "Outlook" : "Gmail";
