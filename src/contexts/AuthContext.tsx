@@ -41,6 +41,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
           localStorage.removeItem("railway_jwt");
           localStorage.removeItem("railway_jwt_uid");
+          localStorage.removeItem("railway_jwt_email");
+          localStorage.removeItem("railway_jwt_version");
         } catch {}
       }
       currentUserIdRef.current = newUserId;
@@ -53,7 +55,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    try { localStorage.removeItem("railway_jwt"); } catch {}
+    try {
+      localStorage.removeItem("railway_jwt");
+      localStorage.removeItem("railway_jwt_uid");
+      localStorage.removeItem("railway_jwt_email");
+      localStorage.removeItem("railway_jwt_version");
+    } catch {}
     setUser(null);
     setSession(null);
   };
