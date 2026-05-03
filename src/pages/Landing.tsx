@@ -1,5 +1,6 @@
+import { useEffect } from "react";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, Receipt, CreditCard, Mail, Brain, Users, TrendingDown, BarChart3, Shield } from "lucide-react";
 import PricingSection from "@/components/PricingSection";
 import ContactSection from "@/components/ContactSection";
