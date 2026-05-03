@@ -676,7 +676,21 @@ const Receipts = () => {
     toast.success("Adresse email connectée !");
   };
 
-  const handleSyncEmail = async (emailAddr: string, provider: string) => {
+  const handleDeleteEmail = async (emailId: string) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from("connected_emails")
+      .delete()
+      .eq("id", emailId)
+      .eq("user_id", user.id);
+    if (error) {
+      toast.error("Erreur lors de la suppression");
+      return;
+    }
+    setEmails((prev) => prev.filter((e) => e.id !== emailId));
+    toast.success("Adresse email déconnectée");
+  };
+
     if (!user || syncing) return;
     setSyncing(true);
     const providerLabel = provider === "microsoft" ? "Outlook" : "Gmail";
