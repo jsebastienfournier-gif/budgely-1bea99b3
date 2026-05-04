@@ -444,6 +444,20 @@ const Receipts = () => {
       setRawExpenses(expenseRes.data || []);
       setExpenses(mapExpenses(expenseRes.data || []));
       setLoading(false);
+
+      // Backfill: if user has connected emails, pull Railway email expenses into Supabase
+      const connectedEmails = (emailRes.data as ConnectedEmail[]) || [];
+      if (connectedEmails.length > 0) {
+        try {
+          const railwayExpenses = await fetchRailwayEmailExpenses();
+          if (railwayExpenses.length > 0) {
+            await upsertEmailExpensesToSupabase(railwayExpenses);
+            await reloadExpenses();
+          }
+        } catch (err) {
+          console.warn("Backfill email expenses failed:", err);
+        }
+      }
     };
     load();
   }, [user]);
