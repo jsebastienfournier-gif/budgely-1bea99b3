@@ -429,27 +429,20 @@ const Receipts = () => {
     if (!user) return;
     const load = async () => {
       setLoading(true);
-      const [emailRes, bankRes, expenseRes, railwayData] = await Promise.all([
+      const [emailRes, bankRes, expenseRes] = await Promise.all([
         supabase.from("connected_emails").select("*").eq("user_id", user.id).order("created_at"),
         supabase.from("connected_bank_accounts").select("*").eq("user_id", user.id).order("created_at"),
         supabase
           .from("expenses")
           .select("*")
           .eq("user_id", user.id)
-          .neq("source", "email")
-          .order("created_at", { ascending: false })
-          .limit(50),
-        fetchRailwayEmailExpenses(),
+          .order("date_expense", { ascending: false })
+          .limit(100),
       ]);
       setEmails((emailRes.data as ConnectedEmail[]) || []);
       setBanks((bankRes.data as ConnectedBank[]) || []);
-      const merged = [...(expenseRes.data || []), ...railwayData].sort((a, b) => {
-        const da = a.date_expense ? new Date(a.date_expense).getTime() : 0;
-        const db = b.date_expense ? new Date(b.date_expense).getTime() : 0;
-        return db - da;
-      });
-      setRawExpenses(merged);
-      setExpenses(mapExpenses(merged));
+      setRawExpenses(expenseRes.data || []);
+      setExpenses(mapExpenses(expenseRes.data || []));
       setLoading(false);
     };
     load();
