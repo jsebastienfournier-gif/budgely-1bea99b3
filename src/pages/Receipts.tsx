@@ -769,34 +769,7 @@ const Receipts = () => {
 
       if (data?.analyzed > 0) {
         toast.success(`${data.analyzed} email(s) analysé(s) sur ${data.total}`);
-        const { data: expenseRes } = await supabase
-          .from("expenses")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(50);
-        const mapped = (expenseRes || []).map((e: any) => {
-          const articles = (e.articles || []).map((a: any) => ({
-            name: a.nom || a.name || "",
-            qty: a.quantite || a.qty || 1,
-            unit: a.unite || a.unit || "pce",
-            unitPrice: a.prix_unitaire || a.unitPrice || 0,
-            total: a.prix_total || a.total || 0,
-          }));
-          return {
-            id: e.id,
-            store: e.magasin || e.fournisseur || "Inconnu",
-            date: e.date_expense
-              ? new Date(e.date_expense).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
-              : "Date inconnue",
-            total: `€${(e.montant_total || 0).toFixed(2)}`,
-            items: articles.length,
-            status: "Analysé",
-            products: articles,
-            source: e.source,
-          };
-        });
-        setExpenses(mapped);
+        await reloadExpenses();
         setEmails((prev) =>
           prev.map((em) => (em.email === emailAddr ? { ...em, last_sync_at: new Date().toISOString() } : em)),
         );
