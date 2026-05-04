@@ -144,7 +144,20 @@ export const railwayFetch = async <T = any>(path: string, opts: RequestOpts = {}
     });
   };
 
-  let res = await doFetch(token);
+  let res: Response;
+  try {
+    res = await doFetch(token);
+  } catch (networkErr) {
+    // Erreur réseau (Failed to fetch) → vider le cache et retenter une fois
+    console.warn("[railwayFetch] Network error, retrying with fresh token:", networkErr);
+    clearToken();
+    try {
+      token = await ensureToken();
+    } catch {
+      throw networkErr;
+    }
+    res = await doFetch(token);
+  }
 
   // Si JWT invalide / expiré → on retente une fois après refresh
   if (res.status === 401) {
