@@ -362,14 +362,34 @@ const Receipts = () => {
   const upsertEmailExpensesToSupabase = async (railwayExpenses: any[]) => {
     if (!user || railwayExpenses.length === 0) return;
 
-    // Upsert each email expense into Supabase using source_id as dedup key
+    // Upsert each email expense into Supabase using Railway/source identifiers as dedup keys.
+    // Important: the Railway list can contain manually-created expenses even when queried with source=email.
+    // If the same railway_id is already linked to a non-email expense, keep the manual row and skip import.
     for (const e of railwayExpenses) {
       const sourceId = String(e.source_id || e.railway_id || e.id);
+      const railwayId = e.railway_id || e.id ? String(e.railway_id || e.id) : null;
+
+      let existing: { id: string; source: string } | null = null;
+
+      if (railwayId) {
+        const { data: byRailwayId } = await supabase
+          .from("expenses")
+          .select("id, source")
+          .eq("user_id", user.id)
+          .eq("railway_id", railwayId)
+          .maybeSingle();
+        existing = byRailwayId as { id: string; source: string } | null;
+      }
+
+      if (existing && existing.source !== "email") {
+        continue;
+      }
+
       const payload = {
         user_id: user.id,
         source: "email" as const,
         source_id: sourceId,
-        railway_id: String(e.railway_id || e.id),
+        railway_id: railwayId,
         montant_total: e.montant_total,
         categorie: e.categorie,
         fournisseur: e.fournisseur,
@@ -382,18 +402,25 @@ const Receipts = () => {
         articles: e.articles || [],
       };
 
-      // Check if exists
-      const { data: existing } = await supabase
-        .from("expenses")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("source_id", sourceId)
-        .maybeSingle();
+      if (!existing) {
+        const { data: bySourceId } = await supabase
+          .from("expenses")
+          .select("id, source")
+          .eq("user_id", user.id)
+          .eq("source_id", sourceId)
+          .maybeSingle();
+        existing = bySourceId as { id: string; source: string } | null;
+      }
+
+      if (existing && existing.source !== "email") {
+        continue;
+      }
 
       if (existing) {
         await supabase.from("expenses").update(payload).eq("id", existing.id);
       } else {
-        await supabase.from("expenses").insert(payload);
+        const { error } = await supabase.from("expenses").insert(payload);
+        if (error) console.warn("[email-expenses/backfill] insert skipped:", error.message);
       }
     }
 
