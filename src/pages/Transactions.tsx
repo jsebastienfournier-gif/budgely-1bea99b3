@@ -27,11 +27,17 @@ const EMOJI_MAP: Record<string, string> = {
   "Épargne & Investissement": "💰", Autres: "📌",
 };
 
+const normalizeCategory = (cat: string): string => {
+  if (cat === "Restauration" || cat === "Restaurants") return "Alimentation";
+  if (cat === "Épargne" || cat === "Investissement") return "Épargne & Investissement";
+  return cat;
+};
+
 function buildCategories(expenses: Expense[]): CategoryStat[] {
   const map: Record<string, number> = {};
   let total = 0;
   expenses.forEach((e) => {
-    const cat = e.categorie || "Autres";
+    const cat = normalizeCategory(e.categorie || "Autres");
     const amt = e.montant_total || 0;
     map[cat] = (map[cat] || 0) + amt;
     total += amt;
