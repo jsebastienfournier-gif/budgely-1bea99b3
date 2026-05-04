@@ -808,17 +808,18 @@ const Receipts = () => {
 
       if (data?.analyzed > 0) {
         toast.success(`${data.analyzed} email(s) analysé(s) sur ${data.total}`);
-        // Persist email expenses from Railway into Supabase
-        toast.info("Sauvegarde des dépenses email…");
-        const railwayExpenses = await fetchRailwayEmailExpenses();
-        await upsertEmailExpensesToSupabase(railwayExpenses);
-        await reloadExpenses();
-        setEmails((prev) =>
-          prev.map((em) => (em.email === emailAddr ? { ...em, last_sync_at: new Date().toISOString() } : em)),
-        );
       } else {
-        toast.info(data?.message || "Aucun email financier trouvé");
+        toast.info(data?.message || "Aucun nouvel email financier trouvé");
       }
+
+      // Always persist email expenses from Railway into Supabase after sync
+      toast.info("Sauvegarde des dépenses email…");
+      const railwayExpenses = await fetchRailwayEmailExpenses();
+      await upsertEmailExpensesToSupabase(railwayExpenses);
+      await reloadExpenses();
+      setEmails((prev) =>
+        prev.map((em) => (em.email === emailAddr ? { ...em, last_sync_at: new Date().toISOString() } : em)),
+      );
     } catch (err: any) {
       toast.error("Erreur de synchronisation : " + (err.message || "Erreur inconnue"));
     } finally {
