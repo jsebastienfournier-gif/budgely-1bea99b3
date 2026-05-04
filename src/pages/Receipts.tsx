@@ -351,6 +351,7 @@ const Receipts = () => {
         created_at: e.created_at ?? new Date().toISOString(),
         articles: e.articles ?? [],
         railway_id: e.id ?? e._id ?? null,
+        source_id: e.id ?? e._id ?? null,
       }));
     } catch (err) {
       console.warn("Impossible de récupérer les dépenses email depuis Railway:", err);
@@ -358,52 +359,90 @@ const Receipts = () => {
     }
   };
 
+  const upsertEmailExpensesToSupabase = async (railwayExpenses: any[]) => {
+    if (!user || railwayExpenses.length === 0) return;
+
+    // Upsert each email expense into Supabase using source_id as dedup key
+    for (const e of railwayExpenses) {
+      const sourceId = String(e.source_id || e.railway_id || e.id);
+      const payload = {
+        user_id: user.id,
+        source: "email" as const,
+        source_id: sourceId,
+        railway_id: String(e.railway_id || e.id),
+        montant_total: e.montant_total,
+        categorie: e.categorie,
+        fournisseur: e.fournisseur,
+        magasin: e.magasin,
+        date_expense: e.date_expense,
+        description: e.description,
+        devise: e.devise || "EUR",
+        abonnement_detecte: e.abonnement_detecte ?? false,
+        recurrence: e.recurrence,
+        articles: e.articles || [],
+      };
+
+      // Check if exists
+      const { data: existing } = await supabase
+        .from("expenses")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("source_id", sourceId)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase.from("expenses").update(payload).eq("id", existing.id);
+      } else {
+        await supabase.from("expenses").insert(payload);
+      }
+    }
+
+    // Reconciliation: delete Supabase email expenses that no longer exist in Railway
+    const railwaySourceIds = railwayExpenses.map((e) => String(e.source_id || e.railway_id || e.id));
+    const { data: dbEmailExpenses } = await supabase
+      .from("expenses")
+      .select("id, source_id")
+      .eq("user_id", user.id)
+      .eq("source", "email");
+
+    if (dbEmailExpenses) {
+      const toDelete = dbEmailExpenses.filter((e) => e.source_id && !railwaySourceIds.includes(e.source_id));
+      for (const e of toDelete) {
+        await supabase.from("expenses").delete().eq("id", e.id);
+      }
+    }
+  };
+
   const reloadExpenses = async () => {
     if (!user) return;
-    const [{ data }, railwayData] = await Promise.all([
-      supabase
-        .from("expenses")
-        .select("*")
-        .eq("user_id", user.id)
-        .neq("source", "email")
-        .order("created_at", { ascending: false })
-        .limit(50),
-      fetchRailwayEmailExpenses(),
-    ]);
-    const merged = [...(data || []), ...railwayData].sort((a, b) => {
-      const da = a.date_expense ? new Date(a.date_expense).getTime() : 0;
-      const db = b.date_expense ? new Date(b.date_expense).getTime() : 0;
-      return db - da;
-    });
-    setRawExpenses(merged);
-    setExpenses(mapExpenses(merged));
+    const { data } = await supabase
+      .from("expenses")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("date_expense", { ascending: false })
+      .limit(100);
+    setRawExpenses(data || []);
+    setExpenses(mapExpenses(data || []));
   };
 
   useEffect(() => {
     if (!user) return;
     const load = async () => {
       setLoading(true);
-      const [emailRes, bankRes, expenseRes, railwayData] = await Promise.all([
+      const [emailRes, bankRes, expenseRes] = await Promise.all([
         supabase.from("connected_emails").select("*").eq("user_id", user.id).order("created_at"),
         supabase.from("connected_bank_accounts").select("*").eq("user_id", user.id).order("created_at"),
         supabase
           .from("expenses")
           .select("*")
           .eq("user_id", user.id)
-          .neq("source", "email")
-          .order("created_at", { ascending: false })
-          .limit(50),
-        fetchRailwayEmailExpenses(),
+          .order("date_expense", { ascending: false })
+          .limit(100),
       ]);
       setEmails((emailRes.data as ConnectedEmail[]) || []);
       setBanks((bankRes.data as ConnectedBank[]) || []);
-      const merged = [...(expenseRes.data || []), ...railwayData].sort((a, b) => {
-        const da = a.date_expense ? new Date(a.date_expense).getTime() : 0;
-        const db = b.date_expense ? new Date(b.date_expense).getTime() : 0;
-        return db - da;
-      });
-      setRawExpenses(merged);
-      setExpenses(mapExpenses(merged));
+      setRawExpenses(expenseRes.data || []);
+      setExpenses(mapExpenses(expenseRes.data || []));
       setLoading(false);
     };
     load();
@@ -769,6 +808,10 @@ const Receipts = () => {
 
       if (data?.analyzed > 0) {
         toast.success(`${data.analyzed} email(s) analysé(s) sur ${data.total}`);
+        // Persist email expenses from Railway into Supabase
+        toast.info("Sauvegarde des dépenses email…");
+        const railwayExpenses = await fetchRailwayEmailExpenses();
+        await upsertEmailExpensesToSupabase(railwayExpenses);
         await reloadExpenses();
         setEmails((prev) =>
           prev.map((em) => (em.email === emailAddr ? { ...em, last_sync_at: new Date().toISOString() } : em)),
