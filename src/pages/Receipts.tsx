@@ -445,18 +445,16 @@ const Receipts = () => {
       setExpenses(mapExpenses(expenseRes.data || []));
       setLoading(false);
 
-      // Backfill: if user has connected emails, pull Railway email expenses into Supabase
-      const connectedEmails = (emailRes.data as ConnectedEmail[]) || [];
-      if (connectedEmails.length > 0) {
-        try {
-          const railwayExpenses = await fetchRailwayEmailExpenses();
-          if (railwayExpenses.length > 0) {
-            await upsertEmailExpensesToSupabase(railwayExpenses);
-            await reloadExpenses();
-          }
-        } catch (err) {
-          console.warn("Backfill email expenses failed:", err);
+      // Backfill: always pull Railway email expenses into Supabase
+      // (connected_emails table may be empty even if Outlook is connected via Railway)
+      try {
+        const railwayExpenses = await fetchRailwayEmailExpenses();
+        if (railwayExpenses.length > 0) {
+          await upsertEmailExpensesToSupabase(railwayExpenses);
+          await reloadExpenses();
         }
+      } catch (err) {
+        console.warn("Backfill email expenses failed:", err);
       }
     };
     load();
