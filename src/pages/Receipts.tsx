@@ -444,6 +444,20 @@ const Receipts = () => {
       setRawExpenses(expenseRes.data || []);
       setExpenses(mapExpenses(expenseRes.data || []));
       setLoading(false);
+
+      // Backfill: if user has connected emails, pull Railway email expenses into Supabase
+      const connectedEmails = (emailRes.data as ConnectedEmail[]) || [];
+      if (connectedEmails.length > 0) {
+        try {
+          const railwayExpenses = await fetchRailwayEmailExpenses();
+          if (railwayExpenses.length > 0) {
+            await upsertEmailExpensesToSupabase(railwayExpenses);
+            await reloadExpenses();
+          }
+        } catch (err) {
+          console.warn("Backfill email expenses failed:", err);
+        }
+      }
     };
     load();
   }, [user]);
@@ -808,17 +822,18 @@ const Receipts = () => {
 
       if (data?.analyzed > 0) {
         toast.success(`${data.analyzed} email(s) analysé(s) sur ${data.total}`);
-        // Persist email expenses from Railway into Supabase
-        toast.info("Sauvegarde des dépenses email…");
-        const railwayExpenses = await fetchRailwayEmailExpenses();
-        await upsertEmailExpensesToSupabase(railwayExpenses);
-        await reloadExpenses();
-        setEmails((prev) =>
-          prev.map((em) => (em.email === emailAddr ? { ...em, last_sync_at: new Date().toISOString() } : em)),
-        );
       } else {
-        toast.info(data?.message || "Aucun email financier trouvé");
+        toast.info(data?.message || "Aucun nouvel email financier trouvé");
       }
+
+      // Always persist email expenses from Railway into Supabase after sync
+      toast.info("Sauvegarde des dépenses email…");
+      const railwayExpenses = await fetchRailwayEmailExpenses();
+      await upsertEmailExpensesToSupabase(railwayExpenses);
+      await reloadExpenses();
+      setEmails((prev) =>
+        prev.map((em) => (em.email === emailAddr ? { ...em, last_sync_at: new Date().toISOString() } : em)),
+      );
     } catch (err: any) {
       toast.error("Erreur de synchronisation : " + (err.message || "Erreur inconnue"));
     } finally {
