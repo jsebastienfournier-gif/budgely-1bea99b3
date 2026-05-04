@@ -177,9 +177,9 @@ const Receipts = () => {
         Housing: "Logement",
         Health: "Santé",
         Entertainment: "Loisirs",
-        Restaurant: "Restaurants",
-        Savings: "Épargne",
-        Investment: "Investissement",
+        Restaurant: "Alimentation",
+        Savings: "Épargne & Investissement",
+        Investment: "Épargne & Investissement",
       };
 
       const rows = transactions.map((tx) => ({
