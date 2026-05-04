@@ -14,9 +14,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   Loisirs: "hsl(25, 90%, 55%)",
   Santé: "hsl(340, 70%, 55%)",
   Abonnements: "hsl(250, 60%, 55%)",
-  Restaurants: "hsl(30, 80%, 55%)",
-  Épargne: "hsl(170, 60%, 45%)",
-  Investissement: "hsl(200, 70%, 50%)",
+  "Épargne & Investissement": "hsl(170, 60%, 45%)",
   Autres: "hsl(215, 16%, 47%)",
 };
 
@@ -24,16 +22,22 @@ type CategoryStat = { name: string; emoji: string; percent: number; color: strin
 type Detection = { title: string; desc: string };
 
 const EMOJI_MAP: Record<string, string> = {
-  Alimentation: "🛒", Transport: "🚗", Logement: "🏠", Restaurants: "🍽️",
-  Santé: "💊", Abonnements: "📦", Loisirs: "🎭", Épargne: "💰",
-  Investissement: "📈", Autres: "📌",
+  Alimentation: "🛒", Transport: "🚗", Logement: "🏠",
+  Santé: "💊", Abonnements: "📦", Loisirs: "🎭",
+  "Épargne & Investissement": "💰", Autres: "📌",
+};
+
+const normalizeCategory = (cat: string): string => {
+  if (cat === "Restauration" || cat === "Restaurants") return "Alimentation";
+  if (cat === "Épargne" || cat === "Investissement") return "Épargne & Investissement";
+  return cat;
 };
 
 function buildCategories(expenses: Expense[]): CategoryStat[] {
   const map: Record<string, number> = {};
   let total = 0;
   expenses.forEach((e) => {
-    const cat = e.categorie || "Autres";
+    const cat = normalizeCategory(e.categorie || "Autres");
     const amt = e.montant_total || 0;
     map[cat] = (map[cat] || 0) + amt;
     total += amt;

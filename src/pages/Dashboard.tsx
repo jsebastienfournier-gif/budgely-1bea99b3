@@ -18,9 +18,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   Loisirs: "hsl(25, 90%, 55%)",
   Santé: "hsl(340, 70%, 55%)",
   Abonnements: "hsl(250, 60%, 55%)",
-  Restaurants: "hsl(30, 80%, 55%)",
-  Épargne: "hsl(170, 60%, 45%)",
-  Investissement: "hsl(200, 70%, 50%)",
+  "Épargne & Investissement": "hsl(170, 60%, 45%)",
   Autres: "hsl(215, 16%, 47%)",
 };
 
@@ -37,6 +35,12 @@ const sourceLabels: Record<string, string> = {
   invoice: "Facture",
 };
 
+const normalizeCategory = (cat: string): string => {
+  if (cat === "Restauration" || cat === "Restaurants") return "Alimentation";
+  if (cat === "Épargne" || cat === "Investissement") return "Épargne & Investissement";
+  return cat;
+};
+
 function getColor(cat: string) {
   return CATEGORY_COLORS[cat] || CATEGORY_COLORS.Autres;
 }
@@ -44,7 +48,7 @@ function getColor(cat: string) {
 function buildCategoryData(expenses: Expense[]) {
   const map: Record<string, number> = {};
   expenses.forEach((e) => {
-    const cat = e.categorie || "Autres";
+    const cat = normalizeCategory(e.categorie || "Autres");
     map[cat] = (map[cat] || 0) + (e.montant_total || 0);
   });
   return Object.entries(map)

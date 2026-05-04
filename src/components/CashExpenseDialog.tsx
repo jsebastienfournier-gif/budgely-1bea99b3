@@ -17,16 +17,15 @@ import { toast } from "sonner";
 
 const CATEGORIES = [
   "Alimentation", "Transport", "Logement", "Santé", "Loisirs",
-  "Shopping", "Restauration", "Éducation", "Abonnements",
-  "Épargne", "Investissement", "Autre",
+  "Shopping", "Éducation", "Abonnements",
+  "Épargne & Investissement", "Autre",
 ];
 
 const normalizeName = (s: string) =>
   s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
 
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
-  Alimentation: ["carrefour", "leclerc", "auchan", "lidl", "aldi", "monoprix", "franprix", "intermarche", "casino", "super u", "picard", "boulangerie", "boucherie", "primeur", "marche"],
-  Restauration: ["restaurant", "resto", "mcdo", "mcdonald", "kfc", "burger", "subway", "starbucks", "cafe", "brasserie", "pizzeria", "pizza", "kebab", "sushi", "uber eats", "deliveroo"],
+  Alimentation: ["carrefour", "leclerc", "auchan", "lidl", "aldi", "monoprix", "franprix", "intermarche", "casino", "super u", "picard", "boulangerie", "boucherie", "primeur", "marche", "restaurant", "resto", "mcdo", "mcdonald", "kfc", "burger", "subway", "starbucks", "cafe", "brasserie", "pizzeria", "pizza", "kebab", "sushi", "uber eats", "deliveroo"],
   Transport: ["sncf", "ratp", "uber", "bolt", "taxi", "essence", "total", "shell", "bp", "esso", "station", "parking", "blablacar", "ouigo", "trainline"],
   Logement: ["edf", "engie", "veolia", "suez", "loyer", "syndic", "leroy merlin", "castorama", "bricorama", "ikea"],
   Loisirs: ["cinema", "ugc", "pathe", "gaumont", "spotify", "deezer", "fnac", "decathlon", "concert", "theatre"],
