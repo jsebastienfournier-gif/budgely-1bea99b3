@@ -285,6 +285,9 @@ const Admin = () => {
                 className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
               />
             </div>
+
+            {/* Reclassify all expenses */}
+            <ReclassifyAllButton />
           </TabsContent>
 
           <TabsContent value="messages">
