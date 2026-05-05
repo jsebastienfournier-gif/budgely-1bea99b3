@@ -1247,9 +1247,9 @@ const Receipts = () => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleValidateEmail(r.source_id!, "approved");
+                          handleValidateEmail(r.id, "approved");
                         }}
-                        disabled={validatingId === r.source_id}
+                        disabled={validatingId === r.id}
                         className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-green-500/10 hover:text-green-600 transition-colors disabled:opacity-50"
                         title="Approuver"
                       >
@@ -1258,9 +1258,9 @@ const Receipts = () => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleValidateEmail(r.source_id!, "rejected");
+                          handleValidateEmail(r.id, "rejected");
                         }}
-                        disabled={validatingId === r.source_id}
+                        disabled={validatingId === r.id}
                         className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
                         title="Refuser"
                       >
