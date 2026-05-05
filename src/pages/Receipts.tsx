@@ -524,16 +524,13 @@ const Receipts = () => {
     }
   };
 
-  const handleValidateEmail = async (sourceId: string, status: "approved" | "rejected") => {
-    const messageId = sourceId.replace(/^gmail_/, "");
-    setValidatingId(sourceId);
+  const handleValidateEmail = async (expenseId: string, status: "approved" | "rejected") => {
+    setValidatingId(expenseId);
     try {
-      const res = await fetch("https://budgely-backend-production.up.railway.app/api/gmail/validate", {
+      await railwayFetch(`/expenses/${expenseId}/validate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message_id: messageId, status }),
+        body: { status },
       });
-      if (!res.ok) throw new Error(`Erreur ${res.status}`);
       toast.success(status === "approved" ? "Email approuvé ✓" : "Email refusé ✗");
       reloadExpenses();
     } catch (err: any) {
@@ -1250,9 +1247,9 @@ const Receipts = () => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleValidateEmail(r.source_id!, "approved");
+                          handleValidateEmail(r.id, "approved");
                         }}
-                        disabled={validatingId === r.source_id}
+                        disabled={validatingId === r.id}
                         className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-green-500/10 hover:text-green-600 transition-colors disabled:opacity-50"
                         title="Approuver"
                       >
@@ -1261,9 +1258,9 @@ const Receipts = () => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleValidateEmail(r.source_id!, "rejected");
+                          handleValidateEmail(r.id, "rejected");
                         }}
-                        disabled={validatingId === r.source_id}
+                        disabled={validatingId === r.id}
                         className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
                         title="Refuser"
                       >
