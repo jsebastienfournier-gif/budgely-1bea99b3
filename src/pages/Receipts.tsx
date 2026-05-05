@@ -331,6 +331,7 @@ const Receipts = () => {
         source_id: e.source_id || undefined,
         document_id: e.document_id || null,
         railway_id: (e as any).railway_id || null,
+        email_validated: (e as any).email_validated || null,
       };
     });
   };
