@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export type Expense = {
   id: string;
+  railway_id: string | null;
   montant_total: number | null;
   categorie: string | null;
   fournisseur: string | null;
