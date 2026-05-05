@@ -313,6 +313,7 @@ export type Database = {
           description: string | null
           devise: string | null
           document_id: string | null
+          email_validated: string | null
           fournisseur: string | null
           id: string
           magasin: string | null
@@ -339,6 +340,7 @@ export type Database = {
           description?: string | null
           devise?: string | null
           document_id?: string | null
+          email_validated?: string | null
           fournisseur?: string | null
           id?: string
           magasin?: string | null
@@ -365,6 +367,7 @@ export type Database = {
           description?: string | null
           devise?: string | null
           document_id?: string | null
+          email_validated?: string | null
           fournisseur?: string | null
           id?: string
           magasin?: string | null
