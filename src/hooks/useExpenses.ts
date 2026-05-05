@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export type Expense = {
   id: string;
+  railway_id: string | null;
   montant_total: number | null;
   categorie: string | null;
   fournisseur: string | null;
@@ -32,7 +33,7 @@ export const useExpenses = () => {
 
     const { data } = await supabase
       .from("expenses")
-      .select("id, montant_total, categorie, fournisseur, magasin, date_expense, source, description, devise, abonnement_detecte, recurrence, created_at")
+      .select("id, railway_id, montant_total, categorie, fournisseur, magasin, date_expense, source, description, devise, abonnement_detecte, recurrence, created_at")
       .eq("user_id", user.id)
       .order("date_expense", { ascending: false });
 

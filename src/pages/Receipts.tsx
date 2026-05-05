@@ -72,6 +72,7 @@ type ReceiptProduct = {
 };
 type Receipt = {
   id: string;
+  railway_id?: string | null;
   store: string;
   date: string;
   total: string;
@@ -328,6 +329,7 @@ const Receipts = () => {
         description: e.description || "",
         source_id: e.source_id || undefined,
         document_id: e.document_id || null,
+        railway_id: (e as any).railway_id || null,
       };
     });
   };
@@ -1251,7 +1253,7 @@ const Receipts = () => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleValidateEmail(r.id, (r as any).railway_id, "approved");
+                          handleValidateEmail(r.id, r.railway_id, "approved");
                         }}
                         disabled={validatingId === r.id}
                         className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-green-500/10 hover:text-green-600 transition-colors disabled:opacity-50"
@@ -1262,7 +1264,7 @@ const Receipts = () => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleValidateEmail(r.id, (r as any).railway_id, "rejected");
+                          handleValidateEmail(r.id, r.railway_id, "rejected");
                         }}
                         disabled={validatingId === r.id}
                         className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
