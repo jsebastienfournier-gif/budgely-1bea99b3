@@ -524,16 +524,13 @@ const Receipts = () => {
     }
   };
 
-  const handleValidateEmail = async (sourceId: string, status: "approved" | "rejected") => {
-    const messageId = sourceId.replace(/^gmail_/, "");
-    setValidatingId(sourceId);
+  const handleValidateEmail = async (expenseId: string, status: "approved" | "rejected") => {
+    setValidatingId(expenseId);
     try {
-      const res = await fetch("https://budgely-backend-production.up.railway.app/api/gmail/validate", {
+      await railwayFetch(`/expenses/${expenseId}/validate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message_id: messageId, status }),
+        body: { status },
       });
-      if (!res.ok) throw new Error(`Erreur ${res.status}`);
       toast.success(status === "approved" ? "Email approuvé ✓" : "Email refusé ✗");
       reloadExpenses();
     } catch (err: any) {
