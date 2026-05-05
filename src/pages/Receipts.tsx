@@ -329,6 +329,7 @@ const Receipts = () => {
         description: e.description || "",
         source_id: e.source_id || undefined,
         document_id: e.document_id || null,
+        railway_id: (e as any).railway_id || null,
       };
     });
   };
