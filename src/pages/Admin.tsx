@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Shield, UserCog, Loader2, Crown, Wrench, BarChart3, MessageSquare, Eye, Ban, Bell, Mail, CreditCard, ScrollText } from "lucide-react";
+import { Shield, UserCog, Loader2, Crown, Wrench, BarChart3, MessageSquare, Eye, Ban, Bell, Mail, CreditCard, ScrollText, RefreshCw } from "lucide-react";
+import { railwayFetch } from "@/lib/railway-api";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -284,6 +285,9 @@ const Admin = () => {
                 className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
               />
             </div>
+
+            {/* Reclassify all expenses */}
+            <ReclassifyAllButton />
           </TabsContent>
 
           <TabsContent value="messages">
@@ -316,6 +320,56 @@ const Admin = () => {
         onRefresh={loadUsers}
       />
     </AppLayout>
+  );
+};
+
+const ReclassifyAllButton = () => {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  const handleReclassify = async () => {
+    setLoading(true);
+    setResult(null);
+    try {
+      const data = await railwayFetch("/expenses/reclassify-all", { method: "POST" });
+      const msg = data?.message || data?.detail || JSON.stringify(data);
+      setResult(`✅ ${msg}`);
+      toast.success("Reclassification lancée");
+    } catch (err: any) {
+      setResult(`❌ ${err.message}`);
+      toast.error("Erreur : " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-card border border-border rounded-xl p-5 mt-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+            <RefreshCw className="h-4 w-4 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Reclassifier les dépenses</h3>
+            <p className="text-xs text-muted-foreground">
+              Relance la classification IA sur toutes les dépenses existantes
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={handleReclassify}
+          disabled={loading}
+          className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
+        >
+          {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          Lancer
+        </button>
+      </div>
+      {result && (
+        <p className="mt-3 text-xs text-muted-foreground">{result}</p>
+      )}
+    </div>
   );
 };
 
