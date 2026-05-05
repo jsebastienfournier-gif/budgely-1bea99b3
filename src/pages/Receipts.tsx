@@ -83,6 +83,7 @@ type Receipt = {
   description?: string;
   source_id?: string;
   document_id?: string | null;
+  email_validated?: string | null;
 };
 
 const emailProviders = [
@@ -330,6 +331,7 @@ const Receipts = () => {
         source_id: e.source_id || undefined,
         document_id: e.document_id || null,
         railway_id: (e as any).railway_id || null,
+        email_validated: (e as any).email_validated || null,
       };
     });
   };
@@ -537,6 +539,11 @@ const Receipts = () => {
         method: "POST",
         body: { status },
       });
+      // Persist validation status in Supabase
+      await supabase
+        .from("expenses")
+        .update({ email_validated: status })
+        .eq("id", supabaseId);
       toast.success(status === "approved" ? "Email approuvé ✓" : "Email refusé ✗");
       reloadExpenses();
     } catch (err: any) {
@@ -1249,30 +1256,39 @@ const Receipts = () => {
                   </div>
                   <span className="text-sm font-semibold tabular-nums text-foreground">{r.total}</span>
                   {r.source === "email" && r.source_id && (
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleValidateEmail(r.id, r.railway_id, "approved");
-                        }}
-                        disabled={validatingId === r.id}
-                        className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-green-500/10 hover:text-green-600 transition-colors disabled:opacity-50"
-                        title="Approuver"
+                    r.email_validated ? (
+                      <Badge
+                        variant={r.email_validated === "approved" ? "default" : "destructive"}
+                        className={`text-[10px] px-2 py-0.5 ${r.email_validated === "approved" ? "bg-green-600 hover:bg-green-600" : ""}`}
                       >
-                        <Check className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleValidateEmail(r.id, r.railway_id, "rejected");
-                        }}
-                        disabled={validatingId === r.id}
-                        className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
-                        title="Refuser"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </>
+                        {r.email_validated === "approved" ? "Approuvé" : "Refusé"}
+                      </Badge>
+                    ) : (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleValidateEmail(r.id, r.railway_id, "approved");
+                          }}
+                          disabled={validatingId === r.id}
+                          className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-green-500/10 hover:text-green-600 transition-colors disabled:opacity-50"
+                          title="Approuver"
+                        >
+                          <Check className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleValidateEmail(r.id, r.railway_id, "rejected");
+                          }}
+                          disabled={validatingId === r.id}
+                          className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
+                          title="Refuser"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </>
+                    )
                   )}
                   <button
                     onClick={(e) => {
