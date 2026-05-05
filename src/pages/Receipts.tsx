@@ -524,10 +524,14 @@ const Receipts = () => {
     }
   };
 
-  const handleValidateEmail = async (expenseId: string, status: "approved" | "rejected") => {
-    setValidatingId(expenseId);
+  const handleValidateEmail = async (supabaseId: string, railwayId: string | null, status: "approved" | "rejected") => {
+    if (!railwayId) {
+      toast.error("Impossible de valider : identifiant Railway manquant");
+      return;
+    }
+    setValidatingId(supabaseId);
     try {
-      await railwayFetch(`/expenses/${expenseId}/validate`, {
+      await railwayFetch(`/expenses/${railwayId}/validate`, {
         method: "POST",
         body: { status },
       });
@@ -1247,7 +1251,7 @@ const Receipts = () => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleValidateEmail(r.id, "approved");
+                          handleValidateEmail(r.id, (r as any).railway_id, "approved");
                         }}
                         disabled={validatingId === r.id}
                         className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-green-500/10 hover:text-green-600 transition-colors disabled:opacity-50"
@@ -1258,7 +1262,7 @@ const Receipts = () => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleValidateEmail(r.id, "rejected");
+                          handleValidateEmail(r.id, (r as any).railway_id, "rejected");
                         }}
                         disabled={validatingId === r.id}
                         className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
