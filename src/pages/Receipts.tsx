@@ -83,6 +83,7 @@ type Receipt = {
   description?: string;
   source_id?: string;
   document_id?: string | null;
+  email_validated?: string | null;
 };
 
 const emailProviders = [
