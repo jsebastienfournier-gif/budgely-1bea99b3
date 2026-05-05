@@ -539,6 +539,11 @@ const Receipts = () => {
         method: "POST",
         body: { status },
       });
+      // Persist validation status in Supabase
+      await supabase
+        .from("expenses")
+        .update({ email_validated: status })
+        .eq("id", supabaseId);
       toast.success(status === "approved" ? "Email approuvé ✓" : "Email refusé ✗");
       reloadExpenses();
     } catch (err: any) {
