@@ -524,10 +524,14 @@ const Receipts = () => {
     }
   };
 
-  const handleValidateEmail = async (expenseId: string, status: "approved" | "rejected") => {
-    setValidatingId(expenseId);
+  const handleValidateEmail = async (supabaseId: string, railwayId: string | null, status: "approved" | "rejected") => {
+    if (!railwayId) {
+      toast.error("Impossible de valider : identifiant Railway manquant");
+      return;
+    }
+    setValidatingId(supabaseId);
     try {
-      await railwayFetch(`/expenses/${expenseId}/validate`, {
+      await railwayFetch(`/expenses/${railwayId}/validate`, {
         method: "POST",
         body: { status },
       });
