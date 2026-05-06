@@ -8,7 +8,7 @@ import {
 import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { useExpenses, Expense } from "@/hooks/useExpenses";
-import { format, subMonths, startOfMonth, endOfMonth, parseISO } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
 
 const CATEGORY_COLORS: Record<string, string> = {
