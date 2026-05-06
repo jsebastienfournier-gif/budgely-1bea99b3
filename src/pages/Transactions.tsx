@@ -6,7 +6,7 @@ import AppLayout from "@/components/AppLayout";
 import PremiumCTA from "@/components/PremiumCTA";
 import { useExpenses, Expense } from "@/hooks/useExpenses";
 import { startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, subYears, parseISO } from "date-fns";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+
 
 const CATEGORY_COLORS: Record<string, string> = {
   Alimentation: "hsl(142, 71%, 45%)",
