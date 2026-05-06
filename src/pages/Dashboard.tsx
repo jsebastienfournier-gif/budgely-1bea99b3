@@ -234,14 +234,16 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <motion.div {...fadeUp} className="bg-card rounded-2xl p-6 shadow-sm border border-border">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Dépenses du mois</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                {viewMode === "month" ? "Dépenses du mois" : "Dépenses de l'année"}
+              </p>
               <Wallet className="h-4 w-4 text-muted-foreground" />
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-bold tracking-tight tabular-nums text-foreground">
                 €{thisTotal.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
-              {lastTotal > 0 && (
+              {viewMode === "month" && lastTotal > 0 && (
                 <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${changePct <= 0 ? "text-savings" : "text-destructive"}`}>
                   {changePct <= 0 ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
                   {changePct > 0 ? "+" : ""}{changePct}%
