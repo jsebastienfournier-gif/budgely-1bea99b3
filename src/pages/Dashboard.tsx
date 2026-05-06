@@ -254,9 +254,11 @@ const Dashboard = () => {
 
           <motion.div {...fadeUp} transition={{ delay: 0.1 }} className="bg-card rounded-2xl p-6 shadow-sm border border-border">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Transactions ce mois</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                {viewMode === "month" ? "Transactions ce mois" : "Transactions cette année"}
+              </p>
             </div>
-            <span className="text-3xl font-bold tracking-tight tabular-nums text-foreground">{thisMonthExpenses.length}</span>
+            <span className="text-3xl font-bold tracking-tight tabular-nums text-foreground">{scopedExpenses.length}</span>
           </motion.div>
 
           <motion.div {...fadeUp} transition={{ delay: 0.2 }} className="bg-card rounded-2xl p-6 shadow-sm border border-border">
