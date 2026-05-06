@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { TrendingDown, TrendingUp, Wallet, Sparkles, Inbox, Loader2, Camera, PieChart as PieChartIcon, Lightbulb, ArrowRight } from "lucide-react";
 import {
@@ -8,7 +8,7 @@ import {
 import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { useExpenses, Expense } from "@/hooks/useExpenses";
-import { format, subMonths, startOfMonth, endOfMonth, parseISO } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -132,12 +132,15 @@ const EmptyState = () => (
 
 const Dashboard = () => {
   const { expenses, loading } = useExpenses();
+  const [viewMode, setViewMode] = useState<"month" | "year">("month");
 
   const now = new Date();
   const thisMonthStart = startOfMonth(now);
   const thisMonthEnd = endOfMonth(now);
   const lastMonthStart = startOfMonth(subMonths(now, 1));
   const lastMonthEnd = endOfMonth(subMonths(now, 1));
+  const thisYearStart = startOfYear(now);
+  const thisYearEnd = endOfYear(now);
 
   const thisMonthExpenses = useMemo(
     () => expenses.filter((e) => {
@@ -157,13 +160,24 @@ const Dashboard = () => {
     [expenses, lastMonthStart, lastMonthEnd]
   );
 
-  const thisTotal = useMemo(() => thisMonthExpenses.reduce((s, e) => s + (e.montant_total || 0), 0), [thisMonthExpenses]);
-  const lastTotal = useMemo(() => lastMonthExpenses.reduce((s, e) => s + (e.montant_total || 0), 0), [lastMonthExpenses]);
-  const changePct = lastTotal > 0 ? Math.round(((thisTotal - lastTotal) / lastTotal) * 100) : 0;
+  const thisYearExpenses = useMemo(
+    () => expenses.filter((e) => {
+      if (!e.date_expense) return false;
+      const d = parseISO(e.date_expense);
+      return d >= thisYearStart && d <= thisYearEnd;
+    }),
+    [expenses, thisYearStart, thisYearEnd]
+  );
 
-  const categoryData = useMemo(() => buildCategoryData(thisMonthExpenses), [thisMonthExpenses]);
+  const scopedExpenses = viewMode === "month" ? thisMonthExpenses : thisYearExpenses;
+
+  const thisTotal = useMemo(() => scopedExpenses.reduce((s, e) => s + (e.montant_total || 0), 0), [scopedExpenses]);
+  const lastTotal = useMemo(() => lastMonthExpenses.reduce((s, e) => s + (e.montant_total || 0), 0), [lastMonthExpenses]);
+  const changePct = viewMode === "month" && lastTotal > 0 ? Math.round(((thisTotal - lastTotal) / lastTotal) * 100) : 0;
+
+  const categoryData = useMemo(() => buildCategoryData(scopedExpenses), [scopedExpenses]);
   const monthlyData = useMemo(() => buildMonthlyData(expenses), [expenses]);
-  const topMerchants = useMemo(() => buildTopMerchants(thisMonthExpenses), [thisMonthExpenses]);
+  const topMerchants = useMemo(() => buildTopMerchants(scopedExpenses), [scopedExpenses]);
   const recentActivity = useMemo(() => expenses.slice(0, 6), [expenses]);
 
   if (loading) {
@@ -183,25 +197,53 @@ const Dashboard = () => {
   return (
     <AppLayout>
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-foreground">Tableau de bord</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {format(now, "MMMM yyyy", { locale: fr })} — Vue d'ensemble de vos dépenses
-          </p>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Tableau de bord</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              {viewMode === "month"
+                ? `${format(now, "MMMM yyyy", { locale: fr })} — Vue d'ensemble de vos dépenses`
+                : `Année ${now.getFullYear()} — Vue d'ensemble annuelle`}
+            </p>
+          </div>
+          <div className="flex bg-secondary rounded-lg p-0.5">
+            <button
+              onClick={() => setViewMode("month")}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                viewMode === "month"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Mois
+            </button>
+            <button
+              onClick={() => setViewMode("year")}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                viewMode === "year"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Année
+            </button>
+          </div>
         </div>
 
         <QuickActions />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <motion.div {...fadeUp} className="bg-card rounded-2xl p-6 shadow-sm border border-border">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Dépenses du mois</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                {viewMode === "month" ? "Dépenses du mois" : "Dépenses de l'année"}
+              </p>
               <Wallet className="h-4 w-4 text-muted-foreground" />
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-bold tracking-tight tabular-nums text-foreground">
                 €{thisTotal.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
-              {lastTotal > 0 && (
+              {viewMode === "month" && lastTotal > 0 && (
                 <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${changePct <= 0 ? "text-savings" : "text-destructive"}`}>
                   {changePct <= 0 ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
                   {changePct > 0 ? "+" : ""}{changePct}%
@@ -212,9 +254,11 @@ const Dashboard = () => {
 
           <motion.div {...fadeUp} transition={{ delay: 0.1 }} className="bg-card rounded-2xl p-6 shadow-sm border border-border">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Transactions ce mois</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                {viewMode === "month" ? "Transactions ce mois" : "Transactions cette année"}
+              </p>
             </div>
-            <span className="text-3xl font-bold tracking-tight tabular-nums text-foreground">{thisMonthExpenses.length}</span>
+            <span className="text-3xl font-bold tracking-tight tabular-nums text-foreground">{scopedExpenses.length}</span>
           </motion.div>
 
           <motion.div {...fadeUp} transition={{ delay: 0.2 }} className="bg-card rounded-2xl p-6 shadow-sm border border-border">
