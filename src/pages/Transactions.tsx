@@ -208,7 +208,7 @@ const Transactions = () => {
             <p className="text-lg font-bold text-foreground">{thisTotal.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €</p>
           </motion.div>
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-card rounded-2xl border border-border p-4 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Évolution vs mois dernier</p>
+            <p className="text-xs text-muted-foreground mb-1">{viewMode === "month" ? "Évolution vs mois dernier" : "Évolution vs année dernière"}</p>
             <p className={`text-lg font-bold ${changePct > 0 ? "text-destructive" : "text-savings"}`}>
               {lastTotal > 0 ? `${changePct > 0 ? "+" : ""}${changePct.toFixed(1)} %` : "—"}
             </p>
