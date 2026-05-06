@@ -132,12 +132,15 @@ const EmptyState = () => (
 
 const Dashboard = () => {
   const { expenses, loading } = useExpenses();
+  const [viewMode, setViewMode] = useState<"month" | "year">("month");
 
   const now = new Date();
   const thisMonthStart = startOfMonth(now);
   const thisMonthEnd = endOfMonth(now);
   const lastMonthStart = startOfMonth(subMonths(now, 1));
   const lastMonthEnd = endOfMonth(subMonths(now, 1));
+  const thisYearStart = startOfYear(now);
+  const thisYearEnd = endOfYear(now);
 
   const thisMonthExpenses = useMemo(
     () => expenses.filter((e) => {
@@ -157,13 +160,24 @@ const Dashboard = () => {
     [expenses, lastMonthStart, lastMonthEnd]
   );
 
-  const thisTotal = useMemo(() => thisMonthExpenses.reduce((s, e) => s + (e.montant_total || 0), 0), [thisMonthExpenses]);
-  const lastTotal = useMemo(() => lastMonthExpenses.reduce((s, e) => s + (e.montant_total || 0), 0), [lastMonthExpenses]);
-  const changePct = lastTotal > 0 ? Math.round(((thisTotal - lastTotal) / lastTotal) * 100) : 0;
+  const thisYearExpenses = useMemo(
+    () => expenses.filter((e) => {
+      if (!e.date_expense) return false;
+      const d = parseISO(e.date_expense);
+      return d >= thisYearStart && d <= thisYearEnd;
+    }),
+    [expenses, thisYearStart, thisYearEnd]
+  );
 
-  const categoryData = useMemo(() => buildCategoryData(thisMonthExpenses), [thisMonthExpenses]);
+  const scopedExpenses = viewMode === "month" ? thisMonthExpenses : thisYearExpenses;
+
+  const thisTotal = useMemo(() => scopedExpenses.reduce((s, e) => s + (e.montant_total || 0), 0), [scopedExpenses]);
+  const lastTotal = useMemo(() => lastMonthExpenses.reduce((s, e) => s + (e.montant_total || 0), 0), [lastMonthExpenses]);
+  const changePct = viewMode === "month" && lastTotal > 0 ? Math.round(((thisTotal - lastTotal) / lastTotal) * 100) : 0;
+
+  const categoryData = useMemo(() => buildCategoryData(scopedExpenses), [scopedExpenses]);
   const monthlyData = useMemo(() => buildMonthlyData(expenses), [expenses]);
-  const topMerchants = useMemo(() => buildTopMerchants(thisMonthExpenses), [thisMonthExpenses]);
+  const topMerchants = useMemo(() => buildTopMerchants(scopedExpenses), [scopedExpenses]);
   const recentActivity = useMemo(() => expenses.slice(0, 6), [expenses]);
 
   if (loading) {
