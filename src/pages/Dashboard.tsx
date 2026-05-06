@@ -197,11 +197,37 @@ const Dashboard = () => {
   return (
     <AppLayout>
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-foreground">Tableau de bord</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {format(now, "MMMM yyyy", { locale: fr })} — Vue d'ensemble de vos dépenses
-          </p>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Tableau de bord</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              {viewMode === "month"
+                ? `${format(now, "MMMM yyyy", { locale: fr })} — Vue d'ensemble de vos dépenses`
+                : `Année ${now.getFullYear()} — Vue d'ensemble annuelle`}
+            </p>
+          </div>
+          <div className="flex bg-secondary rounded-lg p-0.5">
+            <button
+              onClick={() => setViewMode("month")}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                viewMode === "month"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Mois
+            </button>
+            <button
+              onClick={() => setViewMode("year")}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                viewMode === "year"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Année
+            </button>
+          </div>
         </div>
 
         <QuickActions />
