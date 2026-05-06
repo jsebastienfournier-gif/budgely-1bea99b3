@@ -1,11 +1,12 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Inbox, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import PremiumCTA from "@/components/PremiumCTA";
 import { useExpenses, Expense } from "@/hooks/useExpenses";
-import { startOfMonth, endOfMonth, subMonths, parseISO } from "date-fns";
+import { startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, subYears, parseISO } from "date-fns";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const CATEGORY_COLORS: Record<string, string> = {
   Alimentation: "hsl(142, 71%, 45%)",
@@ -116,12 +117,17 @@ const EmptyState = () => (
 
 const Transactions = () => {
   const { expenses, loading } = useExpenses();
+  const [viewMode, setViewMode] = useState<"month" | "year">("month");
 
   const now = new Date();
   const thisMonthStart = startOfMonth(now);
   const thisMonthEnd = endOfMonth(now);
   const lastMonthStart = startOfMonth(subMonths(now, 1));
   const lastMonthEnd = endOfMonth(subMonths(now, 1));
+  const thisYearStart = startOfYear(now);
+  const thisYearEnd = endOfYear(now);
+  const lastYearStart = startOfYear(subYears(now, 1));
+  const lastYearEnd = endOfYear(subYears(now, 1));
 
   const thisMonth = useMemo(
     () => expenses.filter((e) => {
@@ -141,12 +147,33 @@ const Transactions = () => {
     [expenses, lastMonthStart, lastMonthEnd]
   );
 
-  const thisTotal = useMemo(() => thisMonth.reduce((s, e) => s + (e.montant_total || 0), 0), [thisMonth]);
-  const lastTotal = useMemo(() => lastMonth.reduce((s, e) => s + (e.montant_total || 0), 0), [lastMonth]);
+  const thisYearExpenses = useMemo(
+    () => expenses.filter((e) => {
+      if (!e.date_expense) return false;
+      const d = parseISO(e.date_expense);
+      return d >= thisYearStart && d <= thisYearEnd;
+    }),
+    [expenses, thisYearStart, thisYearEnd]
+  );
+
+  const lastYearExpenses = useMemo(
+    () => expenses.filter((e) => {
+      if (!e.date_expense) return false;
+      const d = parseISO(e.date_expense);
+      return d >= lastYearStart && d <= lastYearEnd;
+    }),
+    [expenses, lastYearStart, lastYearEnd]
+  );
+
+  const scopedExpenses = viewMode === "month" ? thisMonth : thisYearExpenses;
+  const prevExpenses = viewMode === "month" ? lastMonth : lastYearExpenses;
+
+  const thisTotal = useMemo(() => scopedExpenses.reduce((s, e) => s + (e.montant_total || 0), 0), [scopedExpenses]);
+  const lastTotal = useMemo(() => prevExpenses.reduce((s, e) => s + (e.montant_total || 0), 0), [prevExpenses]);
   const changePct = lastTotal > 0 ? ((thisTotal - lastTotal) / lastTotal) * 100 : 0;
 
-  const categories = useMemo(() => buildCategories(thisMonth), [thisMonth]);
-  const detections = useMemo(() => buildDetections(thisMonth, lastMonth), [thisMonth, lastMonth]);
+  const categories = useMemo(() => buildCategories(scopedExpenses), [scopedExpenses]);
+  const detections = useMemo(() => buildDetections(scopedExpenses, prevExpenses), [scopedExpenses, prevExpenses]);
 
   if (loading) {
     return (
@@ -163,15 +190,21 @@ const Transactions = () => {
   return (
     <AppLayout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl font-bold text-foreground">Analyses</h1>
-          <p className="text-sm text-muted-foreground mt-1">Comprenez où va votre argent</p>
+        <div className="flex items-center justify-between mb-6 sm:mb-8">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Analyses</h1>
+            <p className="text-sm text-muted-foreground mt-1">Comprenez où va votre argent</p>
+          </div>
+          <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as "month" | "year")} className="bg-muted rounded-lg p-0.5">
+            <ToggleGroupItem value="month" className="text-xs px-3 py-1 rounded-md data-[state=on]:bg-background data-[state=on]:shadow-sm">Mois</ToggleGroupItem>
+            <ToggleGroupItem value="year" className="text-xs px-3 py-1 rounded-md data-[state=on]:bg-background data-[state=on]:shadow-sm">Année</ToggleGroupItem>
+          </ToggleGroup>
         </div>
 
         {/* KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="bg-card rounded-2xl border border-border p-4 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Dépenses du mois</p>
+            <p className="text-xs text-muted-foreground mb-1">{viewMode === "month" ? "Dépenses du mois" : "Dépenses de l'année"}</p>
             <p className="text-lg font-bold text-foreground">{thisTotal.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €</p>
           </motion.div>
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-card rounded-2xl border border-border p-4 text-center">
