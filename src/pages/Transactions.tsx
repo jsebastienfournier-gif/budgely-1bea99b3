@@ -195,10 +195,28 @@ const Transactions = () => {
             <h1 className="text-2xl font-bold text-foreground">Analyses</h1>
             <p className="text-sm text-muted-foreground mt-1">Comprenez où va votre argent</p>
           </div>
-          <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as "month" | "year")} className="bg-muted rounded-lg p-0.5">
-            <ToggleGroupItem value="month" className="text-xs px-3 py-1 rounded-md data-[state=on]:bg-background data-[state=on]:shadow-sm">Mois</ToggleGroupItem>
-            <ToggleGroupItem value="year" className="text-xs px-3 py-1 rounded-md data-[state=on]:bg-background data-[state=on]:shadow-sm">Année</ToggleGroupItem>
-          </ToggleGroup>
+          <div className="flex bg-secondary rounded-lg p-0.5">
+            <button
+              onClick={() => setViewMode("month")}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                viewMode === "month"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Mois
+            </button>
+            <button
+              onClick={() => setViewMode("year")}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                viewMode === "year"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Année
+            </button>
+          </div>
         </div>
 
         {/* KPIs */}
