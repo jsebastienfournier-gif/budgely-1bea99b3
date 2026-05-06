@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { TrendingDown, TrendingUp, Wallet, Sparkles, Inbox, Loader2, Camera, PieChart as PieChartIcon, Lightbulb, ArrowRight } from "lucide-react";
 import {
