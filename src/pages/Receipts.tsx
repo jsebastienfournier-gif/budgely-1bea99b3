@@ -308,7 +308,28 @@ const Receipts = () => {
       toast.info("Connexion bancaire annulée.");
       setSearchParams({}, { replace: true });
     }
+    if (searchParams.get("powens_callback") === "true") {
+      const connectionId = searchParams.get("connection_id");
+      setSearchParams({}, { replace: true });
+      if (!connectionId) {
+        toast.error("Connexion bancaire : identifiant manquant.");
+      } else {
+        (async () => {
+          try {
+            await railwayFetch("/sources/powens/callback", {
+              method: "POST",
+              body: { connection_id: Number(connectionId) || connectionId },
+            });
+            toast.success("Compte bancaire connecté via Powens !");
+            handleSyncBank();
+          } catch (err: any) {
+            toast.error("Erreur lors de la finalisation Powens : " + (err?.message || "inconnue"));
+          }
+        })();
+      }
+    }
   }, [searchParams]);
+
 
   const mapExpenses = (data: any[]) => {
     return data.map((e: any) => {
