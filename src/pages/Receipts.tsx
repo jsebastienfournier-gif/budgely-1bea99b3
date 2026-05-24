@@ -304,6 +304,10 @@ const Receipts = () => {
       toast.error("Erreur de connexion Powens : " + searchParams.get("powens_error"));
       setSearchParams({}, { replace: true });
     }
+    if (searchParams.get("powens_cancelled") === "true") {
+      toast.info("Connexion bancaire annulée.");
+      setSearchParams({}, { replace: true });
+    }
   }, [searchParams]);
 
   const mapExpenses = (data: any[]) => {
