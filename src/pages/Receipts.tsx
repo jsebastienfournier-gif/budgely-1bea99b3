@@ -151,84 +151,21 @@ const Receipts = () => {
     setSyncing(true);
     toast.info("Synchronisation bancaire en cours…");
     try {
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/powens-proxy?action=transactions&user_id=${encodeURIComponent(user.id)}`,
-        { headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } },
-      );
-      if (!res.ok) throw new Error(`Erreur ${res.status}`);
-      const transactions: Array<{
-        id: string;
-        amount: number;
-        currency: string;
-        date: string;
-        label: string;
-        category: string;
-        account_id: string;
-      }> = await res.json();
+      // Récupérer la source Powens de l'utilisateur
+      const sources = await railwayFetch<any[]>("/sources/", { method: "GET" });
+      const powensSource = sources.find((s: any) => s.provider === "powens");
 
-      if (!transactions.length) {
-        toast.info("Aucune nouvelle transaction bancaire trouvée");
+      if (!powensSource) {
+        toast.error("Aucun compte bancaire connecté");
         return;
       }
 
-      // Map Powens category to app categories
-      const categoryMap: Record<string, string> = {
-        Food: "Alimentation",
-        Subscription: "Abonnements",
-        Transport: "Transport",
-        Housing: "Logement",
-        Health: "Santé",
-        Entertainment: "Loisirs",
-        Restaurant: "Alimentation",
-        Savings: "Épargne & Investissement",
-        Investment: "Épargne & Investissement",
-      };
+      // Déclencher la synchro via Railway
+      const result = await railwayFetch<{ expenses_created: number }>(`/sources/${powensSource.id}/sync`, {
+        method: "POST",
+      });
 
-      const rows = transactions.map((tx) => ({
-        user_id: user.id,
-        source: "bank" as const,
-        source_id: tx.id,
-        montant_total: Math.abs(tx.amount),
-        devise: tx.currency || "EUR",
-        date_expense: tx.date,
-        fournisseur: tx.label,
-        categorie: categoryMap[tx.category] || "Autres",
-        description: tx.label,
-        abonnement_detecte: tx.category === "Subscription",
-      }));
-
-      // Upsert: skip already imported transactions (by source_id)
-      const { data: existing } = await supabase
-        .from("expenses")
-        .select("source_id")
-        .eq("user_id", user.id)
-        .eq("source", "bank")
-        .in(
-          "source_id",
-          rows.map((r) => r.source_id!),
-        );
-
-      const existingIds = new Set((existing || []).map((e: any) => e.source_id));
-      const newRows = rows.filter((r) => !existingIds.has(r.source_id));
-
-      if (newRows.length === 0) {
-        toast.info("Toutes les transactions sont déjà importées");
-        return;
-      }
-
-      const { error } = await supabase.from("expenses").insert(newRows);
-      if (error) throw new Error(error.message);
-
-      toast.success(`${newRows.length} transaction(s) bancaire(s) importée(s)`);
-
-      // Update bank last_sync_at
-      await supabase
-        .from("connected_bank_accounts")
-        .update({ last_sync_at: new Date().toISOString() })
-        .eq("user_id", user.id);
-
-      setBanks((prev) => prev.map((b) => ({ ...b, last_sync_at: new Date().toISOString() })));
-
+      toast.success(`${result.expenses_created} transaction(s) importée(s)`);
       reloadExpenses();
     } catch (err: any) {
       toast.error("Erreur de synchronisation bancaire : " + (err.message || "Erreur inconnue"));
