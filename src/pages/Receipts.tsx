@@ -152,7 +152,7 @@ const Receipts = () => {
     toast.info("Synchronisation bancaire en cours…");
     try {
       // Récupérer la source Powens de l'utilisateur
-      const sources = await railwayFetch<any[]>("/sources/", { method: "GET" });
+      const sources = await railwayFetch<any[]>("/sources/");
       const powensSource = sources.find((s: any) => s.provider === "powens");
 
       if (!powensSource) {
@@ -161,9 +161,10 @@ const Receipts = () => {
       }
 
       // Déclencher la synchro via Railway
-      const result = await railwayFetch<{ expenses_created: number }>(`/sources/${powensSource.id}/sync`, {
-        method: "POST",
-      });
+      const result = await railwayFetch<{
+        expenses_created: number;
+        duplicates_skipped: number;
+      }>(`/sources/${powensSource.id}/sync`, { method: "POST" });
 
       toast.success(`${result.expenses_created} transaction(s) importée(s)`);
       reloadExpenses();
