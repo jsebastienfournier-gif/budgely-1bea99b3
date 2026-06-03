@@ -226,7 +226,12 @@ serve(async (req) => {
     // Service role client for admin operations
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-    const { document_id, source, raw_text, source_id, skip_usage_check } = await req.json();
+    // NOTE: `skip_usage_check` was previously accepted from the request body, which
+    // allowed any authenticated user to bypass AI usage quotas. It is now ignored.
+    // Internal bypass (if ever needed) must go through a dedicated header validated
+    // against a server-side secret — never trust client-supplied flags.
+    const body = await req.json();
+    const { document_id, source, raw_text, source_id } = body;
 
     if (!source || !raw_text) {
       return new Response(JSON.stringify({ error: "source et raw_text requis" }), {
@@ -234,6 +239,13 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Internal bypass: only honored if caller provides a valid shared secret.
+    const internalKey = req.headers.get("x-internal-key");
+    const expectedInternalKey = Deno.env.get("ANALYZE_DOCUMENT_INTERNAL_KEY");
+    const isInternalCall = Boolean(
+      expectedInternalKey && internalKey && internalKey === expectedInternalKey
+    );
 
     // Check user plan
     const { data: planData } = await supabaseAdmin
@@ -253,8 +265,9 @@ serve(async (req) => {
       );
     }
 
-    // Check usage (skip if called from sync functions that already counted)
-    if (!skip_usage_check) {
+    // Check & increment usage. Trusted internal callers may skip the counter
+    // when usage has already been recorded upstream.
+    if (!isInternalCall) {
       const { data: usageCount } = await supabaseAdmin.rpc("increment_ai_usage", {
         _user_id: user.id,
         _source: source,
