@@ -137,6 +137,7 @@ const Receipts = () => {
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
   const [showCashDialog, setShowCashDialog] = useState(false);
   const [rawExpenses, setRawExpenses] = useState<any[]>([]);
+  const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set());
   const [editingExpense, setEditingExpense] = useState<any | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
