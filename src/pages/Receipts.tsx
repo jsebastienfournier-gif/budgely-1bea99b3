@@ -329,7 +329,7 @@ const Receipts = () => {
 
   const fetchRailwayEmailExpenses = async (): Promise<any[]> => {
     try {
-      const raw = await railwayFetch<any[]>("/expenses/", { query: { source: "email" } });
+      const raw = await railwayFetch<any[]>("/expenses/", { query: { source: "email", limit: 1000 } });
       if (!Array.isArray(raw)) return [];
       return raw.map((e: any) => ({
         id: e.id ?? e._id ?? crypto.randomUUID(),
