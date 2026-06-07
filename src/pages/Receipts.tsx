@@ -113,6 +113,7 @@ const Receipts = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const powensProcessedRef = useRef(false);
   const [emails, setEmails] = useState<ConnectedEmail[]>([]);
   const [banks, setBanks] = useState<ConnectedBank[]>([]);
   const [expenses, setExpenses] = useState<Receipt[]>([]);
@@ -265,6 +266,33 @@ const Receipts = () => {
           }
         })();
       }
+    }
+  }, [searchParams]);
+
+  // Handle Powens redirect with connection_id + state (process endpoint)
+  useEffect(() => {
+    const connectionId = searchParams.get("connection_id");
+    const state = searchParams.get("state");
+    if (connectionId && state && !powensProcessedRef.current) {
+      powensProcessedRef.current = true;
+      (async () => {
+        try {
+          const result = await railwayFetch<{ status: string }>("/sources/powens/process", {
+            method: "POST",
+            body: { connection_id: connectionId },
+          });
+          if (result?.status === "ok") {
+            toast.success("Compte bancaire connecté via Powens !");
+          }
+        } catch (err: any) {
+          toast.error("Erreur lors de la finalisation Powens : " + (err?.message || "inconnue"));
+        } finally {
+          const url = new URL(window.location.href);
+          url.searchParams.delete("connection_id");
+          url.searchParams.delete("state");
+          window.history.replaceState({}, "", url.toString());
+        }
+      })();
     }
   }, [searchParams]);
 
