@@ -313,6 +313,8 @@ const Receipts = () => {
         date: e.date_expense
           ? new Date(e.date_expense).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
           : "Date inconnue",
+        dateIso: e.date_expense || null,
+        amount: Number(e.montant_total || 0),
         total: `€${(e.montant_total || 0).toFixed(2)}`,
         items: articles.length,
         status: "Analysé",
