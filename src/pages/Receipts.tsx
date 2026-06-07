@@ -75,6 +75,8 @@ type Receipt = {
   railway_id?: string | null;
   store: string;
   date: string;
+  dateIso?: string | null;
+  amount?: number;
   total: string;
   items: number;
   status: string;
