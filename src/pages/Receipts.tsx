@@ -5,6 +5,7 @@ import {
   Camera,
   FileText,
   ChevronRight,
+  ChevronDown,
   Mail,
   Landmark,
   RefreshCw,
@@ -75,6 +76,8 @@ type Receipt = {
   railway_id?: string | null;
   store: string;
   date: string;
+  dateIso?: string | null;
+  amount?: number;
   total: string;
   items: number;
   status: string;
@@ -134,6 +137,7 @@ const Receipts = () => {
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
   const [showCashDialog, setShowCashDialog] = useState(false);
   const [rawExpenses, setRawExpenses] = useState<any[]>([]);
+  const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set());
   const [editingExpense, setEditingExpense] = useState<any | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
@@ -313,6 +317,8 @@ const Receipts = () => {
         date: e.date_expense
           ? new Date(e.date_expense).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
           : "Date inconnue",
+        dateIso: e.date_expense || null,
+        amount: Number(e.montant_total || 0),
         total: `€${(e.montant_total || 0).toFixed(2)}`,
         items: articles.length,
         status: "Analysé",
@@ -1226,88 +1232,169 @@ const Receipts = () => {
               <p className="text-xs text-muted-foreground mt-1">Importez un ticket ou une facture pour commencer</p>
             </div>
           ) : (
-            <div className="divide-y divide-border">
-              {expenses.map((r) => (
-                <div
-                  key={r.id}
-                  className="flex flex-wrap items-center gap-3 p-4 hover:bg-secondary/50 transition-colors"
-                >
-                  <div
-                    onClick={() => setSelectedReceipt(r)}
-                    className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center text-lg cursor-pointer"
-                  >
-                    {sourceIcon(r.source)}
-                  </div>
-                  <div onClick={() => setSelectedReceipt(r)} className="cursor-pointer flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">{r.store}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {r.date} ·{" "}
-                      {r.description || (r.items > 0 ? `${r.items} article${r.items > 1 ? "s" : ""}` : "Aucun article")}
-                    </p>
-                  </div>
-                  <span className="text-sm font-semibold tabular-nums text-foreground">{r.total}</span>
-                  {r.source === "email" && r.source_id && (
-                    r.email_validated ? (
-                      <Badge
-                        variant={r.email_validated === "approved" ? "default" : "destructive"}
-                        className={`text-[10px] px-2 py-0.5 ${r.email_validated === "approved" ? "bg-green-600 hover:bg-green-600" : ""}`}
-                      >
-                        {r.email_validated === "approved" ? "Approuvé" : "Refusé"}
-                      </Badge>
-                    ) : (
-                      <>
+            (() => {
+              // Group by YYYY-MM
+              const groups = new Map<string, { label: string; items: Receipt[]; total: number }>();
+              const noDateKey = "0000-00";
+              expenses.forEach((r) => {
+                let key = noDateKey;
+                let label = "Date inconnue";
+                if (r.dateIso) {
+                  const d = new Date(r.dateIso);
+                  if (!isNaN(d.getTime())) {
+                    key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+                    label = d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+                    label = label.charAt(0).toUpperCase() + label.slice(1);
+                  }
+                }
+                if (!groups.has(key)) groups.set(key, { label, items: [], total: 0 });
+                const g = groups.get(key)!;
+                g.items.push(r);
+                g.total += r.amount || 0;
+              });
+              const sortedKeys = Array.from(groups.keys()).sort((a, b) => b.localeCompare(a));
+              const now = new Date();
+              const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+              return (
+                <div className="divide-y divide-border">
+                  {sortedKeys.map((key) => {
+                    const g = groups.get(key)!;
+                    const isCollapsed = collapsedMonths.has(key)
+                      ? true
+                      : key !== currentKey
+                        ? !collapsedMonths.has(`__open__${key}`)
+                        : false;
+                    const toggle = () => {
+                      setCollapsedMonths((prev) => {
+                        const next = new Set(prev);
+                        if (key === currentKey) {
+                          // Current month: default open, toggle via collapsedMonths
+                          if (next.has(key)) next.delete(key);
+                          else next.add(key);
+                        } else {
+                          // Other months: default closed, track open via __open__ marker
+                          const openMarker = `__open__${key}`;
+                          if (next.has(openMarker)) next.delete(openMarker);
+                          else next.add(openMarker);
+                        }
+                        return next;
+                      });
+                    };
+
+                    return (
+                      <div key={key}>
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleValidateEmail(r.id, r.railway_id, "approved");
-                          }}
-                          disabled={validatingId === r.id}
-                          className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-green-500/10 hover:text-green-600 transition-colors disabled:opacity-50"
-                          title="Approuver"
+                          onClick={toggle}
+                          className="w-full flex items-center justify-between px-4 py-2.5 bg-secondary/30 hover:bg-secondary/50 transition-colors"
                         >
-                          <Check className="h-4 w-4" />
+                          <div className="flex items-center gap-2">
+                            {isCollapsed ? (
+                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            )}
+                            <span className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                              {g.label}
+                            </span>
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                              {g.items.length}
+                            </Badge>
+                          </div>
+                          <span className="text-xs font-semibold tabular-nums text-muted-foreground">
+                            €{g.total.toFixed(2)}
+                          </span>
                         </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleValidateEmail(r.id, r.railway_id, "rejected");
-                          }}
-                          disabled={validatingId === r.id}
-                          className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
-                          title="Refuser"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </>
-                    )
-                  )}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEditExpense(r.id);
-                    }}
-                    className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
-                    title="Modifier"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeletingExpenseId(r.id);
-                    }}
-                    className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-                    title="Supprimer"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                  <ChevronRight
-                    onClick={() => setSelectedReceipt(r)}
-                    className="h-4 w-4 text-muted-foreground cursor-pointer"
-                  />
+                        {!isCollapsed && (
+                          <div className="divide-y divide-border">
+                            {g.items.map((r) => (
+                              <div
+                                key={r.id}
+                                className="flex flex-wrap items-center gap-3 p-4 hover:bg-secondary/50 transition-colors"
+                              >
+                                <div
+                                  onClick={() => setSelectedReceipt(r)}
+                                  className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center text-lg cursor-pointer"
+                                >
+                                  {sourceIcon(r.source)}
+                                </div>
+                                <div onClick={() => setSelectedReceipt(r)} className="cursor-pointer flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-foreground">{r.store}</p>
+                                  <p className="text-[10px] text-muted-foreground">
+                                    {r.date} ·{" "}
+                                    {r.description || (r.items > 0 ? `${r.items} article${r.items > 1 ? "s" : ""}` : "Aucun article")}
+                                  </p>
+                                </div>
+                                <span className="text-sm font-semibold tabular-nums text-foreground">{r.total}</span>
+                                {r.source === "email" && r.source_id && (
+                                  r.email_validated ? (
+                                    <Badge
+                                      variant={r.email_validated === "approved" ? "default" : "destructive"}
+                                      className={`text-[10px] px-2 py-0.5 ${r.email_validated === "approved" ? "bg-green-600 hover:bg-green-600" : ""}`}
+                                    >
+                                      {r.email_validated === "approved" ? "Approuvé" : "Refusé"}
+                                    </Badge>
+                                  ) : (
+                                    <>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleValidateEmail(r.id, r.railway_id, "approved");
+                                        }}
+                                        disabled={validatingId === r.id}
+                                        className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-green-500/10 hover:text-green-600 transition-colors disabled:opacity-50"
+                                        title="Approuver"
+                                      >
+                                        <Check className="h-4 w-4" />
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleValidateEmail(r.id, r.railway_id, "rejected");
+                                        }}
+                                        disabled={validatingId === r.id}
+                                        className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
+                                        title="Refuser"
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </button>
+                                    </>
+                                  )
+                                )}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditExpense(r.id);
+                                  }}
+                                  className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                                  title="Modifier"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeletingExpenseId(r.id);
+                                  }}
+                                  className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                  title="Supprimer"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                                <ChevronRight
+                                  onClick={() => setSelectedReceipt(r)}
+                                  className="h-4 w-4 text-muted-foreground cursor-pointer"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
+              );
+            })()
           )}
         </div>
 
