@@ -113,6 +113,7 @@ const Receipts = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const powensProcessedRef = useRef(false);
   const [emails, setEmails] = useState<ConnectedEmail[]>([]);
   const [banks, setBanks] = useState<ConnectedBank[]>([]);
   const [expenses, setExpenses] = useState<Receipt[]>([]);
