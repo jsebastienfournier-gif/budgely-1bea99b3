@@ -5,6 +5,7 @@ import {
   Camera,
   FileText,
   ChevronRight,
+  ChevronDown,
   Mail,
   Landmark,
   RefreshCw,
