@@ -459,7 +459,7 @@ const Receipts = () => {
           .select("*")
           .eq("user_id", user.id)
           .order("date_expense", { ascending: false })
-          .limit(100),
+          .limit(1000),
       ]);
       setEmails((emailRes.data as ConnectedEmail[]) || []);
       setBanks((bankRes.data as ConnectedBank[]) || []);
