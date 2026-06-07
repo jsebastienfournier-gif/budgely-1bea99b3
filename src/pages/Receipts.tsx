@@ -329,7 +329,7 @@ const Receipts = () => {
 
   const fetchRailwayEmailExpenses = async (): Promise<any[]> => {
     try {
-      const raw = await railwayFetch<any[]>("/expenses/", { query: { source: "email" } });
+      const raw = await railwayFetch<any[]>("/expenses/", { query: { source: "email", limit: 1000 } });
       if (!Array.isArray(raw)) return [];
       return raw.map((e: any) => ({
         id: e.id ?? e._id ?? crypto.randomUUID(),
@@ -442,7 +442,7 @@ const Receipts = () => {
       .select("*")
       .eq("user_id", user.id)
       .order("date_expense", { ascending: false })
-      .limit(100);
+      .limit(1000);
     setRawExpenses(data || []);
     setExpenses(mapExpenses(data || []));
   };
@@ -459,7 +459,7 @@ const Receipts = () => {
           .select("*")
           .eq("user_id", user.id)
           .order("date_expense", { ascending: false })
-          .limit(100),
+          .limit(1000),
       ]);
       setEmails((emailRes.data as ConnectedEmail[]) || []);
       setBanks((bankRes.data as ConnectedBank[]) || []);
