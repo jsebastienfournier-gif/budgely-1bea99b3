@@ -11,18 +11,31 @@ export const useMaintenanceMode = () => {
   const [loading, setLoading] = useState(true);
 
   const fetchMaintenance = async () => {
-    const { data } = await supabase
-      .from("app_settings")
-      .select("value")
-      .eq("key", "maintenance_mode")
-      .single();
+    try {
+      const request = supabase
+        .from("app_settings")
+        .select("value")
+        .eq("key", "maintenance_mode")
+        .maybeSingle();
 
-    if (data?.value) {
-      const val = data.value as unknown as MaintenanceSettings;
-      setMaintenance({ enabled: val.enabled ?? false, message: val.message ?? "" });
+      // Ne jamais bloquer l'affichage de l'app si la requête traîne
+      const timeout = new Promise<{ data: null }>((resolve) =>
+        setTimeout(() => resolve({ data: null }), 4000)
+      );
+
+      const { data } = (await Promise.race([request, timeout])) as { data: any };
+
+      if (data?.value) {
+        const val = data.value as unknown as MaintenanceSettings;
+        setMaintenance({ enabled: val.enabled ?? false, message: val.message ?? "" });
+      }
+    } catch {
+      // en cas d'erreur réseau, on laisse l'app accessible
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
+
 
   const toggleMaintenance = async (enabled: boolean, message?: string) => {
     const newValue = {
