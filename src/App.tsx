@@ -32,11 +32,12 @@ const MaintenanceGate = ({ children }: { children: React.ReactNode }) => {
   const { isAdmin } = useIsAdmin();
   const location = useLocation();
 
-  // Allow admin and auth page through
-  if (loading) return null;
-  if (maintenance.enabled && !isAdmin && location.pathname !== "/auth" && location.pathname !== "/admin") {
+  // Allow admin and auth page through.
+  // Pendant le chargement, on affiche l'app normalement (jamais de page blanche).
+  if (!loading && maintenance.enabled && !isAdmin && location.pathname !== "/auth" && location.pathname !== "/admin") {
     return <Maintenance message={maintenance.message} />;
   }
+
   return <>{children}</>;
 };
 
