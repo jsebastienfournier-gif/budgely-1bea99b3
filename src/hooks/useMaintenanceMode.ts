@@ -68,6 +68,9 @@ export const useMaintenanceMode = () => {
 
     if (!error) {
       setMaintenance(newValue);
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(newValue));
+      } catch {}
     }
     return { error };
   };
