@@ -335,8 +335,16 @@ const Receipts = () => {
 
   const fetchRailwayEmailExpenses = async (): Promise<any[]> => {
     try {
-      const raw = await railwayFetch<any[]>("/expenses/", { query: { source: "email", limit: 1000 } });
-      if (!Array.isArray(raw)) return [];
+      // L'API Railway limite à 200 résultats par appel : on pagine jusqu'à 1000
+      const PAGE = 200;
+      const MAX = 1000;
+      const raw: any[] = [];
+      for (let skip = 0; skip < MAX; skip += PAGE) {
+        const page = await railwayFetch<any[]>("/expenses/", { query: { source: "email", limit: PAGE, skip } });
+        if (!Array.isArray(page) || page.length === 0) break;
+        raw.push(...page);
+        if (page.length < PAGE) break;
+      }
       return raw.map((e: any) => ({
         id: e.id ?? e._id ?? crypto.randomUUID(),
         montant_total: e.montant_total ?? e.amount ?? null,
