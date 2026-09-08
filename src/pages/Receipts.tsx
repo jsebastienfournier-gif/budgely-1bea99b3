@@ -1157,14 +1157,14 @@ const Receipts = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
             onClick={() => {
-              if (plan === "free") {
+              if (!canUseBank) {
                 navigate("/subscription");
                 return;
               }
               hasBanks ? handleSyncBank() : setShowBankDialog(true);
             }}
             className={`bg-card rounded-2xl border p-6 transition-colors ${
-              plan === "free"
+              !canUseBank
                 ? "border-border/50 bg-muted/30 cursor-pointer hover:border-primary/20"
                 : "border-border hover:border-primary/30 cursor-pointer"
             }`}
@@ -1172,13 +1172,29 @@ const Receipts = () => {
             <div className="flex items-start gap-4">
               <div
                 className={`h-12 w-12 rounded-xl flex items-center justify-center shrink-0 ${
-                  plan === "free" ? "bg-muted" : "bg-primary/10"
+                  !canUseBank ? "bg-muted" : "bg-primary/10"
                 }`}
               >
-                <Landmark className={`h-6 w-6 ${plan === "free" ? "text-muted-foreground" : "text-primary"}`} />
+                <Landmark className={`h-6 w-6 ${!canUseBank ? "text-muted-foreground" : "text-primary"}`} />
               </div>
               <div className="flex-1 min-w-0">
-                {hasBanks ? (
+                {hasBanks && !canUseBank ? (
+                  <>
+                    <p className="text-sm font-semibold text-muted-foreground">
+                      🏦 {banks.length} compte{banks.length > 1 ? "s" : ""} · Suspendue
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                      {banks.map((b) => b.account_label || b.bank_name).join(", ")}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Synchronisation arrêtée : la connexion bancaire n'est pas incluse dans votre offre.
+                    </p>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary bg-primary/10 px-2 py-1 rounded-full mt-2">
+                      Passer à Essentiel
+                      <ChevronRight className="h-3 w-3" />
+                    </span>
+                  </>
+                ) : hasBanks ? (
                   <>
                     <p className="text-sm font-semibold text-foreground">
                       🏦 {banks.length} compte{banks.length > 1 ? "s" : ""} connecté{banks.length > 1 ? "s" : ""}
@@ -1190,16 +1206,16 @@ const Receipts = () => {
                 ) : (
                   <>
                     <p
-                      className={`text-sm font-semibold ${plan === "free" ? "text-muted-foreground" : "text-foreground"}`}
+                      className={`text-sm font-semibold ${!canUseBank ? "text-muted-foreground" : "text-foreground"}`}
                     >
                       🏦 Banque : connexion sécurisée
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {plan === "free"
+                      {!canUseBank
                         ? "Disponible dans les offres Essentiel et Premium"
                         : "Synchronisez vos transactions bancaires en toute sécurité"}
                     </p>
-                    {plan === "free" && (
+                    {!canUseBank && (
                       <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary bg-primary/10 px-2 py-1 rounded-full mt-2">
                         Passer à Essentiel
                         <ChevronRight className="h-3 w-3" />
@@ -1208,7 +1224,7 @@ const Receipts = () => {
                   </>
                 )}
               </div>
-              {plan !== "free" && hasBanks ? (
+              {canUseBank && hasBanks ? (
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     onClick={(e) => {
@@ -1230,7 +1246,7 @@ const Receipts = () => {
                     <Plus className="h-3.5 w-3.5 text-primary" />
                   </button>
                 </div>
-              ) : plan !== "free" ? (
+              ) : canUseBank ? (
                 <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-3" />
               ) : null}
             </div>
