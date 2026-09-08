@@ -113,6 +113,7 @@ const bankList = [
 const Receipts = () => {
   const { user } = useAuth();
   const { plan } = useSubscription();
+  const { canUseBank, canUseEmail, emailLimit, emailRemaining, refreshUsage } = usePlanCapabilities();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -153,6 +154,10 @@ const Receipts = () => {
   // Sync bank transactions from Railway backend
   const handleSyncBank = async () => {
     if (!user || syncing) return;
+    if (!canUseBank) {
+      toast.error("La connexion bancaire n'est pas incluse dans votre offre.");
+      return;
+    }
     setSyncing(true);
     toast.info("Synchronisation bancaire en cours…");
     try {
@@ -236,7 +241,17 @@ const Receipts = () => {
       toast.error("Erreur de connexion Outlook : " + searchParams.get("microsoft_error"));
       setSearchParams({}, { replace: true });
     }
-    // Powens callback
+    // Powens callback (uniquement si l'offre autorise la connexion bancaire)
+    const powensParam =
+      searchParams.get("powens_connected") ||
+      searchParams.get("powens_error") ||
+      searchParams.get("powens_cancelled") ||
+      searchParams.get("powens_callback");
+    if (powensParam && !canUseBank) {
+      toast.error("La connexion bancaire n'est pas incluse dans votre offre.");
+      setSearchParams({}, { replace: true });
+      return;
+    }
     if (searchParams.get("powens_connected") === "true") {
       toast.success("Compte bancaire connecté via Powens !");
       setSearchParams({}, { replace: true });
@@ -271,12 +286,21 @@ const Receipts = () => {
         })();
       }
     }
-  }, [searchParams]);
+  }, [searchParams, canUseBank]);
 
   // Handle Powens redirect with connection_id + state (process endpoint)
   useEffect(() => {
     const connectionId = searchParams.get("connection_id");
     const state = searchParams.get("state");
+    if (connectionId && state && !canUseBank) {
+      powensProcessedRef.current = true;
+      toast.error("La connexion bancaire n'est pas incluse dans votre offre.");
+      const url = new URL(window.location.href);
+      url.searchParams.delete("connection_id");
+      url.searchParams.delete("state");
+      window.history.replaceState({}, "", url.toString());
+      return;
+    }
     if (connectionId && state && !powensProcessedRef.current) {
       powensProcessedRef.current = true;
       (async () => {
