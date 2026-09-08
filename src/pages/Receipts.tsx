@@ -25,6 +25,8 @@ import AppLayout from "@/components/AppLayout";
 import PremiumCTA from "@/components/PremiumCTA";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
+import { usePlanCapabilities } from "@/hooks/usePlanCapabilities";
+import { canUseSource, detectExpenseOrigin } from "@/lib/plan-capabilities";
 import { supabase } from "@/integrations/supabase/client";
 import { invokeAuthenticatedFunction } from "@/lib/edge-functions";
 import { railwayFetch, getRailwayToken } from "@/lib/railway-api";
@@ -113,6 +115,7 @@ const bankList = [
 const Receipts = () => {
   const { user } = useAuth();
   const { plan } = useSubscription();
+  const { canUseBank, canUseEmail, emailLimit, emailRemaining, refreshUsage } = usePlanCapabilities();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -153,6 +156,10 @@ const Receipts = () => {
   // Sync bank transactions from Railway backend
   const handleSyncBank = async () => {
     if (!user || syncing) return;
+    if (!canUseBank) {
+      toast.error("La connexion bancaire n'est pas incluse dans votre offre.");
+      return;
+    }
     setSyncing(true);
     toast.info("Synchronisation bancaire en cours…");
     try {
@@ -236,7 +243,17 @@ const Receipts = () => {
       toast.error("Erreur de connexion Outlook : " + searchParams.get("microsoft_error"));
       setSearchParams({}, { replace: true });
     }
-    // Powens callback
+    // Powens callback (uniquement si l'offre autorise la connexion bancaire)
+    const powensParam =
+      searchParams.get("powens_connected") ||
+      searchParams.get("powens_error") ||
+      searchParams.get("powens_cancelled") ||
+      searchParams.get("powens_callback");
+    if (powensParam && !canUseBank) {
+      toast.error("La connexion bancaire n'est pas incluse dans votre offre.");
+      setSearchParams({}, { replace: true });
+      return;
+    }
     if (searchParams.get("powens_connected") === "true") {
       toast.success("Compte bancaire connecté via Powens !");
       setSearchParams({}, { replace: true });
@@ -271,12 +288,21 @@ const Receipts = () => {
         })();
       }
     }
-  }, [searchParams]);
+  }, [searchParams, canUseBank]);
 
   // Handle Powens redirect with connection_id + state (process endpoint)
   useEffect(() => {
     const connectionId = searchParams.get("connection_id");
     const state = searchParams.get("state");
+    if (connectionId && state && !canUseBank) {
+      powensProcessedRef.current = true;
+      toast.error("La connexion bancaire n'est pas incluse dans votre offre.");
+      const url = new URL(window.location.href);
+      url.searchParams.delete("connection_id");
+      url.searchParams.delete("state");
+      window.history.replaceState({}, "", url.toString());
+      return;
+    }
     if (connectionId && state && !powensProcessedRef.current) {
       powensProcessedRef.current = true;
       (async () => {
@@ -345,23 +371,32 @@ const Receipts = () => {
         raw.push(...page);
         if (page.length < PAGE) break;
       }
-      return raw.map((e: any) => ({
-        id: e.id ?? e._id ?? crypto.randomUUID(),
-        montant_total: e.montant_total ?? e.amount ?? null,
-        categorie: e.categorie ?? e.category ?? null,
-        fournisseur: e.fournisseur ?? e.merchant ?? null,
-        magasin: e.magasin ?? null,
-        date_expense: e.date_expense ?? e.date ?? null,
-        source: "email",
-        description: e.description ?? null,
-        devise: e.devise ?? e.currency ?? "EUR",
-        abonnement_detecte: e.abonnement_detecte ?? false,
-        recurrence: e.recurrence ?? null,
-        created_at: e.created_at ?? new Date().toISOString(),
-        articles: e.articles ?? [],
-        railway_id: e.id ?? e._id ?? null,
-        source_id: e.id ?? e._id ?? null,
-      }));
+      return raw
+        .filter((e: any) => {
+          const origin = detectExpenseOrigin(e);
+          if (!canUseSource(plan, origin)) {
+            console.info(`[capture] dépense ignorée (source "${origin}" non incluse dans l'offre ${plan})`);
+            return false;
+          }
+          return true;
+        })
+        .map((e: any) => ({
+          id: e.id ?? e._id ?? crypto.randomUUID(),
+          montant_total: e.montant_total ?? e.amount ?? null,
+          categorie: e.categorie ?? e.category ?? null,
+          fournisseur: e.fournisseur ?? e.merchant ?? null,
+          magasin: e.magasin ?? null,
+          date_expense: e.date_expense ?? e.date ?? null,
+          source: "email",
+          description: e.description ?? null,
+          devise: e.devise ?? e.currency ?? "EUR",
+          abonnement_detecte: e.abonnement_detecte ?? false,
+          recurrence: e.recurrence ?? null,
+          created_at: e.created_at ?? new Date().toISOString(),
+          articles: e.articles ?? [],
+          railway_id: e.id ?? e._id ?? null,
+          source_id: e.id ?? e._id ?? null,
+        }));
     } catch (err) {
       console.warn("Impossible de récupérer les dépenses email depuis Railway:", err);
       return [];
@@ -481,8 +516,9 @@ const Receipts = () => {
       setExpenses(mapExpenses(expenseRes.data || []));
       setLoading(false);
 
-      // Backfill: always pull Railway email expenses into Supabase
-      // (connected_emails table may be empty even if Outlook is connected via Railway)
+      // Backfill: pull Railway email expenses into Supabase, seulement si l'offre
+      // autorise la source e-mail (connected_emails peut être vide malgré Outlook connecté)
+      if (!canUseEmail) return;
       try {
         const railwayExpenses = await fetchRailwayEmailExpenses();
         if (railwayExpenses.length > 0) {
@@ -829,6 +865,17 @@ const Receipts = () => {
 
   const handleSyncEmail = async (emailAddr: string, provider: string) => {
     if (!user || syncing) return;
+    if (!canUseEmail) {
+      toast.error("L'analyse des mails n'est pas incluse dans votre offre.");
+      return;
+    }
+    if (emailRemaining <= 0) {
+      toast.error(
+        `Limite atteinte : ${emailLimit} analyse(s) de mails ce mois-ci. Passez au Premium pour un usage illimité.`,
+      );
+      navigate("/subscription");
+      return;
+    }
     setSyncing(true);
     const providerLabel = provider === "microsoft" ? "Outlook" : "Gmail";
     toast.info(`Synchronisation ${providerLabel} en cours…`);
@@ -871,6 +918,7 @@ const Receipts = () => {
       const railwayExpenses = await fetchRailwayEmailExpenses();
       await upsertEmailExpensesToSupabase(railwayExpenses);
       await reloadExpenses();
+      await refreshUsage();
       setEmails((prev) =>
         prev.map((em) => (em.email === emailAddr ? { ...em, last_sync_at: new Date().toISOString() } : em)),
       );
@@ -883,6 +931,11 @@ const Receipts = () => {
 
   const handleAddBank = async () => {
     if (!user) return;
+    if (!canUseBank) {
+      toast.error("La connexion bancaire n'est pas incluse dans votre offre.");
+      navigate("/subscription");
+      return;
+    }
     setSaving(true);
     try {
       // Nouvelle API Railway : GET /sources/powens/connect-url (auth Bearer)
@@ -1104,14 +1157,14 @@ const Receipts = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
             onClick={() => {
-              if (plan === "free") {
+              if (!canUseBank) {
                 navigate("/subscription");
                 return;
               }
               hasBanks ? handleSyncBank() : setShowBankDialog(true);
             }}
             className={`bg-card rounded-2xl border p-6 transition-colors ${
-              plan === "free"
+              !canUseBank
                 ? "border-border/50 bg-muted/30 cursor-pointer hover:border-primary/20"
                 : "border-border hover:border-primary/30 cursor-pointer"
             }`}
@@ -1119,13 +1172,29 @@ const Receipts = () => {
             <div className="flex items-start gap-4">
               <div
                 className={`h-12 w-12 rounded-xl flex items-center justify-center shrink-0 ${
-                  plan === "free" ? "bg-muted" : "bg-primary/10"
+                  !canUseBank ? "bg-muted" : "bg-primary/10"
                 }`}
               >
-                <Landmark className={`h-6 w-6 ${plan === "free" ? "text-muted-foreground" : "text-primary"}`} />
+                <Landmark className={`h-6 w-6 ${!canUseBank ? "text-muted-foreground" : "text-primary"}`} />
               </div>
               <div className="flex-1 min-w-0">
-                {hasBanks ? (
+                {hasBanks && !canUseBank ? (
+                  <>
+                    <p className="text-sm font-semibold text-muted-foreground">
+                      🏦 {banks.length} compte{banks.length > 1 ? "s" : ""} · Suspendue
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                      {banks.map((b) => b.account_label || b.bank_name).join(", ")}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Synchronisation arrêtée : la connexion bancaire n'est pas incluse dans votre offre.
+                    </p>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary bg-primary/10 px-2 py-1 rounded-full mt-2">
+                      Passer à Essentiel
+                      <ChevronRight className="h-3 w-3" />
+                    </span>
+                  </>
+                ) : hasBanks ? (
                   <>
                     <p className="text-sm font-semibold text-foreground">
                       🏦 {banks.length} compte{banks.length > 1 ? "s" : ""} connecté{banks.length > 1 ? "s" : ""}
@@ -1137,16 +1206,16 @@ const Receipts = () => {
                 ) : (
                   <>
                     <p
-                      className={`text-sm font-semibold ${plan === "free" ? "text-muted-foreground" : "text-foreground"}`}
+                      className={`text-sm font-semibold ${!canUseBank ? "text-muted-foreground" : "text-foreground"}`}
                     >
                       🏦 Banque : connexion sécurisée
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {plan === "free"
+                      {!canUseBank
                         ? "Disponible dans les offres Essentiel et Premium"
                         : "Synchronisez vos transactions bancaires en toute sécurité"}
                     </p>
-                    {plan === "free" && (
+                    {!canUseBank && (
                       <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary bg-primary/10 px-2 py-1 rounded-full mt-2">
                         Passer à Essentiel
                         <ChevronRight className="h-3 w-3" />
@@ -1155,7 +1224,7 @@ const Receipts = () => {
                   </>
                 )}
               </div>
-              {plan !== "free" && hasBanks ? (
+              {canUseBank && hasBanks ? (
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     onClick={(e) => {
@@ -1177,7 +1246,7 @@ const Receipts = () => {
                     <Plus className="h-3.5 w-3.5 text-primary" />
                   </button>
                 </div>
-              ) : plan !== "free" ? (
+              ) : canUseBank ? (
                 <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-3" />
               ) : null}
             </div>
