@@ -25,6 +25,8 @@ import AppLayout from "@/components/AppLayout";
 import PremiumCTA from "@/components/PremiumCTA";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
+import { usePlanCapabilities } from "@/hooks/usePlanCapabilities";
+import { canUseSource, detectExpenseOrigin } from "@/lib/plan-capabilities";
 import { supabase } from "@/integrations/supabase/client";
 import { invokeAuthenticatedFunction } from "@/lib/edge-functions";
 import { railwayFetch, getRailwayToken } from "@/lib/railway-api";
@@ -369,23 +371,32 @@ const Receipts = () => {
         raw.push(...page);
         if (page.length < PAGE) break;
       }
-      return raw.map((e: any) => ({
-        id: e.id ?? e._id ?? crypto.randomUUID(),
-        montant_total: e.montant_total ?? e.amount ?? null,
-        categorie: e.categorie ?? e.category ?? null,
-        fournisseur: e.fournisseur ?? e.merchant ?? null,
-        magasin: e.magasin ?? null,
-        date_expense: e.date_expense ?? e.date ?? null,
-        source: "email",
-        description: e.description ?? null,
-        devise: e.devise ?? e.currency ?? "EUR",
-        abonnement_detecte: e.abonnement_detecte ?? false,
-        recurrence: e.recurrence ?? null,
-        created_at: e.created_at ?? new Date().toISOString(),
-        articles: e.articles ?? [],
-        railway_id: e.id ?? e._id ?? null,
-        source_id: e.id ?? e._id ?? null,
-      }));
+      return raw
+        .filter((e: any) => {
+          const origin = detectExpenseOrigin(e);
+          if (!canUseSource(plan, origin)) {
+            console.info(`[capture] dépense ignorée (source "${origin}" non incluse dans l'offre ${plan})`);
+            return false;
+          }
+          return true;
+        })
+        .map((e: any) => ({
+          id: e.id ?? e._id ?? crypto.randomUUID(),
+          montant_total: e.montant_total ?? e.amount ?? null,
+          categorie: e.categorie ?? e.category ?? null,
+          fournisseur: e.fournisseur ?? e.merchant ?? null,
+          magasin: e.magasin ?? null,
+          date_expense: e.date_expense ?? e.date ?? null,
+          source: "email",
+          description: e.description ?? null,
+          devise: e.devise ?? e.currency ?? "EUR",
+          abonnement_detecte: e.abonnement_detecte ?? false,
+          recurrence: e.recurrence ?? null,
+          created_at: e.created_at ?? new Date().toISOString(),
+          articles: e.articles ?? [],
+          railway_id: e.id ?? e._id ?? null,
+          source_id: e.id ?? e._id ?? null,
+        }));
     } catch (err) {
       console.warn("Impossible de récupérer les dépenses email depuis Railway:", err);
       return [];
@@ -505,8 +516,9 @@ const Receipts = () => {
       setExpenses(mapExpenses(expenseRes.data || []));
       setLoading(false);
 
-      // Backfill: always pull Railway email expenses into Supabase
-      // (connected_emails table may be empty even if Outlook is connected via Railway)
+      // Backfill: pull Railway email expenses into Supabase, seulement si l'offre
+      // autorise la source e-mail (connected_emails peut être vide malgré Outlook connecté)
+      if (!canUseEmail) return;
       try {
         const railwayExpenses = await fetchRailwayEmailExpenses();
         if (railwayExpenses.length > 0) {
@@ -853,6 +865,17 @@ const Receipts = () => {
 
   const handleSyncEmail = async (emailAddr: string, provider: string) => {
     if (!user || syncing) return;
+    if (!canUseEmail) {
+      toast.error("L'analyse des mails n'est pas incluse dans votre offre.");
+      return;
+    }
+    if (emailRemaining <= 0) {
+      toast.error(
+        `Limite atteinte : ${emailLimit} analyse(s) de mails ce mois-ci. Passez au Premium pour un usage illimité.`,
+      );
+      navigate("/subscription");
+      return;
+    }
     setSyncing(true);
     const providerLabel = provider === "microsoft" ? "Outlook" : "Gmail";
     toast.info(`Synchronisation ${providerLabel} en cours…`);
@@ -895,6 +918,7 @@ const Receipts = () => {
       const railwayExpenses = await fetchRailwayEmailExpenses();
       await upsertEmailExpensesToSupabase(railwayExpenses);
       await reloadExpenses();
+      await refreshUsage();
       setEmails((prev) =>
         prev.map((em) => (em.email === emailAddr ? { ...em, last_sync_at: new Date().toISOString() } : em)),
       );
@@ -907,6 +931,11 @@ const Receipts = () => {
 
   const handleAddBank = async () => {
     if (!user) return;
+    if (!canUseBank) {
+      toast.error("La connexion bancaire n'est pas incluse dans votre offre.");
+      navigate("/subscription");
+      return;
+    }
     setSaving(true);
     try {
       // Nouvelle API Railway : GET /sources/powens/connect-url (auth Bearer)
