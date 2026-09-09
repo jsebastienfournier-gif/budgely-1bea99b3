@@ -1640,13 +1640,13 @@ const Receipts = () => {
           <DialogHeader>
             <DialogTitle>Connecter un compte bancaire</DialogTitle>
             <DialogDescription>
-              {plan === "free"
+              {!canUseBank
                 ? "Cette fonctionnalité est disponible à partir de l'offre Essentiel."
                 : "Vous allez être redirigé vers notre partenaire sécurisé pour connecter votre banque et synchroniser vos transactions automatiquement."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
-            {plan === "free" ? (
+            {!canUseBank ? (
               <div className="bg-muted rounded-xl p-4 text-center">
                 <Lock className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground mb-3">
