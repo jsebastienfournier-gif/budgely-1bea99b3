@@ -371,15 +371,18 @@ const Receipts = () => {
         raw.push(...page);
         if (page.length < PAGE) break;
       }
+      // Purge des dépenses déjà enregistrées dont l'origine réelle n'est pas autorisée
+      const disallowedIds = raw
+        .filter((e: any) => !canUseSource(plan, detectExpenseOrigin(e)))
+        .map((e: any) => String(e.id ?? e._id))
+        .filter(Boolean);
+      if (disallowedIds.length > 0 && user) {
+        console.info(`[capture] ${disallowedIds.length} dépense(s) ignorée(s) : source non incluse dans l'offre ${plan}`);
+        await supabase.from("expenses").delete().eq("user_id", user.id).in("railway_id", disallowedIds);
+      }
+
       return raw
-        .filter((e: any) => {
-          const origin = detectExpenseOrigin(e);
-          if (!canUseSource(plan, origin)) {
-            console.info(`[capture] dépense ignorée (source "${origin}" non incluse dans l'offre ${plan})`);
-            return false;
-          }
-          return true;
-        })
+        .filter((e: any) => canUseSource(plan, detectExpenseOrigin(e)))
         .map((e: any) => ({
           id: e.id ?? e._id ?? crypto.randomUUID(),
           montant_total: e.montant_total ?? e.amount ?? null,
