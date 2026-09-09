@@ -12,9 +12,11 @@ import { Switch } from "@/components/ui/switch";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import NotificationToggle from "@/components/NotificationToggle";
+import { usePlanCapabilities } from "@/hooks/usePlanCapabilities";
 
 const Settings = () => {
   const { user, signOut } = useAuth();
+  const { canUseBank } = usePlanCapabilities();
   const [fullName, setFullName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);

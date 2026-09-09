@@ -5,13 +5,9 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import { Progress } from "@/components/ui/progress";
 import { Mail, Camera, FileText, Landmark } from "lucide-react";
 
-const PLAN_LIMITS: Record<string, Record<string, number>> = {
-  free: { receipt: 999, invoice: 999, email: 5, bank: 0 },
-  essentiel: { receipt: 999, invoice: 999, email: 15, bank: 999 },
-  premium: { receipt: 999, invoice: 999, email: 999, bank: 999 },
-};
+import { CaptureSource, getMonthlyLimit } from "@/lib/plan-capabilities";
 
-type SourceKey = "receipt" | "invoice" | "email" | "bank";
+type SourceKey = CaptureSource;
 
 const SOURCE_META: Record<SourceKey, { label: string; icon: typeof Mail }> = {
   email: { label: "Analyses e-mail", icon: Mail },
