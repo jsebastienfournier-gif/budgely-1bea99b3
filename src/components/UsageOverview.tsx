@@ -41,9 +41,6 @@ const UsageOverview = () => {
       });
   }, [user]);
 
-  const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
-
-  // Only show sources that have a meaningful limit (not 999 = unlimited)
   const sources: SourceKey[] = ["email", "receipt", "invoice", "bank"];
 
   if (loading) return null;
