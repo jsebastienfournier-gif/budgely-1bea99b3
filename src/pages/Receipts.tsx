@@ -519,18 +519,8 @@ const Receipts = () => {
       setExpenses(mapExpenses(expenseRes.data || []));
       setLoading(false);
 
-      // Backfill: pull Railway email expenses into Supabase, seulement si l'offre
-      // autorise la source e-mail (connected_emails peut être vide malgré Outlook connecté)
-      if (!canUseEmail) return;
-      try {
-        const railwayExpenses = await fetchRailwayEmailExpenses();
-        if (railwayExpenses.length > 0) {
-          await upsertEmailExpensesToSupabase(railwayExpenses);
-          await reloadExpenses();
-        }
-      } catch (err) {
-        console.warn("Backfill email expenses failed:", err);
-      }
+      // Aucune synchronisation automatique : l'import ne se fait que sur clic
+      // explicite du bouton « Synchroniser » (voir handleSyncEmail / handleSyncBank).
     };
     load();
   }, [user]);
