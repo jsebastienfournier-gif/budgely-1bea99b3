@@ -52,9 +52,9 @@ const UsageOverview = () => {
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         {sources.map((source) => {
-          const limit = limits[source] ?? 0;
+          const limit = getMonthlyLimit(plan, source);
           const used = usage[source] ?? 0;
-          const isUnlimited = limit >= 999;
+          const isUnlimited = !Number.isFinite(limit);
           const isBlocked = limit === 0;
           const Icon = SOURCE_META[source].icon;
           const pct = isUnlimited || isBlocked ? 0 : Math.min((used / limit) * 100, 100);
