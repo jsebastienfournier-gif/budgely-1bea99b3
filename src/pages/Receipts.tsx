@@ -255,10 +255,8 @@ const Receipts = () => {
       return;
     }
     if (searchParams.get("powens_connected") === "true") {
-      toast.success("Compte bancaire connecté via Powens !");
+      toast.success("Compte bancaire connecté. Cliquez sur « Synchroniser » pour importer vos dépenses.");
       setSearchParams({}, { replace: true });
-      // Auto-sync transactions after connection
-      handleSyncBank();
     }
     if (searchParams.get("powens_error")) {
       toast.error("Erreur de connexion Powens : " + searchParams.get("powens_error"));
