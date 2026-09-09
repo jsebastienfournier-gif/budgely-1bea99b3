@@ -278,8 +278,7 @@ const Receipts = () => {
               method: "POST",
               body: { connection_id: Number(connectionId) || connectionId },
             });
-            toast.success("Compte bancaire connecté via Powens !");
-            handleSyncBank();
+            toast.success("Compte bancaire connecté. Cliquez sur « Synchroniser » pour importer vos dépenses.");
           } catch (err: any) {
             toast.error("Erreur lors de la finalisation Powens : " + (err?.message || "inconnue"));
           }
