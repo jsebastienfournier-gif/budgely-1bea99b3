@@ -255,10 +255,8 @@ const Receipts = () => {
       return;
     }
     if (searchParams.get("powens_connected") === "true") {
-      toast.success("Compte bancaire connecté via Powens !");
+      toast.success("Compte bancaire connecté. Cliquez sur « Synchroniser » pour importer vos dépenses.");
       setSearchParams({}, { replace: true });
-      // Auto-sync transactions after connection
-      handleSyncBank();
     }
     if (searchParams.get("powens_error")) {
       toast.error("Erreur de connexion Powens : " + searchParams.get("powens_error"));
@@ -280,8 +278,7 @@ const Receipts = () => {
               method: "POST",
               body: { connection_id: Number(connectionId) || connectionId },
             });
-            toast.success("Compte bancaire connecté via Powens !");
-            handleSyncBank();
+            toast.success("Compte bancaire connecté. Cliquez sur « Synchroniser » pour importer vos dépenses.");
           } catch (err: any) {
             toast.error("Erreur lors de la finalisation Powens : " + (err?.message || "inconnue"));
           }
@@ -519,18 +516,8 @@ const Receipts = () => {
       setExpenses(mapExpenses(expenseRes.data || []));
       setLoading(false);
 
-      // Backfill: pull Railway email expenses into Supabase, seulement si l'offre
-      // autorise la source e-mail (connected_emails peut être vide malgré Outlook connecté)
-      if (!canUseEmail) return;
-      try {
-        const railwayExpenses = await fetchRailwayEmailExpenses();
-        if (railwayExpenses.length > 0) {
-          await upsertEmailExpensesToSupabase(railwayExpenses);
-          await reloadExpenses();
-        }
-      } catch (err) {
-        console.warn("Backfill email expenses failed:", err);
-      }
+      // Aucune synchronisation automatique : l'import ne se fait que sur clic
+      // explicite du bouton « Synchroniser » (voir handleSyncEmail / handleSyncBank).
     };
     load();
   }, [user]);
