@@ -5,13 +5,9 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import { Progress } from "@/components/ui/progress";
 import { Mail, Camera, FileText, Landmark } from "lucide-react";
 
-const PLAN_LIMITS: Record<string, Record<string, number>> = {
-  free: { receipt: 999, invoice: 999, email: 5, bank: 0 },
-  essentiel: { receipt: 999, invoice: 999, email: 15, bank: 999 },
-  premium: { receipt: 999, invoice: 999, email: 999, bank: 999 },
-};
+import { CaptureSource, getMonthlyLimit } from "@/lib/plan-capabilities";
 
-type SourceKey = "receipt" | "invoice" | "email" | "bank";
+type SourceKey = CaptureSource;
 
 const SOURCE_META: Record<SourceKey, { label: string; icon: typeof Mail }> = {
   email: { label: "Analyses e-mail", icon: Mail },
@@ -45,9 +41,6 @@ const UsageOverview = () => {
       });
   }, [user]);
 
-  const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
-
-  // Only show sources that have a meaningful limit (not 999 = unlimited)
   const sources: SourceKey[] = ["email", "receipt", "invoice", "bank"];
 
   if (loading) return null;
@@ -59,9 +52,9 @@ const UsageOverview = () => {
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         {sources.map((source) => {
-          const limit = limits[source] ?? 0;
+          const limit = getMonthlyLimit(plan, source);
           const used = usage[source] ?? 0;
-          const isUnlimited = limit >= 999;
+          const isUnlimited = !Number.isFinite(limit);
           const isBlocked = limit === 0;
           const Icon = SOURCE_META[source].icon;
           const pct = isUnlimited || isBlocked ? 0 : Math.min((used / limit) * 100, 100);

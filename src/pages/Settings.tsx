@@ -12,9 +12,11 @@ import { Switch } from "@/components/ui/switch";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import NotificationToggle from "@/components/NotificationToggle";
+import { usePlanCapabilities } from "@/hooks/usePlanCapabilities";
 
 const Settings = () => {
   const { user, signOut } = useAuth();
+  const { canUseBank } = usePlanCapabilities();
   const [fullName, setFullName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -448,7 +450,11 @@ const Settings = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-medium bg-savings/10 text-savings px-2.5 py-1 rounded-full">{b.status === "active" ? "Actif" : "En attente"}</span>
+                      {canUseBank ? (
+                        <span className="text-[10px] font-medium bg-savings/10 text-savings px-2.5 py-1 rounded-full">{b.status === "active" ? "Actif" : "En attente"}</span>
+                      ) : (
+                        <span className="text-[10px] font-medium bg-muted text-muted-foreground px-2.5 py-1 rounded-full">Suspendue</span>
+                      )}
                       <button
                         onClick={() => handleDeleteBank(b.id)}
                         className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"

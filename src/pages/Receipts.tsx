@@ -371,15 +371,18 @@ const Receipts = () => {
         raw.push(...page);
         if (page.length < PAGE) break;
       }
+      // Purge des dépenses déjà enregistrées dont l'origine réelle n'est pas autorisée
+      const disallowedIds = raw
+        .filter((e: any) => !canUseSource(plan, detectExpenseOrigin(e)))
+        .map((e: any) => String(e.id ?? e._id))
+        .filter(Boolean);
+      if (disallowedIds.length > 0 && user) {
+        console.info(`[capture] ${disallowedIds.length} dépense(s) ignorée(s) : source non incluse dans l'offre ${plan}`);
+        await supabase.from("expenses").delete().eq("user_id", user.id).in("railway_id", disallowedIds);
+      }
+
       return raw
-        .filter((e: any) => {
-          const origin = detectExpenseOrigin(e);
-          if (!canUseSource(plan, origin)) {
-            console.info(`[capture] dépense ignorée (source "${origin}" non incluse dans l'offre ${plan})`);
-            return false;
-          }
-          return true;
-        })
+        .filter((e: any) => canUseSource(plan, detectExpenseOrigin(e)))
         .map((e: any) => ({
           id: e.id ?? e._id ?? crypto.randomUUID(),
           montant_total: e.montant_total ?? e.amount ?? null,
@@ -1640,13 +1643,13 @@ const Receipts = () => {
           <DialogHeader>
             <DialogTitle>Connecter un compte bancaire</DialogTitle>
             <DialogDescription>
-              {plan === "free"
+              {!canUseBank
                 ? "Cette fonctionnalité est disponible à partir de l'offre Essentiel."
                 : "Vous allez être redirigé vers notre partenaire sécurisé pour connecter votre banque et synchroniser vos transactions automatiquement."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
-            {plan === "free" ? (
+            {!canUseBank ? (
               <div className="bg-muted rounded-xl p-4 text-center">
                 <Lock className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground mb-3">
