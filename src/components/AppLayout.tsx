@@ -85,7 +85,11 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       {/* Mobile nav overlay */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-40 bg-background/80 backdrop-blur-sm" onClick={() => setMobileOpen(false)}>
-          <div className="absolute top-14 left-0 right-0 bg-card border-b border-border p-4 space-y-1" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="absolute left-0 right-0 bg-card border-b border-border p-4 space-y-1"
+            style={{ top: "calc(3.5rem + env(safe-area-inset-top))" }}
+            onClick={(e) => e.stopPropagation()}
+          >
             {allNavItems.map((item) => {
               const active = location.pathname === item.to;
               return (
@@ -114,7 +118,10 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       )}
 
       {/* Content */}
-      <main className="flex-1 overflow-auto lg:p-0 pt-14">
+      <main
+        className="flex-1 overflow-auto lg:p-0 pt-14 lg:!pt-0"
+        style={{ paddingTop: "calc(3.5rem + env(safe-area-inset-top))" }}
+      >
         {children}
       </main>
     </div>
