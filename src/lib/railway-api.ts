@@ -45,43 +45,14 @@ const clearToken = () => {
 
 export const railwayLogout = () => clearToken();
 
-const loginOrRegister = async (email: string, password: string, fullName?: string): Promise<string> => {
-  // 1) Essayer login (form-encoded)
-  const loginRes = await fetch(`${RAILWAY_BASE}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ username: email, password }).toString(),
-  });
-
-  if (loginRes.ok) {
-    const data = await loginRes.json();
-    return data.access_token as string;
+const requestServerToken = async (): Promise<string> => {
+  const { data, error } = await supabase.functions.invoke("railway-auth", { body: {} });
+  if (error) {
+    throw new Error("Authentification Railway impossible. Réessayez dans un instant.");
   }
-
-  // 2) Si échec → tenter register puis re-login
-  const regRes = await fetch(`${RAILWAY_BASE}/auth/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password, full_name: fullName || email }),
-  });
-
-  if (regRes.ok) {
-    const data = await regRes.json();
-    if (data?.access_token) return data.access_token as string;
-  }
-
-  // 3) Re-login après register (au cas où register ne renverrait pas le token)
-  const retry = await fetch(`${RAILWAY_BASE}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ username: email, password }).toString(),
-  });
-  if (!retry.ok) {
-    const t = await retry.text();
-    throw new Error(`Auth Railway échouée : ${retry.status} ${t.slice(0, 200)}`);
-  }
-  const data = await retry.json();
-  return data.access_token as string;
+  const token = (data as { access_token?: string } | null)?.access_token;
+  if (!token) throw new Error("Authentification Railway impossible.");
+  return token;
 };
 
 const ensureToken = async (): Promise<string> => {
@@ -91,8 +62,7 @@ const ensureToken = async (): Promise<string> => {
   const cached = getToken(user.id, user.email);
   if (cached) return cached;
 
-  const password = derivePassword(user.id);
-  const token = await loginOrRegister(user.email, password, (user.user_metadata as any)?.full_name);
+  const token = await requestServerToken();
   setToken(token, user.id, user.email);
   return token;
 };
