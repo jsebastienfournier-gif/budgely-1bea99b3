@@ -1,0 +1,47 @@
+{
+  "name": "Budgely - Ton Coach Budget",
+  "short_name": "Budgely",
+  "description": "Budgely analyse vos dépenses (banque, emails, tickets) pour identifier des opportunités d'économies.",
+  "lang": "fr",
+  "dir": "ltr",
+  "start_url": "/dashboard",
+  "id": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#2563eb",
+  "background_color": "#f7f9fb",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Capture des dépenses",
+      "short_name": "Capture",
+      "url": "/receipts"
+    },
+    {
+      "name": "Analyses",
+      "short_name": "Analyses",
+      "url": "/transactions"
+    }
+  ]
+}
