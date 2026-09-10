@@ -67,7 +67,10 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       </aside>
 
       {/* Mobile header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-card border-b border-border px-4 h-14 flex items-center justify-between">
+      <div
+        className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-card border-b border-border px-4 h-14 flex items-center justify-between"
+        style={{ paddingTop: "env(safe-area-inset-top)", height: "calc(3.5rem + env(safe-area-inset-top))" }}
+      >
         <Link to="/" className="flex items-center gap-2">
           <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
             <BarChart3 className="h-3.5 w-3.5 text-primary-foreground" />
@@ -82,7 +85,11 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       {/* Mobile nav overlay */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-40 bg-background/80 backdrop-blur-sm" onClick={() => setMobileOpen(false)}>
-          <div className="absolute top-14 left-0 right-0 bg-card border-b border-border p-4 space-y-1" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="absolute left-0 right-0 bg-card border-b border-border p-4 space-y-1"
+            style={{ top: "calc(3.5rem + env(safe-area-inset-top))" }}
+            onClick={(e) => e.stopPropagation()}
+          >
             {allNavItems.map((item) => {
               const active = location.pathname === item.to;
               return (
@@ -111,7 +118,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       )}
 
       {/* Content */}
-      <main className="flex-1 overflow-auto lg:p-0 pt-14">
+      <main className="flex-1 overflow-auto lg:p-0 app-main-safe">
         {children}
       </main>
     </div>

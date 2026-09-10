@@ -91,6 +91,25 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    overscroll-behavior-y: none;
+  }
+}
+
+/* Mode application installée (plein écran) */
+@media (display-mode: standalone) {
+  html {
+    background-color: hsl(var(--background));
+  }
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  input,
+  textarea,
+  [contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
   }
 }
 
@@ -101,5 +120,15 @@
   .font-mono-nums {
     font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
     font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Décalage sous l'en-tête mobile fixe, avec zone sûre iOS */
+.app-main-safe {
+  padding-top: calc(3.5rem + env(safe-area-inset-top));
+}
+@media (min-width: 1024px) {
+  .app-main-safe {
+    padding-top: 0;
   }
 }
