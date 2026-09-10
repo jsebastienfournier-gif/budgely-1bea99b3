@@ -122,3 +122,13 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* Décalage sous l'en-tête mobile fixe, avec zone sûre iOS */
+.app-main-safe {
+  padding-top: calc(3.5rem + env(safe-area-inset-top));
+}
+@media (min-width: 1024px) {
+  .app-main-safe {
+    padding-top: 0;
+  }
+}

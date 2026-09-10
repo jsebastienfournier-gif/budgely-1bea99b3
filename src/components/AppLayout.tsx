@@ -118,10 +118,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       )}
 
       {/* Content */}
-      <main
-        className="flex-1 overflow-auto lg:p-0 pt-14 lg:!pt-0"
-        style={{ paddingTop: "calc(3.5rem + env(safe-area-inset-top))" }}
-      >
+      <main className="flex-1 overflow-auto lg:p-0 app-main-safe">
         {children}
       </main>
     </div>
