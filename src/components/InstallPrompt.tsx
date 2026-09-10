@@ -18,6 +18,7 @@ const isIos = () => /iphone|ipad|ipod/i.test(window.navigator.userAgent);
 const InstallPrompt = () => {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [showIosHint, setShowIosHint] = useState(false);
+  const [showSteps, setShowSteps] = useState(false);
 
   useEffect(() => {
     // Jamais dans l'aperçu intégré ni si déjà installée
@@ -76,9 +77,29 @@ const InstallPrompt = () => {
               </Button>
             </>
           ) : (
-            <p className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-              Touchez <Share className="inline h-3.5 w-3.5" /> puis « Sur l'écran d'accueil ».
-            </p>
+            <>
+              <p className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                Sur iPhone, l'installation se fait depuis le menu de Safari.
+              </p>
+              {showSteps ? (
+                <ol className="mt-2 space-y-1 text-xs text-muted-foreground">
+                  <li className="flex flex-wrap items-center gap-1">
+                    1. Touchez <Share className="inline h-3.5 w-3.5" /> en bas de l'écran
+                  </li>
+                  <li>2. Faites défiler et choisissez « Sur l'écran d'accueil »</li>
+                  <li>3. Touchez « Ajouter » en haut à droite</li>
+                </ol>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-3"
+                  onClick={() => setShowSteps(true)}
+                >
+                  Voir comment faire
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>
