@@ -24,6 +24,7 @@ import TermsOfService from "./pages/TermsOfService";
 import Unsubscribe from "./pages/Unsubscribe";
 import NotFound from "./pages/NotFound";
 import Maintenance from "./pages/Maintenance";
+import InstallPrompt from "./components/InstallPrompt";
 
 const queryClient = new QueryClient();
 
