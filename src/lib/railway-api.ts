@@ -1,6 +1,7 @@
 // Client pour le backend Railway (Budgely API)
-// Gère automatiquement l'auth : crée un compte miroir + login pour obtenir un JWT.
-// Le mot de passe est dérivé de l'user.id Supabase (stable, jamais exposé à l'utilisateur).
+// L'authentification est déléguée à la fonction serveur `railway-auth` :
+// le mot de passe du compte miroir est dérivé côté serveur (HMAC + secret privé)
+// et n'est jamais présent dans le navigateur.
 
 import { supabase } from "@/integrations/supabase/client";
 
@@ -10,13 +11,7 @@ const TOKEN_KEY = "railway_jwt";
 const TOKEN_USER_KEY = "railway_jwt_uid";
 const TOKEN_EMAIL_KEY = "railway_jwt_email";
 const TOKEN_VERSION_KEY = "railway_jwt_version";
-const TOKEN_VERSION = "2026-05-03-email-bound-v2";
-
-const derivePassword = (userId: string) => {
-  // Mot de passe déterministe propre à Railway, dérivé de l'id Supabase.
-  // Suffisamment long et imprévisible côté tiers.
-  return `bgly_${userId}_v1!`;
-};
+const TOKEN_VERSION = "2026-09-10-server-derived-v3";
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
