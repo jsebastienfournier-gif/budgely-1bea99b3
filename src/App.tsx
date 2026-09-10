@@ -56,6 +56,7 @@ const App = () => (
         <AuthProvider>
           <SubscriptionProvider>
             <PageTracker />
+            <InstallPrompt />
             <MaintenanceGate>
               <Routes>
                 <Route path="/" element={<Landing />} />
