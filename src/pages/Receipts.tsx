@@ -1374,84 +1374,107 @@ const Receipts = () => {
                         </button>
                         {!isCollapsed && (
                           <div className="divide-y divide-border">
-                            {g.items.map((r) => (
+                             {g.items.map((r) => (
                               <div
                                 key={r.id}
-                                className="flex flex-wrap items-center gap-3 p-4 hover:bg-secondary/50 transition-colors"
+                                className="p-4 hover:bg-secondary/40 transition-colors cursor-pointer"
+                                onClick={() => setSelectedReceipt(r)}
                               >
-                                <div
-                                  onClick={() => setSelectedReceipt(r)}
-                                  className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center text-lg cursor-pointer"
-                                >
-                                  {sourceIcon(r.source)}
+                                {/* Ligne 1 : commerçant + montant */}
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex items-start gap-3 min-w-0">
+                                    <div className="h-10 w-10 rounded-xl bg-secondary flex-shrink-0 flex items-center justify-center text-lg">
+                                      {sourceIcon(r.source)}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-semibold text-foreground truncate">{r.store}</p>
+                                      <p className="text-xs text-muted-foreground mt-0.5">
+                                        {r.date}
+                                        {r.items > 0 && (
+                                          <span> · {r.items} article{r.items > 1 ? "s" : ""}</span>
+                                        )}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <span className="text-base font-bold tabular-nums text-foreground flex-shrink-0 whitespace-nowrap">
+                                    {r.total}
+                                  </span>
                                 </div>
-                                <div onClick={() => setSelectedReceipt(r)} className="cursor-pointer flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-foreground">{r.store}</p>
-                                  <p className="text-[10px] text-muted-foreground">
-                                    {r.date} ·{" "}
-                                    {r.description || (r.items > 0 ? `${r.items} article${r.items > 1 ? "s" : ""}` : "Aucun article")}
+
+                                {/* Ligne 2 : motif / description */}
+                                {r.description && (
+                                  <p className="text-xs text-muted-foreground leading-relaxed mt-2 pl-[3.25rem] line-clamp-2">
+                                    {r.description}
                                   </p>
-                                </div>
-                                <span className="text-sm font-semibold tabular-nums text-foreground">{r.total}</span>
-                                {r.source === "email" && r.source_id && (
-                                  r.email_validated ? (
-                                    <Badge
-                                      variant={r.email_validated === "approved" ? "default" : "destructive"}
-                                      className={`text-[10px] px-2 py-0.5 ${r.email_validated === "approved" ? "bg-green-600 hover:bg-green-600" : ""}`}
-                                    >
-                                      {r.email_validated === "approved" ? "Approuvé" : "Refusé"}
-                                    </Badge>
-                                  ) : (
-                                    <>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleValidateEmail(r.id, r.railway_id, "approved");
-                                        }}
-                                        disabled={validatingId === r.id}
-                                        className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-green-500/10 hover:text-green-600 transition-colors disabled:opacity-50"
-                                        title="Approuver"
-                                      >
-                                        <Check className="h-4 w-4" />
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleValidateEmail(r.id, r.railway_id, "rejected");
-                                        }}
-                                        disabled={validatingId === r.id}
-                                        className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
-                                        title="Refuser"
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </button>
-                                    </>
-                                  )
                                 )}
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEditExpense(r.id);
-                                  }}
-                                  className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
-                                  title="Modifier"
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setDeletingExpenseId(r.id);
-                                  }}
-                                  className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-                                  title="Supprimer"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                                <ChevronRight
-                                  onClick={() => setSelectedReceipt(r)}
-                                  className="h-4 w-4 text-muted-foreground cursor-pointer"
-                                />
+
+                                {/* Ligne 3 : actions */}
+                                <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-border/70">
+                                  {r.source === "email" && r.source_id ? (
+                                    r.email_validated ? (
+                                      <Badge
+                                        variant={r.email_validated === "approved" ? "default" : "destructive"}
+                                        className={`text-[10px] px-2 py-0.5 ${r.email_validated === "approved" ? "bg-green-600 hover:bg-green-600" : ""}`}
+                                      >
+                                        {r.email_validated === "approved" ? "Approuvé" : "Refusé"}
+                                      </Badge>
+                                    ) : (
+                                      <div className="flex items-center gap-1.5">
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleValidateEmail(r.id, r.railway_id, "approved");
+                                          }}
+                                          disabled={validatingId === r.id}
+                                          className="h-9 px-3 rounded-lg flex items-center gap-1.5 text-xs font-medium text-green-700 hover:bg-green-500/10 transition-colors disabled:opacity-50"
+                                          title="Approuver"
+                                        >
+                                          <Check className="h-4 w-4" />
+                                          Approuver
+                                        </button>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleValidateEmail(r.id, r.railway_id, "rejected");
+                                          }}
+                                          disabled={validatingId === r.id}
+                                          className="h-9 px-3 rounded-lg flex items-center gap-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+                                          title="Refuser"
+                                        >
+                                          <X className="h-4 w-4" />
+                                          Refuser
+                                        </button>
+                                      </div>
+                                    )
+                                  ) : (
+                                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                                      {r.source === "bank" ? "Banque" : "Manuel"}
+                                    </span>
+                                  )}
+                                  <div className="flex items-center gap-0.5 flex-shrink-0">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEditExpense(r.id);
+                                      }}
+                                      className="h-9 w-9 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                                      title="Modifier"
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDeletingExpenseId(r.id);
+                                      }}
+                                      className="h-9 w-9 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                      title="Supprimer"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                    <ChevronRight className="h-4 w-4 text-muted-foreground/60" />
+                                  </div>
+                                </div>
                               </div>
                             ))}
                           </div>
