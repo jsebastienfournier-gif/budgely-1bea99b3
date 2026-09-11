@@ -8,41 +8,16 @@ import { useExpenses, Expense } from "@/hooks/useExpenses";
 import { startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, subYears, parseISO } from "date-fns";
 
 
-const CATEGORY_COLORS: Record<string, string> = {
-  Alimentation: "hsl(142, 71%, 45%)",
-  Transport: "hsl(221, 83%, 53%)",
-  Logement: "hsl(262, 60%, 55%)",
-  Loisirs: "hsl(25, 90%, 55%)",
-  Santé: "hsl(340, 70%, 55%)",
-  Shopping: "hsl(320, 65%, 55%)",
-  "Éducation": "hsl(45, 90%, 50%)",
-  Abonnements: "hsl(250, 60%, 55%)",
-  "Épargne & Investissement": "hsl(170, 60%, 45%)",
-  Autre: "hsl(215, 16%, 47%)",
-  Autres: "hsl(215, 16%, 47%)",
-};
+import { normalizeCategory, getCategoryColor, getCategoryEmoji } from "@/lib/categories";
 
 type CategoryStat = { name: string; emoji: string; percent: number; color: string; amount: number };
 type Detection = { title: string; desc: string };
-
-const EMOJI_MAP: Record<string, string> = {
-  Alimentation: "🛒", Transport: "🚗", Logement: "🏠",
-  Santé: "💊", Abonnements: "📦", Loisirs: "🎭",
-  Shopping: "🛍️", "Éducation": "🎓",
-  "Épargne & Investissement": "💰", Autre: "📌", Autres: "📌",
-};
-
-const normalizeCategory = (cat: string): string => {
-  if (cat === "Restauration" || cat === "Restaurants") return "Alimentation";
-  if (cat === "Épargne" || cat === "Investissement") return "Épargne & Investissement";
-  return cat;
-};
 
 function buildCategories(expenses: Expense[]): CategoryStat[] {
   const map: Record<string, number> = {};
   let total = 0;
   expenses.forEach((e) => {
-    const cat = normalizeCategory(e.categorie || "Autres");
+    const cat = normalizeCategory(e.categorie);
     const amt = e.montant_total || 0;
     map[cat] = (map[cat] || 0) + amt;
     total += amt;
@@ -51,9 +26,9 @@ function buildCategories(expenses: Expense[]): CategoryStat[] {
   return Object.entries(map)
     .map(([name, amount]) => ({
       name,
-      emoji: EMOJI_MAP[name] || "📌",
+      emoji: getCategoryEmoji(name),
       percent: Math.round((amount / total) * 100),
-      color: CATEGORY_COLORS[name] || CATEGORY_COLORS.Autres,
+      color: getCategoryColor(name),
       amount,
     }))
     .sort((a, b) => b.percent - a.percent);
