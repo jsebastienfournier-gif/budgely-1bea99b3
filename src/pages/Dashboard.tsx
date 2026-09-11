@@ -91,8 +91,8 @@ function buildTopMerchants(expenses: Expense[]) {
 
 const quickActions = [
   { to: "/receipts", icon: Camera, label: "Capture", desc: "Ajouter des dépenses", color: "text-primary" },
-  { to: "/transactions", icon: PieChartIcon, label: "Analyses", desc: "Comprendre vos dépenses", color: "text-chart-2" },
-  { to: "/insights", icon: Lightbulb, label: "Optimisations", desc: "Réduire vos coûts", color: "text-chart-4" },
+  { to: "/transactions", icon: PieChartIcon, label: "Analyses", desc: "Comprendre vos dépenses", color: "text-primary" },
+  { to: "/insights", icon: Lightbulb, label: "Optimisations", desc: "Réduire vos coûts", color: "text-primary" },
 ];
 
 const QuickActions = () => (
