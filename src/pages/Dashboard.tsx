@@ -11,19 +11,7 @@ import { useExpenses, Expense } from "@/hooks/useExpenses";
 import { format, subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
 
-const CATEGORY_COLORS: Record<string, string> = {
-  Alimentation: "hsl(142, 71%, 45%)",
-  Transport: "hsl(221, 83%, 53%)",
-  Logement: "hsl(262, 60%, 55%)",
-  Loisirs: "hsl(25, 90%, 55%)",
-  Santé: "hsl(340, 70%, 55%)",
-  Shopping: "hsl(320, 65%, 55%)",
-  "Éducation": "hsl(45, 90%, 50%)",
-  Abonnements: "hsl(250, 60%, 55%)",
-  "Épargne & Investissement": "hsl(170, 60%, 45%)",
-  Autre: "hsl(215, 16%, 47%)",
-  Autres: "hsl(215, 16%, 47%)",
-};
+import { normalizeCategory, getCategoryColor } from "@/lib/categories";
 
 const fadeUp = {
   initial: { opacity: 0, y: 8 },
@@ -38,24 +26,14 @@ const sourceLabels: Record<string, string> = {
   invoice: "Facture",
 };
 
-const normalizeCategory = (cat: string): string => {
-  if (cat === "Restauration" || cat === "Restaurants") return "Alimentation";
-  if (cat === "Épargne" || cat === "Investissement") return "Épargne & Investissement";
-  return cat;
-};
-
-function getColor(cat: string) {
-  return CATEGORY_COLORS[cat] || CATEGORY_COLORS.Autres;
-}
-
 function buildCategoryData(expenses: Expense[]) {
   const map: Record<string, number> = {};
   expenses.forEach((e) => {
-    const cat = normalizeCategory(e.categorie || "Autres");
+    const cat = normalizeCategory(e.categorie);
     map[cat] = (map[cat] || 0) + (e.montant_total || 0);
   });
   return Object.entries(map)
-    .map(([name, value]) => ({ name, value: Math.round(value * 100) / 100, color: getColor(name) }))
+    .map(([name, value]) => ({ name, value: Math.round(value * 100) / 100, color: getCategoryColor(name) }))
     .sort((a, b) => b.value - a.value);
 }
 
