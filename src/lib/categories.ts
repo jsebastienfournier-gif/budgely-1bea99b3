@@ -20,7 +20,7 @@ const CANONICAL: Record<string, string> = {
   abonnement: "Abonnements",
   epargne: "Épargne & Investissement",
   épargne: "Épargne & Investissement",
-  investissement: "Investissement" in {} ? "" : "Épargne & Investissement",
+  investissement: "Épargne & Investissement",
   "épargne & investissement": "Épargne & Investissement",
   "epargne & investissement": "Épargne & Investissement",
   divers: "Autre",
