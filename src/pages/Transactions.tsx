@@ -56,8 +56,8 @@ function buildDetections(thisMonth: Expense[], lastMonth: Expense[]): Detection[
   // Category increase
   const thisMap: Record<string, number> = {};
   const lastMap: Record<string, number> = {};
-  thisMonth.forEach((e) => { thisMap[e.categorie || "Autres"] = (thisMap[e.categorie || "Autres"] || 0) + (e.montant_total || 0); });
-  lastMonth.forEach((e) => { lastMap[e.categorie || "Autres"] = (lastMap[e.categorie || "Autres"] || 0) + (e.montant_total || 0); });
+  thisMonth.forEach((e) => { const c = normalizeCategory(e.categorie); thisMap[c] = (thisMap[c] || 0) + (e.montant_total || 0); });
+  lastMonth.forEach((e) => { const c = normalizeCategory(e.categorie); lastMap[c] = (lastMap[c] || 0) + (e.montant_total || 0); });
   Object.entries(thisMap).forEach(([cat, amt]) => {
     const prev = lastMap[cat] || 0;
     if (prev > 0) {
