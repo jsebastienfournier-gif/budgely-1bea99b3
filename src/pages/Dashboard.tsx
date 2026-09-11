@@ -17,8 +17,11 @@ const CATEGORY_COLORS: Record<string, string> = {
   Logement: "hsl(262, 60%, 55%)",
   Loisirs: "hsl(25, 90%, 55%)",
   Santé: "hsl(340, 70%, 55%)",
+  Shopping: "hsl(320, 65%, 55%)",
+  "Éducation": "hsl(45, 90%, 50%)",
   Abonnements: "hsl(250, 60%, 55%)",
   "Épargne & Investissement": "hsl(170, 60%, 45%)",
+  Autre: "hsl(215, 16%, 47%)",
   Autres: "hsl(215, 16%, 47%)",
 };
 
