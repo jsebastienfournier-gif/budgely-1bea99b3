@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, Receipt, CreditCard, Mail, Brain, Users, TrendingDown, BarChart3, Shield } from "lucide-react";
 import PricingSection from "@/components/PricingSection";
 import ContactSection from "@/components/ContactSection";
+import { useAuth } from "@/contexts/AuthContext";
 
 const fadeUp = {
   initial: { opacity: 0, y: 20 },
@@ -27,6 +28,14 @@ const features = [
 const Landing = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+
+  // Utilisateur déjà connecté : aller directement au tableau de bord
+  useEffect(() => {
+    if (!authLoading && user && !searchParams.toString()) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [authLoading, user, searchParams, navigate]);
 
   // Si un callback OAuth (Gmail/Outlook/Powens) atterrit sur "/", rediriger vers /receipts
   useEffect(() => {
