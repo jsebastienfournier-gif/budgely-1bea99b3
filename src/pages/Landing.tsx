@@ -76,7 +76,7 @@ const Landing = () => {
       </nav>
 
       {/* Hero */}
-      <section className="pt-32 pb-20 px-6">
+      <section className="pt-32 pb-20 px-6" style={{ paddingTop: "calc(8rem + env(safe-area-inset-top))" }}>
         <motion.div
           className="max-w-4xl mx-auto text-center"
           variants={stagger}
