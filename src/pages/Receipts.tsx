@@ -484,6 +484,75 @@ const Receipts = () => {
     }
   };
 
+  /**
+   * Le moteur d'analyse peut refuser un ticket parce qu'il le considère déjà connu
+   * de son côté, alors que la dépense n'a jamais été enregistrée dans l'application.
+   * On récupère alors la dépense existante et on l'enregistre ici.
+   */
+  const importExistingReceiptFromRailway = async (
+    parsed: any,
+    documentId: string,
+    source: "receipt" | "invoice",
+  ): Promise<boolean> => {
+    if (!user) return false;
+
+    const existingId =
+      parsed?.expense_id ?? parsed?.existing_id ?? parsed?.duplicate_id ?? parsed?.expense?.id ?? parsed?.id ?? null;
+
+    let remote: any = null;
+    try {
+      if (existingId) {
+        remote = await railwayFetch<any>(`/expenses/${existingId}`);
+      } else {
+        const recent = await railwayFetch<any[]>("/expenses/", { query: { limit: 50, skip: 0 } });
+        remote = Array.isArray(recent) ? recent[0] : null;
+      }
+    } catch (err) {
+      console.warn("[capture/duplicate] impossible de récupérer la dépense existante:", err);
+      return false;
+    }
+
+    if (!remote) return false;
+
+    const railwayId = String(remote.id ?? remote._id ?? existingId ?? "");
+    if (!railwayId) return false;
+
+    const { data: already } = await supabase
+      .from("expenses")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("railway_id", railwayId)
+      .maybeSingle();
+
+    if (already) return false;
+
+    const p = remote.parsed || {};
+    const { error } = await supabase.from("expenses").insert({
+      user_id: user.id,
+      document_id: documentId,
+      source,
+      source_id: railwayId,
+      railway_id: railwayId,
+      magasin: remote.magasin ?? p.magasin ?? null,
+      fournisseur: remote.fournisseur ?? remote.merchant ?? p.fournisseur ?? null,
+      date_expense: remote.date_expense ?? remote.date ?? p.date ?? null,
+      montant_total: remote.montant_total ?? remote.amount ?? p.montant_total ?? null,
+      devise: remote.devise ?? remote.currency ?? "EUR",
+      categorie: remote.categorie ?? remote.category ?? p.categorie ?? null,
+      description: remote.description ?? p.description ?? null,
+      articles: remote.articles ?? p.articles ?? [],
+      raw_ai_response: remote,
+    });
+
+    if (error) {
+      console.warn("[capture/duplicate] enregistrement impossible:", error.message);
+      return false;
+    }
+
+    return true;
+  };
+
+
   const reloadExpenses = async () => {
     if (!user) return;
     const { data } = await supabase
@@ -656,16 +725,23 @@ const Receipts = () => {
         console.log("[railway/expenses/upload] Response:", parsed);
 
         if (parsed?.status === "duplicate") {
+          const recovered = await importExistingReceiptFromRailway(parsed, doc.id, source as "receipt" | "invoice");
           await supabase
             .from("documents")
             .update({ status: "completed", error_message: parsed.message || "Doublon" })
             .eq("id", doc.id);
-          toast.info(parsed.message || "Dépense déjà enregistrée");
+          if (recovered) {
+            await reloadExpenses();
+            toast.success("Dépense retrouvée et ajoutée à vos dépenses");
+          } else {
+            toast.info(parsed.message || "Dépense déjà enregistrée");
+          }
           setUploading(false);
           setAnalysisProgress(0);
           setAnalysisStep("");
           return;
         }
+
       } catch (e: any) {
         console.error("[railway/expenses/upload] Error:", e);
         await supabase.from("documents").update({ status: "failed", error_message: e.message }).eq("id", doc.id);
