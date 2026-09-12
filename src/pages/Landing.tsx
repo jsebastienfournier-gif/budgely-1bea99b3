@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, Receipt, CreditCard, Mail, Brain, Users, TrendingDown, BarChart3, Shield } from "lucide-react";
 import PricingSection from "@/components/PricingSection";
 import ContactSection from "@/components/ContactSection";
+import PageMeta from "@/components/PageMeta";
 import { useAuth } from "@/contexts/AuthContext";
 
 const fadeUp = {
