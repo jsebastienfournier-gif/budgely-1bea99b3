@@ -63,6 +63,11 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen bg-background flex">
+      <PageMeta
+        title="Connexion — Budgely"
+        description="Connectez-vous ou créez votre compte Budgely pour suivre et optimiser vos dépenses."
+        path="/auth"
+      />
       {/* Left - Form */}
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <motion.div
