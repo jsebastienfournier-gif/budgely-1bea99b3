@@ -77,7 +77,12 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
           </div>
           <span className="text-base font-semibold text-foreground">Budgely</span>
         </Link>
-        <button onClick={() => setMobileOpen(!mobileOpen)} className="text-foreground">
+        <button
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className="text-foreground"
+          aria-label={mobileOpen ? "Fermer le menu" : "Ouvrir le menu"}
+          aria-expanded={mobileOpen}
+        >
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
       </div>
