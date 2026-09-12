@@ -54,6 +54,11 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <PageMeta
+        title="Budgely — Ton coach budget au quotidien"
+        description="Budgely analyse vos dépenses provenant de relevés bancaires, emails et tickets de caisse pour identifier des opportunités d'économies."
+        path="/"
+      />
       {/* Nav */}
       <nav
         className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border"
