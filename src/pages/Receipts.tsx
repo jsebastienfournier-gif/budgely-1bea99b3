@@ -779,7 +779,10 @@ const Receipts = () => {
             await reloadExpenses();
             toast.success("Dépense retrouvée et ajoutée à vos dépenses");
           } else {
-            toast.info(parsed.message || "Dépense déjà enregistrée");
+            toast.warning(
+              "Ce ticket est vu comme déjà analysé, mais la dépense est introuvable. Ajoutez-la manuellement ou supprimez-la côté analyse avant de rescanner.",
+            );
+
           }
           setUploading(false);
           setAnalysisProgress(0);
