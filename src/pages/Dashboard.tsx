@@ -256,7 +256,7 @@ const Dashboard = () => {
         {categoryData.length > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
             <motion.div {...fadeUp} className="bg-card rounded-2xl p-6 border border-border">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-6">Dépenses par catégorie</p>
+              <h2 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-6">Dépenses par catégorie</h2>
               <div className="flex items-center gap-6">
                 <div className="w-40 h-40">
                   <ResponsiveContainer width="100%" height="100%">
@@ -284,7 +284,7 @@ const Dashboard = () => {
             </motion.div>
 
             <motion.div {...fadeUp} className="bg-card rounded-2xl p-6 border border-border">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-6">Tendance mensuelle</p>
+              <h2 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-6">Tendance mensuelle</h2>
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={monthlyData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -305,7 +305,7 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
           {topMerchants.length > 0 && (
             <motion.div {...fadeUp} className="bg-card rounded-2xl p-6 border border-border">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Top commerçants</p>
+              <h2 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Top commerçants</h2>
               <div className="space-y-3">
                 {topMerchants.map((m) => (
                   <div key={m.name} className="flex items-center justify-between">
@@ -327,7 +327,7 @@ const Dashboard = () => {
 
           {categoryData.length > 0 && (
             <motion.div {...fadeUp} className="bg-card rounded-2xl p-6 border border-border">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-6">Par catégorie (barres)</p>
+              <h2 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-6">Par catégorie (barres)</h2>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={categoryData} layout="vertical">
                   <XAxis type="number" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
@@ -343,7 +343,7 @@ const Dashboard = () => {
         {/* Recent Activity */}
         {recentActivity.length > 0 && (
           <motion.div {...fadeUp} className="bg-card rounded-2xl p-6 border border-border">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Activité récente</p>
+            <h2 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Activité récente</h2>
             <div className="divide-y divide-border">
               {recentActivity.map((a) => (
                 <div key={a.id} className="grid grid-cols-[auto_1fr_auto] gap-4 py-3 items-center">

@@ -1427,7 +1427,7 @@ const Receipts = () => {
         {/* Receipt List */}
         <div className="bg-card rounded-2xl border border-border overflow-hidden">
           <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-            <p className="text-sm font-semibold text-foreground">Dépenses analysées</p>
+            <h2 className="text-sm font-semibold text-foreground">Dépenses analysées</h2>
             <Badge variant="secondary" className="text-xs">
               {expenses.length} résultat{expenses.length > 1 ? "s" : ""}
             </Badge>
