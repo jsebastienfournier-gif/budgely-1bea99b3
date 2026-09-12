@@ -1223,12 +1223,12 @@ const Receipts = () => {
               </div>
               <div className="flex-1 min-w-0">
                 {hasEmails ? (
-                  <p className="text-sm font-semibold text-foreground">
+                  <h2 className="text-sm font-semibold text-foreground">
                     📥 {emails.length} email{emails.length > 1 ? "s" : ""} connecté{emails.length > 1 ? "s" : ""}
-                  </p>
+                  </h2>
                 ) : (
                   <>
-                    <p className="text-sm font-semibold text-foreground">📥 Emails : connexion messagerie</p>
+                    <h2 className="text-sm font-semibold text-foreground">📥 Emails : connexion messagerie</h2>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       Importez automatiquement vos reçus depuis votre boîte mail
                     </p>
@@ -1317,9 +1317,9 @@ const Receipts = () => {
               <div className="flex-1 min-w-0">
                 {hasBanks && !canUseBank ? (
                   <>
-                    <p className="text-sm font-semibold text-muted-foreground">
+                    <h2 className="text-sm font-semibold text-muted-foreground">
                       🏦 {banks.length} compte{banks.length > 1 ? "s" : ""} · Suspendue
-                    </p>
+                    </h2>
                     <p className="text-xs text-muted-foreground mt-0.5 truncate">
                       {banks.map((b) => b.account_label || b.bank_name).join(", ")}
                     </p>
@@ -1333,20 +1333,20 @@ const Receipts = () => {
                   </>
                 ) : hasBanks ? (
                   <>
-                    <p className="text-sm font-semibold text-foreground">
+                    <h2 className="text-sm font-semibold text-foreground">
                       🏦 {banks.length} compte{banks.length > 1 ? "s" : ""} connecté{banks.length > 1 ? "s" : ""}
-                    </p>
+                    </h2>
                     <p className="text-xs text-muted-foreground mt-0.5 truncate">
                       {banks.map((b) => b.account_label || b.bank_name).join(", ")}
                     </p>
                   </>
                 ) : (
                   <>
-                    <p
+                    <h2
                       className={`text-sm font-semibold ${!canUseBank ? "text-muted-foreground" : "text-foreground"}`}
                     >
                       🏦 Banque : connexion sécurisée
-                    </p>
+                    </h2>
                     <p className="text-xs text-muted-foreground mt-1">
                       {!canUseBank
                         ? "Disponible dans les offres Essentiel et Premium"
@@ -1416,7 +1416,7 @@ const Receipts = () => {
                 <Coins className="h-6 w-6 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-foreground">💵 Espèces : saisie manuelle</p>
+                <h2 className="text-sm font-semibold text-foreground">💵 Espèces : saisie manuelle</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">Ajoutez vos dépenses réglées en espèces</p>
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />

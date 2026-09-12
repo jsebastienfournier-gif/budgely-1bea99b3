@@ -216,9 +216,9 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <motion.div {...fadeUp} className="bg-card rounded-2xl p-6 shadow-sm border border-border">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              <h2 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                 {viewMode === "month" ? "Dépenses du mois" : "Dépenses de l'année"}
-              </p>
+              </h2>
               <Wallet className="h-4 w-4 text-muted-foreground" />
             </div>
             <div className="flex items-baseline gap-2">
@@ -236,16 +236,16 @@ const Dashboard = () => {
 
           <motion.div {...fadeUp} transition={{ delay: 0.1 }} className="bg-card rounded-2xl p-6 shadow-sm border border-border">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              <h2 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                 {viewMode === "month" ? "Transactions ce mois" : "Transactions cette année"}
-              </p>
+              </h2>
             </div>
             <span className="text-3xl font-bold tracking-tight tabular-nums text-foreground">{scopedExpenses.length}</span>
           </motion.div>
 
           <motion.div {...fadeUp} transition={{ delay: 0.2 }} className="bg-card rounded-2xl p-6 shadow-sm border border-border">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Catégorie principale</p>
+              <h2 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Catégorie principale</h2>
               <Sparkles className="h-4 w-4 text-muted-foreground" />
             </div>
             <span className="text-xl font-bold text-foreground">{categoryData[0]?.name || "—"}</span>
