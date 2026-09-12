@@ -725,16 +725,23 @@ const Receipts = () => {
         console.log("[railway/expenses/upload] Response:", parsed);
 
         if (parsed?.status === "duplicate") {
+          const recovered = await importExistingReceiptFromRailway(parsed, doc.id, source as "receipt" | "invoice");
           await supabase
             .from("documents")
             .update({ status: "completed", error_message: parsed.message || "Doublon" })
             .eq("id", doc.id);
-          toast.info(parsed.message || "Dépense déjà enregistrée");
+          if (recovered) {
+            await reloadExpenses();
+            toast.success("Dépense retrouvée et ajoutée à vos dépenses");
+          } else {
+            toast.info(parsed.message || "Dépense déjà enregistrée");
+          }
           setUploading(false);
           setAnalysisProgress(0);
           setAnalysisStep("");
           return;
         }
+
       } catch (e: any) {
         console.error("[railway/expenses/upload] Error:", e);
         await supabase.from("documents").update({ status: "failed", error_message: e.message }).eq("id", doc.id);
