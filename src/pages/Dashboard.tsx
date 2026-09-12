@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { TrendingDown, TrendingUp, Wallet, Sparkles, Inbox, Loader2, Camera, PieChart as PieChartIcon, Lightbulb, ArrowRight } from "lucide-react";
+import { TrendingDown, TrendingUp, Wallet, Sparkles, Inbox, Loader2, Camera, PieChart as PieChartIcon, Lightbulb } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid,
@@ -79,19 +79,18 @@ const quickActions = [
 const QuickActions = () => (
   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
     {quickActions.map((a) => (
-      <Link key={a.to} to={a.to}>
+      <Link key={a.to} to={a.to} className="h-full">
         <motion.div
           whileHover={{ y: -2 }}
-          className="group flex items-center gap-4 bg-card rounded-2xl p-4 border border-border hover:border-primary/30 transition-colors cursor-pointer"
+          className="group flex items-center gap-4 bg-card rounded-2xl p-5 border border-border hover:border-primary/30 transition-colors cursor-pointer h-full"
         >
-          <div className={`h-10 w-10 rounded-xl bg-secondary flex items-center justify-center ${a.color}`}>
-            <a.icon className="h-5 w-5" />
+          <div className={`h-12 w-12 rounded-xl bg-secondary flex items-center justify-center ${a.color}`}>
+            <a.icon className="h-6 w-6" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-foreground">{a.label}</p>
-            <p className="text-xs text-muted-foreground">{a.desc}</p>
+            <p className="text-base font-semibold text-foreground">{a.label}</p>
+            <p className="text-sm text-muted-foreground">{a.desc}</p>
           </div>
-          <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
         </motion.div>
       </Link>
     ))}
