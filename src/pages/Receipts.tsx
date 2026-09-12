@@ -496,47 +496,91 @@ const Receipts = () => {
   ): Promise<boolean> => {
     if (!user) return false;
 
+    const toList = (res: any): any[] => {
+      if (Array.isArray(res)) return res;
+      if (Array.isArray(res?.items)) return res.items;
+      if (Array.isArray(res?.data)) return res.data;
+      if (Array.isArray(res?.results)) return res.results;
+      if (Array.isArray(res?.expenses)) return res.expenses;
+      return [];
+    };
+
+    const dup = parsed?.expense || parsed?.existing || parsed?.duplicate || parsed || {};
+    const dupParsed = dup?.parsed || {};
     const existingId =
-      parsed?.expense_id ?? parsed?.existing_id ?? parsed?.duplicate_id ?? parsed?.expense?.id ?? parsed?.id ?? null;
+      parsed?.expense_id ??
+      parsed?.existing_id ??
+      parsed?.duplicate_id ??
+      parsed?.expense?.id ??
+      dup?.id ??
+      dup?._id ??
+      null;
+
+    const dupAmount =
+      dup.amount ?? dup.montant_total ?? dupParsed.montant_total ?? parsed?.amount ?? parsed?.montant_total ?? null;
+    const dupMerchant =
+      dup.merchant ?? dup.fournisseur ?? dup.magasin ?? dupParsed.fournisseur ?? dupParsed.magasin ?? null;
 
     let remote: any = null;
-    try {
-      if (existingId) {
+
+    if (existingId) {
+      try {
         remote = await railwayFetch<any>(`/expenses/${existingId}`);
-      } else {
-        const recent = await railwayFetch<any[]>("/expenses/", { query: { limit: 50, skip: 0 } });
-        remote = Array.isArray(recent) ? recent[0] : null;
+      } catch (err) {
+        console.warn("[capture/duplicate] lecture par id impossible:", err);
       }
-    } catch (err) {
-      console.warn("[capture/duplicate] impossible de récupérer la dépense existante:", err);
-      return false;
+    }
+
+    if (!remote) {
+      try {
+        const recent = toList(await railwayFetch<any>("/expenses/", { query: { limit: 100, skip: 0 } }));
+        const matches = (e: any) => {
+          const amount = e.amount ?? e.montant_total ?? e.parsed?.montant_total ?? null;
+          const merchant = String(
+            e.merchant ?? e.fournisseur ?? e.magasin ?? e.parsed?.fournisseur ?? e.parsed?.magasin ?? "",
+          ).toLowerCase();
+          const amountOk =
+            dupAmount == null || (amount != null && Math.abs(Number(amount) - Number(dupAmount)) < 0.01);
+          const merchantOk =
+            !dupMerchant || (merchant && merchant.includes(String(dupMerchant).toLowerCase().slice(0, 5)));
+          return amountOk && merchantOk;
+        };
+        remote = recent.find(matches) ?? (dupAmount == null && !dupMerchant ? recent[0] : null);
+      } catch (err) {
+        console.warn("[capture/duplicate] liste indisponible:", err);
+      }
+    }
+
+    // Dernier recours : les infos contenues dans la réponse de doublon elle-même.
+    if (!remote && (dupAmount != null || dupMerchant)) {
+      remote = dup;
     }
 
     if (!remote) return false;
 
-    const railwayId = String(remote.id ?? remote._id ?? existingId ?? "");
-    if (!railwayId) return false;
-
-    const { data: already } = await supabase
-      .from("expenses")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("railway_id", railwayId)
-      .maybeSingle();
-
-    if (already) return false;
-
+    const railwayId = remote.id ?? remote._id ?? existingId ?? null;
     const p = remote.parsed || {};
+
+    if (railwayId) {
+      const { data: already } = await supabase
+        .from("expenses")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("railway_id", String(railwayId))
+        .maybeSingle();
+      if (already) return false;
+    }
+
     const { error } = await supabase.from("expenses").insert({
       user_id: user.id,
       document_id: documentId,
       source,
-      source_id: railwayId,
-      railway_id: railwayId,
+      source_id: railwayId ? String(railwayId) : null,
+      railway_id: railwayId ? String(railwayId) : null,
       magasin: remote.magasin ?? p.magasin ?? null,
-      fournisseur: remote.fournisseur ?? remote.merchant ?? p.fournisseur ?? null,
+      fournisseur: remote.fournisseur ?? remote.merchant ?? p.fournisseur ?? dupMerchant ?? null,
       date_expense: remote.date_expense ?? remote.date ?? p.date ?? null,
-      montant_total: remote.montant_total ?? remote.amount ?? p.montant_total ?? null,
+      montant_total: remote.montant_total ?? remote.amount ?? p.montant_total ?? dupAmount ?? null,
       devise: remote.devise ?? remote.currency ?? "EUR",
       categorie: remote.categorie ?? remote.category ?? p.categorie ?? null,
       description: remote.description ?? p.description ?? null,
@@ -551,6 +595,7 @@ const Receipts = () => {
 
     return true;
   };
+
 
 
   const reloadExpenses = async () => {
@@ -734,7 +779,10 @@ const Receipts = () => {
             await reloadExpenses();
             toast.success("Dépense retrouvée et ajoutée à vos dépenses");
           } else {
-            toast.info(parsed.message || "Dépense déjà enregistrée");
+            toast.warning(
+              "Ce ticket est vu comme déjà analysé, mais la dépense est introuvable. Ajoutez-la manuellement ou supprimez-la côté analyse avant de rescanner.",
+            );
+
           }
           setUploading(false);
           setAnalysisProgress(0);
