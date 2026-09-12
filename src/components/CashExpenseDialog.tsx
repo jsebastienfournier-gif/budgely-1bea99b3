@@ -29,7 +29,7 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   Transport: ["sncf", "ratp", "uber", "bolt", "taxi", "essence", "total", "shell", "bp", "esso", "station", "parking", "blablacar", "ouigo", "trainline"],
   Logement: ["edf", "engie", "veolia", "suez", "loyer", "syndic", "leroy merlin", "castorama", "bricorama", "ikea"],
   Loisirs: ["cinema", "ugc", "pathe", "gaumont", "spotify", "deezer", "fnac", "decathlon", "concert", "theatre"],
-  Shopping: ["amazon", "zara", "h&m", "uniqlo", "zalando", "veepee", "shein", "asos"],
+  Shopping: ["amazon", "zara", "h&m", "uniqlo", "zalando", "veepee", "shein", "asos", "bexley"],
   Santé: ["pharmacie", "pharma", "medecin", "docteur", "dentiste", "hopital", "clinique", "laboratoire"],
   Abonnements: ["netflix", "prime video", "disney", "canal", "orange", "free", "sfr", "bouygues", "spotify", "icloud", "google one"],
   Éducation: ["udemy", "coursera", "ecole", "universite", "librairie"],
@@ -50,9 +50,16 @@ interface CashExpenseDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onExpenseAdded?: (expense: any) => void;
+  // FIX : données pré-remplies depuis un ticket rejeté (date manquante)
+  prefill?: {
+    merchant?: string;
+    amount?: number;
+    articles?: Array<{ nom: string; quantite: number; prix_unitaire: number; prix_total: number }>;
+    categorie?: string;
+  };
 }
 
-const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDialogProps) => {
+const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded, prefill }: CashExpenseDialogProps) => {
   const { user } = useAuth();
   const [saving, setSaving] = useState(false);
   const [date, setDate] = useState<Date>(new Date());
@@ -63,15 +70,47 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
   const [detecting, setDetecting] = useState(false);
   const [articles, setArticles] = useState<ArticleRow[]>([{ name: "", qty: 1, unitPrice: 0 }]);
 
+  // FIX : pré-remplir les champs si prefill est fourni
+  useEffect(() => {
+    if (open && prefill) {
+      if (prefill.merchant) setLocation(prefill.merchant);
+
+      if (prefill.articles && prefill.articles.length > 0) {
+        setArticles(prefill.articles.map(a => ({
+          name: a.nom || "",
+          qty: a.quantite || 1,
+          unitPrice: a.prix_unitaire || (a.prix_total / (a.quantite || 1)) || 0,
+        })));
+      } else if (prefill.amount && prefill.amount > 0) {
+        // Si pas d'articles mais montant connu, créer un article générique
+        setArticles([{
+          name: prefill.merchant || "Article",
+          qty: 1,
+          unitPrice: prefill.amount,
+        }]);
+      }
+
+      if (prefill.categorie) {
+        setCategorie(prefill.categorie);
+        setCategorieAuto(true);
+      } else if (prefill.merchant) {
+        const guessed = guessCategoryLocal(prefill.merchant);
+        if (guessed) {
+          setCategorie(guessed);
+          setCategorieAuto(true);
+        }
+      }
+    }
+  }, [open, prefill]);
+
   // Auto-détection de la catégorie depuis le nom du commerçant
   useEffect(() => {
     const name = location.trim();
-    if (!name || categorieTouched) return;
+    if (!name || categorieTouched || (prefill?.merchant && location === prefill.merchant)) return;
     let cancelled = false;
     setDetecting(true);
     const timer = setTimeout(async () => {
       try {
-        // 1) Lookup merchant_profiles (apprentissage)
         const normalized = normalizeName(name);
         const { data: profiles } = await supabase
           .from("merchant_profiles")
@@ -81,7 +120,6 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
           .limit(1);
         let detected = profiles?.[0]?.category as string | undefined;
 
-        // 2) Fallback : mots-clés locaux
         if (!detected) detected = guessCategoryLocal(name) || undefined;
 
         if (!cancelled && detected && CATEGORIES.includes(detected)) {
@@ -97,12 +135,15 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
     return () => { cancelled = true; clearTimeout(timer); };
   }, [location, categorieTouched]);
 
-  // Reset détection quand le formulaire est fermé
+  // Reset quand le formulaire est fermé
   useEffect(() => {
     if (!open) {
       setCategorie("");
       setCategorieAuto(false);
       setCategorieTouched(false);
+      setLocation("");
+      setDate(new Date());
+      setArticles([{ name: "", qty: 1, unitPrice: 0 }]);
     }
   }, [open]);
 
@@ -143,16 +184,16 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
         date_expense: format(date, "yyyy-MM-dd"),
         montant_total: totalAmount,
         articles: formattedArticles as any,
-        moyen_paiement: "espèces",
+        moyen_paiement: prefill ? "carte" : "espèces",
         type_depense: "achat",
         categorie: categorie || "Autre",
         devise: "EUR",
-        description: `Dépense espèces — ${location.trim()}`,
+        description: `Dépense ${prefill ? "ticket" : "espèces"} — ${location.trim()}`,
       }).select().single();
 
       if (error) throw error;
 
-      // Synchronisation Railway (best-effort) — récupère l'ID Railway et le stocke
+      // Synchronisation Railway (best-effort)
       try {
         const railwayResp = await railwayFetch<{ id?: string }>("/expenses/", {
           method: "POST",
@@ -162,32 +203,24 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
             merchant: location.trim(),
             category: (categorie || "Autre").toLowerCase(),
             date: format(date, "yyyy-MM-dd"),
-            description: `Dépense espèces — ${location.trim()}`,
+            description: `Dépense ${prefill ? "ticket" : "espèces"} — ${location.trim()}`,
           },
         });
         const railwayId = railwayResp?.id;
         if (railwayId && data?.id) {
-          const { error: updErr } = await supabase
+          await supabase
             .from("expenses")
             .update({ railway_id: railwayId } as any)
             .eq("id", data.id);
-          if (updErr) console.warn("[railway/expenses/post] update railway_id failed:", updErr);
-          else (data as any).railway_id = railwayId;
+          (data as any).railway_id = railwayId;
         }
       } catch (e) {
         console.warn("[railway/expenses/post] failed:", e);
       }
 
-      toast.success("Dépense en espèces ajoutée !");
+      toast.success(prefill ? "Dépense enregistrée avec la date corrigée !" : "Dépense en espèces ajoutée !");
       onExpenseAdded?.(data);
 
-      // Reset form
-      setLocation("");
-      setDate(new Date());
-      setArticles([{ name: "", qty: 1, unitPrice: 0 }]);
-      setCategorie("");
-      setCategorieAuto(false);
-      setCategorieTouched(false);
       onOpenChange(false);
     } catch (err: any) {
       toast.error(err.message || "Erreur lors de l'enregistrement");
@@ -204,20 +237,36 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Coins className="h-5 w-5 text-primary" />
-            Dépense en espèces
+            {prefill ? "Compléter la dépense" : "Dépense en espèces"}
           </DialogTitle>
-          <DialogDescription>Saisissez manuellement une dépense réglée en espèces.</DialogDescription>
+          <DialogDescription>
+            {prefill
+              ? `Ticket détecté : ${prefill.merchant || "inconnu"} — ${prefill.amount?.toFixed(2) ?? "?"}€. Seule la date n'a pas pu être lue — sélectionnez-la pour enregistrer.`
+              : "Saisissez manuellement une dépense réglée en espèces."
+            }
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 mt-2">
-          {/* Date */}
+          {/* Date — mise en avant si prefill */}
           <div>
-            <Label className="text-sm font-medium mb-1.5 block">Date</Label>
+            <Label className="text-sm font-medium mb-1.5 block">
+              Date {prefill && <span className="text-destructive">*</span>}
+            </Label>
+            {prefill && (
+              <p className="text-xs text-muted-foreground mb-1.5">
+                La date n'a pas pu être lue sur le ticket — sélectionnez-la manuellement.
+              </p>
+            )}
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className={cn("w-full justify-start text-left font-normal", !date && "text-muted-foreground")}
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !date && "text-muted-foreground",
+                    prefill && "border-primary ring-1 ring-primary/30"
+                  )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {date ? format(date, "PPP", { locale: fr }) : "Choisir une date"}
@@ -248,7 +297,7 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded }: CashExpenseDi
             />
           </div>
 
-          {/* Catégorie (auto-détectée, modifiable) */}
+          {/* Catégorie */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <Label className="text-sm font-medium">Catégorie</Label>
