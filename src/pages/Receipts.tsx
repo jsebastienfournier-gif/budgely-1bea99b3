@@ -769,6 +769,19 @@ const Receipts = () => {
         });
         console.log("[railway/expenses/upload] Response:", parsed);
 
+        if (parsed?.status === "rejected") {
+          // Données insuffisantes (date ou montant manquant) — pas un doublon
+          await supabase
+            .from("documents")
+            .update({ status: "failed", error_message: parsed.message || "Données insuffisantes" })
+            .eq("id", doc.id);
+          toast.error("Impossible d'analyser ce ticket : date ou montant non détecté. Ajoutez la dépense manuellement.");
+          setUploading(false);
+          setAnalysisProgress(0);
+          setAnalysisStep("");
+          return;
+        }
+
         if (parsed?.status === "duplicate") {
           const recovered = await importExistingReceiptFromRailway(parsed, doc.id, source as "receipt" | "invoice");
           await supabase
@@ -782,7 +795,6 @@ const Receipts = () => {
             toast.warning(
               "Ce ticket est vu comme déjà analysé, mais la dépense est introuvable. Ajoutez-la manuellement ou supprimez-la côté analyse avant de rescanner.",
             );
-
           }
           setUploading(false);
           setAnalysisProgress(0);
