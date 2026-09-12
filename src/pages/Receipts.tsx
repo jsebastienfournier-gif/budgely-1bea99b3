@@ -139,6 +139,8 @@ const Receipts = () => {
   const [saving, setSaving] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
   const [showCashDialog, setShowCashDialog] = useState(false);
+  // FIX : données pré-remplies depuis un ticket rejeté (date manquante)
+  const [cashPrefill, setCashPrefill] = useState<{ merchant?: string; amount?: number; articles?: any[]; categorie?: string } | undefined>(undefined);
   const [rawExpenses, setRawExpenses] = useState<any[]>([]);
   const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set());
   const [editingExpense, setEditingExpense] = useState<any | null>(null);
@@ -770,12 +772,19 @@ const Receipts = () => {
         console.log("[railway/expenses/upload] Response:", parsed);
 
         if (parsed?.status === "rejected") {
-          // Données insuffisantes (date ou montant manquant) — pas un doublon
+          // Date manquante — ouvrir le dialog pré-rempli avec les données disponibles
           await supabase
             .from("documents")
-            .update({ status: "failed", error_message: parsed.message || "Données insuffisantes" })
+            .update({ status: "failed", error_message: parsed.message || "Date non détectée" })
             .eq("id", doc.id);
-          toast.error("Impossible d'analyser ce ticket : date ou montant non détecté. Ajoutez la dépense manuellement.");
+          const p = parsed?.parsed || {};
+          const merchant = p.magasin || p.fournisseur || null;
+          const amount = p.montant_total || null;
+          const articles = p.articles?.length > 0 ? p.articles : null;
+          const categorie = p.categorie || null;
+          setCashPrefill({ merchant, amount, articles, categorie });
+          setShowCashDialog(true);
+          toast.info("Date non détectée sur le ticket — complétez-la manuellement.");
           setUploading(false);
           setAnalysisProgress(0);
           setAnalysisStep("");
@@ -2027,8 +2036,9 @@ const Receipts = () => {
 
       {/* Cash expense dialog */}
       <CashExpenseDialog
+        prefill={cashPrefill}
         open={showCashDialog}
-        onOpenChange={setShowCashDialog}
+        onOpenChange={(open) => { setShowCashDialog(open); if (!open) setCashPrefill(undefined); }}
         onExpenseAdded={(data) => {
           const articles = (data.articles || []).map((a: any) => ({
             name: a.nom || a.name || "",
