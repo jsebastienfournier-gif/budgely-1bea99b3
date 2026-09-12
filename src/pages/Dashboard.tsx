@@ -7,6 +7,7 @@ import {
 } from "recharts";
 import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
+import PageMeta from "@/components/PageMeta";
 import { useExpenses, Expense } from "@/hooks/useExpenses";
 import { format, subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -163,6 +164,7 @@ const Dashboard = () => {
   if (loading) {
     return (
       <AppLayout>
+      <PageMeta title="Tableau de bord — Budgely" description="Suivez vos dépenses du mois et votre budget en un coup d'œil." path="/dashboard" noindex />
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>

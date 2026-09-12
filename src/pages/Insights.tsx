@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
+import PageMeta from "@/components/PageMeta";
 import PremiumCTA from "@/components/PremiumCTA";
 import { useExpenses, Expense } from "@/hooks/useExpenses";
 import { startOfMonth, endOfMonth, subMonths, parseISO } from "date-fns";
@@ -137,6 +138,7 @@ const Insights = () => {
 
   return (
     <AppLayout>
+    <PageMeta title="Optimisations — Budgely" description="Suggestions concrètes pour réduire vos dépenses." path="/insights" noindex />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl font-bold text-foreground">Optimisation</h1>

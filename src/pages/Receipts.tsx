@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import AppLayout from "@/components/AppLayout";
+import PageMeta from "@/components/PageMeta";
 import PremiumCTA from "@/components/PremiumCTA";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
@@ -1100,6 +1101,7 @@ const Receipts = () => {
 
   return (
     <AppLayout>
+    <PageMeta title="Capture des dépenses — Budgely" description="Scannez vos tickets, importez vos factures et synchronisez vos dépenses." path="/receipts" noindex />
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>

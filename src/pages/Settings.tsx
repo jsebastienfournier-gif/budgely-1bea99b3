@@ -5,6 +5,7 @@ import {
   Plus, Trash2, Lock, Eye, EyeOff, LogOut, Pencil, X, Mail, Landmark
 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
+import PageMeta from "@/components/PageMeta";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -662,6 +663,7 @@ const Settings = () => {
 
   return (
     <AppLayout>
+    <PageMeta title="Paramètres — Budgely" description="Gérez votre compte, vos connexions et vos préférences." path="/settings" noindex />
       <div className="max-w-3xl mx-auto px-6 py-8">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-foreground">Paramètres</h1>

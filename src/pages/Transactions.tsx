@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Inbox, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
+import PageMeta from "@/components/PageMeta";
 import PremiumCTA from "@/components/PremiumCTA";
 import { useExpenses, Expense } from "@/hooks/useExpenses";
 import { startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, subYears, parseISO } from "date-fns";
@@ -168,6 +169,7 @@ const Transactions = () => {
 
   return (
     <AppLayout>
+    <PageMeta title="Analyses — Budgely" description="Analysez vos dépenses par catégorie, mois et année." path="/transactions" noindex />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="flex items-center justify-between mb-6 sm:mb-8">
           <div>

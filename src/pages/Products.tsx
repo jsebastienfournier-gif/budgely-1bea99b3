@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { TrendingDown, ArrowRight } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import AppLayout from "@/components/AppLayout";
+import PageMeta from "@/components/PageMeta";
 
 const products = [
   { name: "Lait demi-écrémé", brand: "Lactel", price: "€1.45", frequency: "4x/mois", merchant: "Carrefour", alt: "Marque Repère — €0.89", savings: "€2.24/mois" },
@@ -25,6 +26,7 @@ const topProducts = [
 const Products = () => {
   return (
     <AppLayout>
+    <PageMeta title="Produits — Budgely" description="Détail des produits achetés et comparatif des prix." path="/products" noindex />
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-foreground">Analyse produits</h1>
