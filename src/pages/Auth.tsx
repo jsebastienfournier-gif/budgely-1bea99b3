@@ -5,6 +5,7 @@ import { BarChart3, Mail, Lock, ArrowRight, User, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { toast } from "sonner";
+import PageMeta from "@/components/PageMeta";
 import { useAuth } from "@/contexts/AuthContext";
 
 const Auth = () => {
@@ -62,6 +63,11 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen bg-background flex">
+      <PageMeta
+        title="Connexion — Budgely"
+        description="Connectez-vous ou créez votre compte Budgely pour suivre et optimiser vos dépenses."
+        path="/auth"
+      />
       {/* Left - Form */}
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <motion.div

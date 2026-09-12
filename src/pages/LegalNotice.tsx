@@ -1,9 +1,15 @@
 import { Link } from "react-router-dom";
 import { ArrowLeft, BarChart3 } from "lucide-react";
 import { motion } from "framer-motion";
+import PageMeta from "@/components/PageMeta";
 
 const LegalNotice = () => (
   <div className="min-h-screen bg-background">
+    <PageMeta
+      title="Mentions légales — Budgely"
+      description="Mentions légales du site Budgely : éditeur, hébergement, propriété intellectuelle et responsabilité."
+      path="/mentions-legales"
+    />
     <nav className="border-b border-border bg-background/80 backdrop-blur-xl">
       <div className="max-w-4xl mx-auto px-6 h-16 flex items-center gap-4">
         <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">

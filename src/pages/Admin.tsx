@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Shield, UserCog, Loader2, Crown, Wrench, BarChart3, MessageSquare, Eye, Ban, Bell, Mail, CreditCard, ScrollText, RefreshCw } from "lucide-react";
 import { railwayFetch } from "@/lib/railway-api";
 import AppLayout from "@/components/AppLayout";
+import PageMeta from "@/components/PageMeta";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -103,6 +104,7 @@ const Admin = () => {
   if (isAdmin === false) {
     return (
       <AppLayout>
+      <PageMeta title="Administration — Budgely" description="Espace d'administration Budgely." path="/admin" noindex />
         <div className="flex flex-col items-center justify-center h-full min-h-[60vh] gap-4">
           <div className="h-14 w-14 rounded-2xl bg-destructive/10 flex items-center justify-center">
             <Shield className="h-7 w-7 text-destructive" />

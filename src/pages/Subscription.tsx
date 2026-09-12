@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import PageMeta from "@/components/PageMeta";
 import PricingSection from "@/components/PricingSection";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useCheckout } from "@/hooks/useCheckout";
@@ -43,6 +44,12 @@ const Subscription = () => {
 
   return (
     <AppLayout>
+      <PageMeta
+        title="Mon offre — Budgely"
+        description="Gérez votre abonnement Budgely et découvrez les formules Découverte, Essentiel et Premium."
+        path="/subscription"
+        noindex
+      />
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="mb-2">
           <h1 className="text-2xl font-bold text-foreground">Mon offre</h1>
