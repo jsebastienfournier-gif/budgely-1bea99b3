@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { CalendarIcon, Plus, Trash2, Loader2, Check, Coins, Sparkles } from "lucide-react";
+import { CalendarIcon, Plus, Trash2, Loader2, Check, Coins, Sparkles, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,53 +9,38 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { railwayFetch } from "@/lib/railway-api";
 import { toast } from "sonner";
 
-const CATEGORIES = [
-  "Alimentation", "Transport", "Logement", "Santé", "Loisirs",
-  "Shopping", "Éducation", "Abonnements",
-  "Épargne & Investissement", "Autre",
-];
-
-const normalizeName = (s: string) =>
-  s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
-
-const CATEGORY_KEYWORDS: Record<string, string[]> = {
-  Alimentation: ["carrefour", "leclerc", "auchan", "lidl", "aldi", "monoprix", "franprix", "intermarche", "casino", "super u", "picard", "boulangerie", "boucherie", "primeur", "marche", "restaurant", "resto", "mcdo", "mcdonald", "kfc", "burger", "subway", "starbucks", "cafe", "brasserie", "pizzeria", "pizza", "kebab", "sushi", "uber eats", "deliveroo"],
-  Transport: ["sncf", "ratp", "uber", "bolt", "taxi", "essence", "total", "shell", "bp", "esso", "station", "parking", "blablacar", "ouigo", "trainline"],
-  Logement: ["edf", "engie", "veolia", "suez", "loyer", "syndic", "leroy merlin", "castorama", "bricorama", "ikea"],
-  Loisirs: ["cinema", "ugc", "pathe", "gaumont", "spotify", "deezer", "fnac", "decathlon", "concert", "theatre"],
-  Shopping: ["amazon", "zara", "h&m", "uniqlo", "zalando", "veepee", "shein", "asos", "bexley"],
-  Santé: ["pharmacie", "pharma", "medecin", "docteur", "dentiste", "hopital", "clinique", "laboratoire"],
-  Abonnements: ["netflix", "prime video", "disney", "canal", "orange", "free", "sfr", "bouygues", "spotify", "icloud", "google one"],
-  Éducation: ["udemy", "coursera", "ecole", "universite", "librairie"],
+type ArticleRow = {
+  name: string;
+  qty: number;
+  unitPrice: number;
+  category: string;
+  subcategory: string;
 };
 
-const guessCategoryLocal = (name: string): string | null => {
-  const n = normalizeName(name);
-  if (!n) return null;
-  for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-    if (keywords.some(k => n.includes(k))) return cat;
-  }
-  return null;
-};
-
-type ArticleRow = { name: string; qty: number; unitPrice: number };
+interface TaxonomyData {
+  categories: string[];
+  taxonomy: Record<string, string[]>;
+  optional_categories: string[];
+}
 
 interface CashExpenseDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onExpenseAdded?: (expense: any) => void;
-  // FIX : données pré-remplies depuis un ticket rejeté (date manquante)
   prefill?: {
     merchant?: string;
     amount?: number;
+    date?: string;
     articles?: Array<{ nom: string; quantite: number; prix_unitaire: number; prix_total: number }>;
     categorie?: string;
+    missingDate?: boolean;
   };
 }
 
@@ -64,103 +49,69 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded, prefill }: Cash
   const [saving, setSaving] = useState(false);
   const [date, setDate] = useState<Date>(new Date());
   const [location, setLocation] = useState("");
-  const [categorie, setCategorie] = useState<string>("");
-  const [categorieAuto, setCategorieAuto] = useState(false);
-  const [categorieTouched, setCategorieTouched] = useState(false);
-  const [detecting, setDetecting] = useState(false);
-  const [articles, setArticles] = useState<ArticleRow[]>([{ name: "", qty: 1, unitPrice: 0 }]);
+  const [globalCategory, setGlobalCategory] = useState("");
+  const [globalSubcategory, setGlobalSubcategory] = useState("");
+  const [articles, setArticles] = useState<ArticleRow[]>([{ name: "", qty: 1, unitPrice: 0, category: "", subcategory: "" }]);
+  const [taxonomy, setTaxonomy] = useState<TaxonomyData | null>(null);
 
-  // FIX : pré-remplir les champs si prefill est fourni
+  // Charger la taxonomie depuis le backend
+  useEffect(() => {
+    railwayFetch<TaxonomyData>("/taxonomy").then(setTaxonomy).catch(console.error);
+  }, []);
+
+  // Pré-remplir depuis le parser
   useEffect(() => {
     if (open && prefill) {
       if (prefill.merchant) setLocation(prefill.merchant);
+
+      if (prefill.date) {
+        try { setDate(new Date(prefill.date)); } catch {}
+      }
 
       if (prefill.articles && prefill.articles.length > 0) {
         setArticles(prefill.articles.map(a => ({
           name: a.nom || "",
           qty: a.quantite || 1,
           unitPrice: a.prix_unitaire || (a.prix_total / (a.quantite || 1)) || 0,
+          category: "",
+          subcategory: "",
         })));
       } else if (prefill.amount && prefill.amount > 0) {
-        // Si pas d'articles mais montant connu, créer un article générique
-        setArticles([{
-          name: prefill.merchant || "Article",
-          qty: 1,
-          unitPrice: prefill.amount,
-        }]);
+        setArticles([{ name: prefill.merchant || "Article", qty: 1, unitPrice: prefill.amount, category: "", subcategory: "" }]);
       }
 
-      if (prefill.categorie) {
-        setCategorie(prefill.categorie);
-        setCategorieAuto(true);
-      } else if (prefill.merchant) {
-        const guessed = guessCategoryLocal(prefill.merchant);
-        if (guessed) {
-          setCategorie(guessed);
-          setCategorieAuto(true);
-        }
+      if (prefill.categorie && taxonomy) {
+        const matched = taxonomy.categories.find(c => c.toLowerCase() === prefill.categorie?.toLowerCase());
+        if (matched) setGlobalCategory(matched);
       }
     }
-  }, [open, prefill]);
+  }, [open, prefill, taxonomy]);
 
-  // Auto-détection de la catégorie depuis le nom du commerçant
-  useEffect(() => {
-    const name = location.trim();
-    if (!name || categorieTouched || (prefill?.merchant && location === prefill.merchant)) return;
-    let cancelled = false;
-    setDetecting(true);
-    const timer = setTimeout(async () => {
-      try {
-        const normalized = normalizeName(name);
-        const { data: profiles } = await supabase
-          .from("merchant_profiles")
-          .select("category, confidence")
-          .eq("normalized_name", normalized)
-          .order("confidence", { ascending: false })
-          .limit(1);
-        let detected = profiles?.[0]?.category as string | undefined;
-
-        if (!detected) detected = guessCategoryLocal(name) || undefined;
-
-        if (!cancelled && detected && CATEGORIES.includes(detected)) {
-          setCategorie(detected);
-          setCategorieAuto(true);
-        }
-      } catch (e) {
-        console.warn("[category/detect] failed:", e);
-      } finally {
-        if (!cancelled) setDetecting(false);
-      }
-    }, 400);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [location, categorieTouched]);
-
-  // Reset quand le formulaire est fermé
+  // Reset à la fermeture
   useEffect(() => {
     if (!open) {
-      setCategorie("");
-      setCategorieAuto(false);
-      setCategorieTouched(false);
-      setLocation("");
       setDate(new Date());
-      setArticles([{ name: "", qty: 1, unitPrice: 0 }]);
+      setLocation("");
+      setGlobalCategory("");
+      setGlobalSubcategory("");
+      setArticles([{ name: "", qty: 1, unitPrice: 0, category: "", subcategory: "" }]);
     }
   }, [open]);
 
-  const addArticle = () => setArticles(prev => [...prev, { name: "", qty: 1, unitPrice: 0 }]);
+  const addArticle = () => setArticles(prev => [...prev, { name: "", qty: 1, unitPrice: 0, category: "", subcategory: "" }]);
 
-  const removeArticle = (index: number) => {
+  const removeArticle = (i: number) => {
     if (articles.length <= 1) return;
-    setArticles(prev => prev.filter((_, i) => i !== index));
+    setArticles(prev => prev.filter((_, idx) => idx !== i));
   };
 
-  const updateArticle = (index: number, field: keyof ArticleRow, value: string | number) => {
-    setArticles(prev => prev.map((a, i) => i === index ? { ...a, [field]: value } : a));
+  const updateArticle = (i: number, field: keyof ArticleRow, value: string | number) => {
+    setArticles(prev => prev.map((a, idx) => idx === i ? { ...a, [field]: value, ...(field === "category" ? { subcategory: "" } : {}) } : a));
   };
 
   const totalAmount = articles.reduce((sum, a) => sum + (a.qty * a.unitPrice), 0);
-
-  const isValid = location.trim().length > 0 && articles.some(a => a.name.trim() && a.unitPrice > 0);
+  const isValid = location.trim().length > 0 && articles.some(a => a.unitPrice > 0);
+  const hasMultipleArticles = articles.length > 1;
 
   const handleSubmit = async () => {
     if (!user || !isValid) return;
@@ -168,13 +119,14 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded, prefill }: Cash
 
     try {
       const formattedArticles = articles
-        .filter(a => a.name.trim())
+        .filter(a => a.unitPrice > 0)
         .map(a => ({
-          nom: a.name.trim(),
+          nom: a.name.trim() || location.trim(),
           quantite: a.qty,
-          unite: "pce",
           prix_unitaire: a.unitPrice,
           prix_total: a.qty * a.unitPrice,
+          category: a.category || globalCategory || "",
+          subcategory: a.subcategory || globalSubcategory || "",
         }));
 
       const { data, error } = await supabase.from("expenses").insert({
@@ -186,14 +138,15 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded, prefill }: Cash
         articles: formattedArticles as any,
         moyen_paiement: prefill ? "carte" : "espèces",
         type_depense: "achat",
-        categorie: categorie || "Autre",
+        categorie: globalCategory || formattedArticles[0]?.category || "Autre",
+        sous_categorie: globalSubcategory || formattedArticles[0]?.subcategory || "",
         devise: "EUR",
-        description: `Dépense ${prefill ? "ticket" : "espèces"} — ${location.trim()}`,
+        description: `${location.trim()} — ${format(date, "dd/MM/yyyy")}`,
       }).select().single();
 
       if (error) throw error;
 
-      // Synchronisation Railway (best-effort)
+      // Sync Railway
       try {
         const railwayResp = await railwayFetch<{ id?: string }>("/expenses/", {
           method: "POST",
@@ -201,26 +154,21 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded, prefill }: Cash
             amount: Number(totalAmount.toFixed(2)),
             currency: "EUR",
             merchant: location.trim(),
-            category: (categorie || "Autre").toLowerCase(),
+            category: (globalCategory || "autre").toLowerCase(),
+            subcategory: globalSubcategory || "",
             date: format(date, "yyyy-MM-dd"),
-            description: `Dépense ${prefill ? "ticket" : "espèces"} — ${location.trim()}`,
+            description: `${location.trim()} — ${format(date, "dd/MM/yyyy")}`,
           },
         });
-        const railwayId = railwayResp?.id;
-        if (railwayId && data?.id) {
-          await supabase
-            .from("expenses")
-            .update({ railway_id: railwayId } as any)
-            .eq("id", data.id);
-          (data as any).railway_id = railwayId;
+        if (railwayResp?.id && data?.id) {
+          await supabase.from("expenses").update({ railway_id: railwayResp.id } as any).eq("id", data.id);
         }
       } catch (e) {
         console.warn("[railway/expenses/post] failed:", e);
       }
 
-      toast.success(prefill ? "Dépense enregistrée avec la date corrigée !" : "Dépense en espèces ajoutée !");
+      toast.success("Dépense enregistrée !");
       onExpenseAdded?.(data);
-
       onOpenChange(false);
     } catch (err: any) {
       toast.error(err.message || "Erreur lors de l'enregistrement");
@@ -229,7 +177,8 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded, prefill }: Cash
     }
   };
 
-  const inputClass = "w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all";
+  const categories = taxonomy?.categories || [];
+  const getSubcategories = (cat: string) => taxonomy?.taxonomy[cat] || [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -237,109 +186,77 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded, prefill }: Cash
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Coins className="h-5 w-5 text-primary" />
-            {prefill ? "Compléter la dépense" : "Dépense en espèces"}
+            {prefill ? "Vérifier & enregistrer" : "Dépense en espèces"}
           </DialogTitle>
           <DialogDescription>
-            {prefill
-              ? `Ticket détecté : ${prefill.merchant || "inconnu"} — ${prefill.amount?.toFixed(2) ?? "?"}€. Seule la date n'a pas pu être lue — sélectionnez-la pour enregistrer.`
+            {prefill?.missingDate
+              ? `Ticket détecté : ${prefill.merchant || "inconnu"} — ${prefill.amount?.toFixed(2) ?? "?"}€. Vérifiez et complétez les informations.`
+              : prefill
+              ? `Vérifiez les informations extraites du ticket avant d'enregistrer.`
               : "Saisissez manuellement une dépense réglée en espèces."
             }
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 mt-2">
-          {/* Date — mise en avant si prefill */}
+
+          {/* Date */}
           <div>
             <Label className="text-sm font-medium mb-1.5 block">
-              Date {prefill && <span className="text-destructive">*</span>}
+              Date {prefill?.missingDate && <span className="text-destructive">*</span>}
             </Label>
-            {prefill && (
-              <p className="text-xs text-muted-foreground mb-1.5">
-                La date n'a pas pu être lue sur le ticket — sélectionnez-la manuellement.
-              </p>
+            {prefill?.missingDate && (
+              <p className="text-xs text-muted-foreground mb-1.5">La date n'a pas pu être lue — sélectionnez-la.</p>
             )}
             <Popover>
               <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !date && "text-muted-foreground",
-                    prefill && "border-primary ring-1 ring-primary/30"
-                  )}
-                >
+                <Button variant="outline" className={cn("w-full justify-start text-left font-normal", prefill?.missingDate && "border-primary ring-1 ring-primary/30")}>
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {date ? format(date, "PPP", { locale: fr }) : "Choisir une date"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={(d) => d && setDate(d)}
-                  disabled={(d) => d > new Date()}
-                  initialFocus
-                  className={cn("p-3 pointer-events-auto")}
-                />
+                <Calendar mode="single" selected={date} onSelect={(d) => d && setDate(d)} disabled={(d) => d > new Date()} initialFocus className="p-3 pointer-events-auto" />
               </PopoverContent>
             </Popover>
           </div>
 
-          {/* Location */}
+          {/* Commerçant */}
           <div>
             <Label className="text-sm font-medium mb-1.5 block">Lieu / Commerçant</Label>
-            <Input
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="Ex: Boulangerie du coin, Marché…"
-              className={inputClass}
-              maxLength={100}
-            />
+            <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Ex: Bexley, Carrefour…" maxLength={100} />
           </div>
 
-          {/* Catégorie */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <Label className="text-sm font-medium">Catégorie</Label>
-              {detecting && !categorieTouched && (
-                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Détection…
-                </span>
-              )}
-              {categorieAuto && !categorieTouched && categorie && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary">
-                  <Sparkles className="h-3 w-3" />
-                  Détectée auto
-                </span>
-              )}
+          {/* Catégorie globale (si article unique) */}
+          {!hasMultipleArticles && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm font-medium mb-1.5 block">Catégorie</Label>
+                <Select value={globalCategory} onValueChange={(v) => { setGlobalCategory(v); setGlobalSubcategory(""); }}>
+                  <SelectTrigger><SelectValue placeholder="Catégorie" /></SelectTrigger>
+                  <SelectContent>
+                    {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm font-medium mb-1.5 block">Sous-catégorie</Label>
+                <Select value={globalSubcategory} onValueChange={setGlobalSubcategory} disabled={!globalCategory}>
+                  <SelectTrigger><SelectValue placeholder="Sous-catégorie" /></SelectTrigger>
+                  <SelectContent>
+                    {getSubcategories(globalCategory).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <Select
-              value={categorie}
-              onValueChange={(v) => { setCategorie(v); setCategorieTouched(true); setCategorieAuto(false); }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Choisir une catégorie" />
-              </SelectTrigger>
-              <SelectContent>
-                {CATEGORIES.map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          )}
 
           {/* Articles */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <Label className="text-sm font-medium">Articles achetés</Label>
-              <button
-                type="button"
-                onClick={addArticle}
-                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
-              >
-                <Plus className="h-3 w-3" />
-                Ajouter
+              <Label className="text-sm font-medium">Articles</Label>
+              <button type="button" onClick={addArticle} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80">
+                <Plus className="h-3 w-3" /> Ajouter
               </button>
             </div>
 
@@ -355,40 +272,48 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded, prefill }: Cash
                       maxLength={80}
                     />
                     {articles.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeArticle(i)}
-                        className="h-9 w-9 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
-                      >
+                      <button type="button" onClick={() => removeArticle(i)} className="h-9 w-9 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     )}
                   </div>
+
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <span className="text-[10px] text-muted-foreground font-medium">Quantité</span>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={article.qty}
-                        onChange={(e) => updateArticle(i, "qty", Math.max(1, parseInt(e.target.value) || 1))}
-                        className="h-9 text-sm mt-0.5"
-                      />
+                      <Input type="number" min={1} value={article.qty} onChange={(e) => updateArticle(i, "qty", Math.max(1, parseInt(e.target.value) || 1))} className="h-9 text-sm mt-0.5" />
                     </div>
                     <div>
                       <span className="text-[10px] text-muted-foreground font-medium">Prix unitaire (€)</span>
-                      <Input
-                        type="number"
-                        min={0}
-                        step={0.01}
-                        value={article.unitPrice || ""}
-                        onChange={(e) => updateArticle(i, "unitPrice", Math.max(0, parseFloat(e.target.value) || 0))}
-                        placeholder="0.00"
-                        className="h-9 text-sm mt-0.5"
-                      />
+                      <Input type="number" min={0} step={0.01} value={article.unitPrice || ""} onChange={(e) => updateArticle(i, "unitPrice", Math.max(0, parseFloat(e.target.value) || 0))} placeholder="0.00" className="h-9 text-sm mt-0.5" />
                     </div>
                   </div>
-                  {article.name && article.unitPrice > 0 && (
+
+                  {/* Catégorie par article si plusieurs articles */}
+                  {hasMultipleArticles && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="text-[10px] text-muted-foreground font-medium">Catégorie</span>
+                        <Select value={article.category} onValueChange={(v) => updateArticle(i, "category", v)}>
+                          <SelectTrigger className="h-9 text-sm mt-0.5"><SelectValue placeholder="Catégorie" /></SelectTrigger>
+                          <SelectContent>
+                            {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-muted-foreground font-medium">Sous-catégorie</span>
+                        <Select value={article.subcategory} onValueChange={(v) => updateArticle(i, "subcategory", v)} disabled={!article.category}>
+                          <SelectTrigger className="h-9 text-sm mt-0.5"><SelectValue placeholder="Sous-cat." /></SelectTrigger>
+                          <SelectContent>
+                            {getSubcategories(article.category).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+
+                  {article.unitPrice > 0 && (
                     <p className="text-[10px] text-muted-foreground text-right">
                       Sous-total : <span className="font-semibold text-foreground">{(article.qty * article.unitPrice).toFixed(2)} €</span>
                     </p>
@@ -400,16 +325,12 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded, prefill }: Cash
 
           {/* Total */}
           <div className="bg-primary/5 rounded-xl px-4 py-3 flex items-center justify-between">
-            <span className="text-sm font-medium text-foreground">Total</span>
+            <span className="text-sm font-medium">Total</span>
             <span className="text-lg font-bold tabular-nums text-primary">{totalAmount.toFixed(2)} €</span>
           </div>
 
           {/* Submit */}
-          <Button
-            onClick={handleSubmit}
-            disabled={saving || !isValid}
-            className="w-full"
-          >
+          <Button onClick={handleSubmit} disabled={saving || !isValid} className="w-full">
             {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Check className="h-4 w-4 mr-2" />}
             Enregistrer la dépense
           </Button>
