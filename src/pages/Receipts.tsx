@@ -783,7 +783,7 @@ const Receipts = () => {
           const amount = p.montant_total || null;
           const articles = p.articles?.length > 0 ? p.articles : null;
           const categorie = p.categorie || null;
-          setCashPrefill({ merchant, amount, articles, categorie });
+          setCashPrefill({ merchant, amount, articles, categorie, missingDate: true });
           setShowCashDialog(true);
           toast.info("Date non détectée sur le ticket — complétez-la manuellement.");
           setUploading(false);
@@ -810,6 +810,19 @@ const Receipts = () => {
           setAnalysisProgress(0);
           setAnalysisStep("");
           return;
+        }
+
+        // FIX : ouvrir le dialog de vérification pour tous les uploads réussis
+        // L'utilisateur peut corriger les articles, catégories et sous-catégories
+        {
+          const p = parsed?.parsed || parsed || {};
+          const merchant = p.magasin || p.fournisseur || null;
+          const amount = p.montant_total || null;
+          const articles = p.articles?.length > 0 ? p.articles : null;
+          const categorie = p.categorie || null;
+          const dateStr = p.date_facture || null;
+          setCashPrefill({ merchant, amount, articles, categorie, date: dateStr, missingDate: false });
+          setShowCashDialog(true);
         }
 
       } catch (e: any) {
@@ -2104,3 +2117,4 @@ const Receipts = () => {
 };
 
 export default Receipts;
+
