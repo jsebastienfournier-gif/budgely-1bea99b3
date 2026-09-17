@@ -139,7 +139,7 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded, prefill }: Cash
         moyen_paiement: prefill ? "carte" : "espèces",
         type_depense: "achat",
         categorie: globalCategory || formattedArticles[0]?.category || "Autre",
-        sous_categorie: globalSubcategory || formattedArticles[0]?.subcategory || "",
+        subcategory: globalSubcategory || formattedArticles[0]?.subcategory || "",
         devise: "EUR",
         description: `${location.trim()} — ${format(date, "dd/MM/yyyy")}`,
       }).select().single();
@@ -341,3 +341,4 @@ const CashExpenseDialog = ({ open, onOpenChange, onExpenseAdded, prefill }: Cash
 };
 
 export default CashExpenseDialog;
+
