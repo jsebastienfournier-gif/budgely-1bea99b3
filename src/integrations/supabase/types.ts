@@ -325,6 +325,7 @@ export type Database = {
           recurrence: string | null
           source: Database["public"]["Enums"]["document_source"]
           source_id: string | null
+          subcategory: string | null
           type_depense: string | null
           type_document: string | null
           updated_at: string
@@ -352,6 +353,7 @@ export type Database = {
           recurrence?: string | null
           source: Database["public"]["Enums"]["document_source"]
           source_id?: string | null
+          subcategory?: string | null
           type_depense?: string | null
           type_document?: string | null
           updated_at?: string
@@ -379,6 +381,7 @@ export type Database = {
           recurrence?: string | null
           source?: Database["public"]["Enums"]["document_source"]
           source_id?: string | null
+          subcategory?: string | null
           type_depense?: string | null
           type_document?: string | null
           updated_at?: string
