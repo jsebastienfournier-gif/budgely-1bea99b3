@@ -141,7 +141,7 @@ const Receipts = () => {
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
   const [showCashDialog, setShowCashDialog] = useState(false);
   // FIX : données pré-remplies depuis un ticket rejeté (date manquante)
-  const [cashPrefill, setCashPrefill] = useState<{ merchant?: string; amount?: number; articles?: any[]; categorie?: string } | undefined>(undefined);
+  const [cashPrefill, setCashPrefill] = useState<{ merchant?: string; amount?: number; articles?: any[]; categorie?: string; date?: string; missingDate?: boolean } | undefined>(undefined);
   const [rawExpenses, setRawExpenses] = useState<any[]>([]);
   const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set());
   const [editingExpense, setEditingExpense] = useState<any | null>(null);
